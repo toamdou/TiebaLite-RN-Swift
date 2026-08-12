@@ -1,0 +1,440 @@
+// ============================================================
+// Topic Detail Page - 话题详情
+// 迁移自: TopicDetailPage.kt
+
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  RefreshControl,
+  ActivityIndicator,
+} from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withDelay, withTiming, interpolate } from 'react-native-reanimated';
+import { FlashList } from '@shopify/flash-list';
+import { useLocalSearchParams, Stack, Link } from 'expo-router';
+import { Image } from 'expo-image';
+import { SymbolView } from '@/components/ui/SymbolView';
+import { useThemeColors } from '@/theme/ThemeContext';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { SkeletonList } from '@/components/ui/Skeleton';
+import FeedCard from '@/components/FeedCard';
+import { topicDetail, mapProtoThread } from '@/services/api/endpoints';
+import { usePagedList } from '@/hooks/usePagedList';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { formatCount } from '@/utils';
+import { Spacing, Radius, DURATION, EASE_OUT } from '@/theme';
+import type { FeedItem, ThreadInfo } from '@/types';
+
+// ---------- 首屏级联入场（仅首次数据批次，Reduce Motion 跳过） ----------
+function FirstBatchStagger({
+  index,
+  enabled,
+  children,
+}: {
+  index: number;
+  enabled: boolean;
+  children: ReactNode;
+}) {
+  const { reduceMotion } = useReducedMotion();
+  const progress = useSharedValue(1);
+  useEffect(() => {
+    if (reduceMotion || !enabled) {
+      progress.value = 1;
+      return;
+    }
+    progress.value = 0;
+    progress.value = withDelay(
+      index * DURATION.stagger,
+      withTiming(1, { duration: DURATION.enter, easing: EASE_OUT }),
+    );
+    return () => {
+      progress.value = 1;
+    };
+  }, [index, enabled, reduceMotion, progress]);
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ translateY: interpolate(progress.value, [0, 1], [12, 0]) }],
+  }));
+  return <Animated.View style={animStyle}>{children}</Animated.View>;
+}
+
+export default function TopicDetailPage() {
+  const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
+  const { colors } = useThemeColors();
+  const { reduceMotion } = useReducedMotion();
+  const topicName = name || '话题';
+  const fetcher = useCallback(
+    async (pageNum: number, _params: undefined, signal?: AbortSignal) => {
+      const data = await topicDetail(id, topicName, pageNum, signal);
+      // Defensive parse for related forums; render them below when present.
+      const rawRelate =
+        data?.relate_forum ??
+        data?.relateForum ??
+        data?.related_forum ??
+        data?.topic_info?.relate_forum ??
+        data?.topic_info?.relateForum ??
+        [];
+      const relateForums = Array.isArray(rawRelate)
+        ? rawRelate
+        : rawRelate && typeof rawRelate === 'object'
+          ? Object.values(rawRelate)
+          : [];
+      const rawThreads = data?.relate_thread?.thread_list ?? data?.thread_list ?? [];
+      const threadList: ThreadInfo[] = rawThreads.map((item: any) =>
+        mapProtoThread(item.thread_info ?? item),
+      );
+      return {
+        items: threadList,
+        hasMore: threadList.length >= 10,
+        nextPage: pageNum + 1,
+        extra: {
+          topicInfo: data?.topic_info ?? data?.topicInfo ?? null,
+          relateForums,
+        },
+      };
+    },
+    [id, topicName],
+  );
+  const paged = usePagedList<ThreadInfo, undefined, { topicInfo: any; relateForums: any[] }>({
+    fetcher,
+    initialPage: 1,
+  });
+  const {
+    items: threads,
+    loading: isLoading,
+    refreshing: isRefreshing,
+    error,
+    load,
+    refresh: handleRefresh,
+    loadMore: handleLoadMore,
+    hasMore,
+    loadingMore,
+    extra,
+  } = paged;
+  const topicInfo = extra?.topicInfo ?? null;
+  const relateForums = useMemo<any[]>(() => extra?.relateForums ?? [], [extra?.relateForums]);
+
+  // Hero entrance animation (fade + slide up when topic info loads) — Reanimated 4
+  const heroAnim = useSharedValue(0);
+  useEffect(() => {
+    if (topicInfo) {
+      if (reduceMotion) {
+        heroAnim.value = 1;
+      } else {
+        heroAnim.value = withSpring(1, {
+          damping: 16,
+          stiffness: 150,
+          mass: 1,
+        });
+      }
+    }
+  }, [topicInfo, heroAnim, reduceMotion]);
+  const heroStyle = useAnimatedStyle(() => ({
+    opacity: heroAnim.value,
+    transform: [{ translateY: interpolate(heroAnim.value, [0, 1], [14, 0]) }],
+  }));
+
+  useEffect(() => {
+    load(1);
+  }, [load]);
+
+  // 首次数据批次标记：仅首屏加载项做 stagger 渐入，分页加载不再重复动画。
+  const firstBatchRef = useRef(true);
+  useEffect(() => {
+    if (threads.length > 0 && firstBatchRef.current) {
+      firstBatchRef.current = false;
+    }
+  }, [threads.length]);
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: ThreadInfo; index: number }) => {
+      const feedItem: FeedItem = {
+        type: 'thread',
+        threadInfo: item,
+      };
+      return (
+        <FirstBatchStagger index={index} enabled={firstBatchRef.current}>
+          <FeedCard item={feedItem} />
+        </FirstBatchStagger>
+      );
+    },
+    [],
+  );
+
+  const threadKeyExtractor = useCallback((item: ThreadInfo) => item.id, []);
+  const listHeader = useCallback(
+    () =>
+      topicInfo ? (
+        <Animated.View style={[styles.topicHeader, heroStyle]}>
+          <View style={styles.topicHeroRow}>
+            <View
+              style={[
+                styles.topicIconBadge,
+                { backgroundColor: colors.isNight ? 'rgba(255,159,10,0.16)' : 'rgba(255,149,0,0.12)' },
+              ]}
+            >
+              <SymbolView name="number" size={18} tintColor={colors.warning} />
+            </View>
+            <View style={styles.topicTitleCol}>
+              <Text style={[styles.topicTitle, { color: colors.text }]} numberOfLines={2}>
+                #{topicName}#
+              </Text>
+              {topicInfo.discuss_num ? (
+                <View style={styles.topicStatRow}>
+                  <SymbolView name="flame" size={13} tintColor={colors.error} />
+                  <Text style={[styles.topicMeta, { color: colors.textSecondary }]}>
+                    {formatCount(topicInfo.discuss_num)} 讨论
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+          {topicInfo.topic_desc ? (
+            <Text style={[styles.topicDesc, { color: colors.textSecondary }]}>
+              {topicInfo.topic_desc}
+            </Text>
+          ) : null}
+          {relateForums.length > 0 && (
+            <View style={styles.relateSection}>
+              <Text style={[styles.relateTitle, { color: colors.textSecondary }]}>
+                相关吧
+              </Text>
+              <View style={styles.relateWrap}>
+                {relateForums.map((forum, idx) => {
+                  const forumName = String(forum.forum_name ?? forum.forumName ?? forum.name ?? '');
+                  const avatar = forum.avatar ?? forum.pic ?? '';
+                  const chip = (
+                    <Pressable
+                      style={[
+                        styles.relateChip,
+                        { backgroundColor: colors.surfaceSecondary },
+                      ]}
+                    >
+                      {avatar ? (
+                        <Image
+                          source={{ uri: avatar }}
+                          style={styles.relateAvatar}
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
+                          recyclingKey={avatar}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.relateAvatar,
+                            { backgroundColor: colors.chip },
+                          ]}
+                        >
+                          <SymbolView
+                            name="person.2.fill"
+                            size={14}
+                            tintColor={colors.textDisabled}
+                          />
+                        </View>
+                      )}
+                      <Text
+                        style={[styles.relateName, { color: colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {forumName || '相关吧'}
+                      </Text>
+                    </Pressable>
+                  );
+                  return forumName ? (
+                    <Link
+                      key={String(forum.forum_id ?? forum.forumId ?? idx)}
+                      href={{
+                        pathname: '/forum/[name]',
+                        params: { name: forumName },
+                      }}
+                      asChild
+                    >
+                      {chip}
+                    </Link>
+                  ) : (
+                    <View
+                      key={String(forum.forum_id ?? forum.forumId ?? idx)}
+                    >
+                      {chip}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </Animated.View>
+      ) : (
+        <View style={styles.simpleHeader}>
+          <Text style={[styles.simpleHeaderText, { color: colors.text }]}>
+            #{topicName}#
+          </Text>
+        </View>
+      ),
+    [topicInfo, topicName, heroStyle, colors, relateForums],
+  );
+  const listEmpty = useCallback(
+    () => (
+      <EmptyState
+        icon="text.bubble"
+        title="暂无讨论"
+        description="这个话题下还没有内容"
+      />
+    ),
+    [],
+  );
+  const listFooter = useCallback(
+    () =>
+      loadingMore ? (
+        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      ) : !hasMore && threads.length > 0 ? (
+        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+          <Text style={{ fontSize: 13, color: colors.textTertiary }}>— 没有更多了 —</Text>
+        </View>
+      ) : null,
+    [loadingMore, hasMore, threads.length, colors.primary, colors.textTertiary],
+  );
+
+  if (isLoading) {
+    return (
+      <View style={StyleSheet.flatten([styles.container, { backgroundColor: colors.background }])}>
+        <Stack.Screen options={{ title: topicName, headerTransparent: false }} />
+        <View style={styles.skeletonWrap}>
+          <SkeletonList variant="thread" count={8} />
+        </View>
+      </View>
+    );
+  }
+
+  if (error && threads.length === 0) {
+    return (
+      <View style={StyleSheet.flatten([styles.container, { backgroundColor: colors.background }])}>
+        <Stack.Screen options={{ title: topicName, headerTransparent: false }} />
+        <ErrorState title="加载失败" message={error} onRetry={() => load(1)} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={StyleSheet.flatten([styles.container, { backgroundColor: colors.background }])}>
+      <Stack.Screen options={{ title: topicName, headerTransparent: false }} />
+      <FlashList
+        data={threads}
+        keyExtractor={threadKeyExtractor}
+        renderItem={renderItem}
+        estimatedItemSize={300}
+        decelerationRate="normal"
+        drawDistance={300}
+        maxItemsInRecyclePool={24}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+          />
+        }
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.3}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={listEmpty}
+        ListFooterComponent={listFooter}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  skeletonWrap: { paddingHorizontal: 16, paddingTop: 12 },
+  listContent: { paddingBottom: Spacing.hero },
+  topicHeader: {
+    padding: Spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(128,128,128,0.2)',
+  },
+  topicHeroRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: Spacing.sm,
+  },
+  topicIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.input,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topicTitleCol: {
+    flex: 1,
+  },
+  topicTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 0,
+  },
+  topicStatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 5,
+  },
+  topicMeta: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontVariant: ['tabular-nums'],
+  },
+  topicDesc: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: Spacing.sm,
+  },
+  relateSection: {
+    marginTop: Spacing.md,
+  },
+  relateTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  relateWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  relateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Radius.input,
+    maxWidth: 180,
+  },
+  relateAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  relateName: {
+    fontSize: 13,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  simpleHeader: {
+    padding: Spacing.lg,
+    alignItems: 'center',
+  },
+  simpleHeaderText: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+});

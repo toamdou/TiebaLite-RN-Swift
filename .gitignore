@@ -1,0 +1,43 @@
+# dependencies
+node_modules/
+
+# expo generated
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# generated native folders
+/ios
+/android
+.kotlin/
+
+# local secrets and signing
+.env*.local
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# tooling and IDE
+.vscode/
+.idea/
+.claude/
+.qoder/
+*.local
+.DS_Store
+
+# swift / xcode
+native-swift-prototype/.build/
+native-swift-prototype/DerivedData/
+native-swift-prototype/*.xcodeproj/
+native-swift-prototype/*.xcworkspace/
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.tsbuildinfo
+.metro-health-check*

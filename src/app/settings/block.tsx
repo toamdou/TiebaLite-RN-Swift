@@ -1,0 +1,409 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text as RNText, View } from 'react-native';
+import { Form, Section, Button, Text, TextField, Toggle, Picker, ConfirmationDialog, RNHostView } from '@expo/ui/swift-ui';
+import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
+import { hapticNotify, hapticSelection, NotificationFeedbackType } from '@/utils/haptics';
+import { BlockManager } from '@/utils/BlockManager';
+import type { BlockedWord, BlockedUser } from '@/types';
+import { ThemedHost } from '@/components/ui/ThemedHost';
+import { Avatar } from '@/components/ui/Avatar';
+import { SkeletonList } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Button as UIButton } from '@/components/ui/Button';
+import { SymbolView } from '@/components/ui/SymbolView';
+import { useThemeColors } from '@/theme/ThemeContext';
+import { Spacing, typographyStyles } from '@/theme';
+import { getBlacklist, delBlacklist, getDislikeForums } from '@/services/api/endpoints';
+import type { SocialUser, DislikeForumItem } from '@/services/api/endpoints/social';
+import { formatCount } from '@/utils';
+
+// NOTE: 此页面使用本地 BlockManager（统一 SQLite kv 表）进行内容过滤。
+// 下方的「云端黑名单」/「屏蔽吧」来自贴吧服务端（social API），
+// 是另一套独立数据，与本地屏蔽互不干扰。
+
+function blacklistTypeLabel(btype?: string): string {
+  if (!btype) return '';
+  const map: Record<string, string> = {
+    FOLLOW: '禁关注',
+    INTERACT: '禁互动',
+    CHAT: '禁聊天',
+  };
+  return btype
+    .split(',')
+    .filter(Boolean)
+    .map((t) => map[t] ?? t)
+    .join('/');
+}
+
+export default function BlockPage() {
+  const { colors } = useThemeColors();
+  const [activeTab, setActiveTab] = useState('keyword');
+  const [keywords, setKeywords] = useState<BlockedWord[]>([]);
+  const [users, setUsers] = useState<BlockedUser[]>([]);
+  const [addText, setAddText] = useState('');
+  const [isRegex, setIsRegex] = useState(false);
+  const [isWhitelist, setIsWhitelist] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  // ── 云端黑名单（社交黑名单 API）──
+  const [blacklist, setBlacklist] = useState<SocialUser[]>([]);
+  const [blacklistLoading, setBlacklistLoading] = useState(true);
+  const [blacklistError, setBlacklistError] = useState('');
+  const [removingUid, setRemovingUid] = useState<string | null>(null);
+
+  // ── 屏蔽吧列表（云端）──
+  const [dislikeForums, setDislikeForums] = useState<DislikeForumItem[]>([]);
+  const [dislikeLoading, setDislikeLoading] = useState(true);
+  const [dislikeError, setDislikeError] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const words = await BlockManager.getBlockedWords();
+        setKeywords(words);
+        const blockedUsers = await BlockManager.getBlockedUsers();
+        setUsers(blockedUsers);
+      } catch {}
+    })();
+  }, []);
+
+  const loadBlacklist = useCallback(async () => {
+    setBlacklistLoading(true);
+    setBlacklistError('');
+    try {
+      setBlacklist(await getBlacklist());
+    } catch (e: any) {
+      setBlacklistError(e?.message || '网络错误，请稍后重试');
+    } finally {
+      setBlacklistLoading(false);
+    }
+  }, []);
+
+  const loadDislikeForums = useCallback(async () => {
+    setDislikeLoading(true);
+    setDislikeError('');
+    try {
+      const res = await getDislikeForums(1, 50);
+      setDislikeForums(res.items);
+    } catch (e: any) {
+      setDislikeError(e?.message || '网络错误，请稍后重试');
+    } finally {
+      setDislikeLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBlacklist();
+    loadDislikeForums();
+  }, [loadBlacklist, loadDislikeForums]);
+
+  const handleAdd = useCallback(async () => {
+    if (!addText.trim()) return;
+    if (activeTab === 'keyword') {
+      if (isRegex) {
+        try {
+          new RegExp(addText.trim());
+        } catch (e: any) {
+          Alert.alert('正则表达式无效', e?.message || '请输入有效的正则表达式');
+          return;
+        }
+      }
+      const newWord: BlockedWord = {
+        id: Date.now().toString(),
+        keyword: addText.trim(),
+        isRegex,
+        category: isWhitelist ? 'whitelist' : 'blacklist',
+      };
+      await BlockManager.addBlockedWord(newWord);
+      setKeywords((prev) => [...prev, newWord]);
+    } else {
+      const newUser: BlockedUser = {
+        id: Date.now().toString(),
+        uid: addText.trim(),
+      };
+      await BlockManager.addBlockedUser(newUser);
+      setUsers((prev) => [...prev, newUser]);
+    }
+    setAddText('');
+    setIsRegex(false);
+    setIsWhitelist(false);
+    hapticNotify(NotificationFeedbackType.Success);
+  }, [addText, activeTab, isRegex, isWhitelist]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return;
+    if (activeTab === 'keyword') {
+      await BlockManager.removeBlockedWord(deleteTarget);
+      setKeywords((prev) => prev.filter((k) => k.id !== deleteTarget));
+    } else {
+      await BlockManager.removeBlockedUser(deleteTarget);
+      setUsers((prev) => prev.filter((u) => u.uid !== deleteTarget));
+    }
+    hapticNotify(NotificationFeedbackType.Success);
+    setDeleteTarget(null);
+  }, [deleteTarget, activeTab]);
+
+  const handleRemoveBlacklist = useCallback(
+    (user: SocialUser) => {
+      const displayName = user.nickName || user.userName || user.uid;
+      Alert.alert(
+        '解除云端黑名单',
+        `确定要解除对「${displayName}」的黑名单吗？`,
+        [
+          { text: '取消', style: 'cancel' },
+          {
+            text: '解除',
+            style: 'destructive',
+            onPress: async () => {
+              setRemovingUid(user.uid);
+              try {
+                await delBlacklist(user.uid);
+                setBlacklist((prev) => prev.filter((u) => u.uid !== user.uid));
+                hapticNotify(NotificationFeedbackType.Success);
+              } catch (e: any) {
+                hapticNotify(NotificationFeedbackType.Error);
+                Alert.alert('解除失败', e?.message || '网络错误，请稍后重试');
+              } finally {
+                setRemovingUid(null);
+              }
+            },
+          },
+        ],
+      );
+    },
+    [],
+  );
+
+  const renderBlacklist = () => {
+    if (blacklistLoading) {
+      return <SkeletonList variant="row" count={5} />;
+    }
+    if (blacklistError) {
+      return (
+        <View style={styles.errorBlock}>
+          <RNText style={[typographyStyles.subhead, { color: colors.textSecondary }]}>
+            云端黑名单加载失败
+          </RNText>
+          <UIButton title="重试" variant="tinted" size="small" onPress={loadBlacklist} />
+        </View>
+      );
+    }
+    if (blacklist.length === 0) {
+      return (
+        <EmptyState
+          title="暂无云端黑名单"
+          description="你还没有在贴吧服务端拉黑过用户"
+          icon="person.crop.circle.badge.xmark"
+        />
+      );
+    }
+    return (
+      <View style={styles.list}>
+        {blacklist.map((user) => {
+          const name = user.nickName || user.userName || user.uid;
+          const typeLabel = blacklistTypeLabel(user.btype);
+          return (
+            <View key={user.uid} style={styles.row}>
+              <Avatar source={user.portrait} initials={name.charAt(0)} size={40} />
+              <View style={styles.rowBody}>
+                <RNText numberOfLines={1} style={[typographyStyles.subheadBold, { color: colors.text }]}>
+                  {name}
+                </RNText>
+                <RNText numberOfLines={1} style={[typographyStyles.footnote, { color: colors.textSecondary }]}>
+                  {user.userName && user.nickName ? `@${user.userName}` : `UID ${user.uid}`}
+                  {typeLabel ? ` · ${typeLabel}` : ''}
+                </RNText>
+              </View>
+              <Pressable
+                onPress={() => handleRemoveBlacklist(user)}
+                disabled={removingUid === user.uid}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`解除 ${name} 的黑名单`}
+                style={styles.removeBtn}
+              >
+                {removingUid === user.uid ? (
+                  <RNText style={[typographyStyles.footnote, { color: colors.textTertiary }]}>解除中…</RNText>
+                ) : (
+                  <SymbolView name="minus.circle.fill" size={22} weight="medium" tintColor={colors.danger} />
+                )}
+              </Pressable>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const renderDislikeForums = () => {
+    if (dislikeLoading) {
+      return <SkeletonList variant="row" count={5} />;
+    }
+    if (dislikeError) {
+      return (
+        <View style={styles.errorBlock}>
+          <RNText style={[typographyStyles.subhead, { color: colors.textSecondary }]}>
+            屏蔽吧列表加载失败
+          </RNText>
+          <UIButton title="重试" variant="tinted" size="small" onPress={loadDislikeForums} />
+        </View>
+      );
+    }
+    if (dislikeForums.length === 0) {
+      return (
+        <EmptyState
+          title="暂无屏蔽吧"
+          description="未发现被屏蔽的贴吧"
+          icon="hand.raised.fill"
+        />
+      );
+    }
+    return (
+      <View style={styles.list}>
+        {dislikeForums.map((f) => (
+          <View key={f.fid} style={styles.row}>
+            <Avatar source={undefined} initials={f.fname?.charAt(0) || '吧'} size={40} />
+            <View style={styles.rowBody}>
+              <RNText numberOfLines={1} style={[typographyStyles.subheadBold, { color: colors.text }]}>
+                {f.fname}
+              </RNText>
+              <RNText numberOfLines={1} style={[typographyStyles.footnote, { color: colors.textSecondary }]}>
+                {formatCount(f.memberNum)} 成员 · {formatCount(f.postNum)} 帖子
+              </RNText>
+            </View>
+            <RNText style={[typographyStyles.caption1, { color: colors.textTertiary }]}>客户端解除</RNText>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  return (
+    <ThemedHost style={{ flex: 1 }}>
+      <Form>
+        <Section>
+          <Picker
+            selection={activeTab}
+            onSelectionChange={(v: string) => { hapticSelection(); setActiveTab(v); setAddText(''); setIsRegex(false); setIsWhitelist(false); }}
+            modifiers={[pickerStyle('segmented')]}
+          >
+            <Text modifiers={[tag('keyword')]}>屏蔽词</Text>
+            <Text modifiers={[tag('user')]}>屏蔽用户</Text>
+          </Picker>
+        </Section>
+
+        <Section title={activeTab === 'keyword' ? '添加屏蔽词' : '添加屏蔽用户'}>
+          <TextField
+            placeholder={activeTab === 'keyword' ? '输入屏蔽关键词' : '输入用户ID'}
+            onTextChange={setAddText}
+          />
+          {activeTab === 'keyword' && (
+            <>
+              <Toggle
+                label="使用正则表达式"
+                isOn={isRegex}
+                onIsOnChange={(v) => { hapticSelection(); setIsRegex(v); }}
+              />
+              <Toggle
+                label="设为白名单"
+                isOn={isWhitelist}
+                onIsOnChange={(v) => { hapticSelection(); setIsWhitelist(v); }}
+              />
+            </>
+          )}
+          <Button
+            label="添加"
+            systemImage="plus.circle.fill"
+            onPress={handleAdd}
+          />
+        </Section>
+
+        <Section title={activeTab === 'keyword' ? `屏蔽词列表 (${keywords.length})` : `屏蔽用户 (${users.length})`}>
+          {(keywords.length > 0 || users.length > 0) && (
+            <ConfirmationDialog
+              title="移除屏蔽项"
+              isPresented={!!deleteTarget}
+              onIsPresentedChange={(v) => { if (!v) setDeleteTarget(null); }}
+              titleVisibility="visible"
+            >
+              <ConfirmationDialog.Trigger>
+                {activeTab === 'keyword'
+                  ? keywords.map((word) => (
+                      <Button
+                        key={word.id}
+                        role="destructive"
+                        onPress={() => setDeleteTarget(word.id)}
+                      >
+                        <Text>{word.keyword}</Text>
+                        <Text>{word.isRegex ? '正则' : ''}{word.category === 'whitelist' ? '白名单' : ''}</Text>
+                      </Button>
+                    ))
+                  : users.map((user) => (
+                      <Button
+                        key={user.uid}
+                        role="destructive"
+                        onPress={() => setDeleteTarget(user.uid)}
+                      >
+                        <Text>{user.username || user.uid}</Text>
+                      </Button>
+                    ))}
+              </ConfirmationDialog.Trigger>
+              <ConfirmationDialog.Actions>
+                <Button label="删除" role="destructive" onPress={handleDeleteConfirm} />
+                <Button label="取消" role="cancel" />
+              </ConfirmationDialog.Actions>
+              <ConfirmationDialog.Message>
+                <Text>确定要移除此屏蔽项吗？</Text>
+              </ConfirmationDialog.Message>
+            </ConfirmationDialog>
+          )}
+          {keywords.length === 0 && users.length === 0 && (
+            <Text>暂无屏蔽项</Text>
+          )}
+        </Section>
+
+        <Section
+          title="云端黑名单"
+          footer="由贴吧服务端维护的社交黑名单，与上方的本地屏蔽相互独立。"
+        >
+          <RNHostView matchContents>
+            {renderBlacklist()}
+          </RNHostView>
+        </Section>
+
+        <Section
+          title="屏蔽吧（云端）"
+          footer="由贴吧服务端记录，解除请在贴吧客户端中操作。"
+        >
+          <RNHostView matchContents>
+            {renderDislikeForums()}
+          </RNHostView>
+        </Section>
+      </Form>
+    </ThemedHost>
+  );
+}
+
+const styles = StyleSheet.create({
+  list: {
+    gap: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  rowBody: {
+    flex: 1,
+  },
+  removeBtn: {
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: Spacing.xs,
+  },
+  errorBlock: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.lg,
+  },
+});

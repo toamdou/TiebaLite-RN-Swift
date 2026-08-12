@@ -1,0 +1,417 @@
+/**
+ * In-Forum Search Page (吧内搜索)
+ * Migrated from com.huanchengfly.tieba.post.ui.page.forum.ForumSearchPostPage
+ *
+ * Search posts within a specific forum with sort/filter options,
+ * search history, and paginated results.
+ */
+
+import { useCallback, useEffect, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  Text,
+  Alert,
+  ScrollView,
+  TextInput,
+} from 'react-native';
+import { Picker, Text as SWText } from '@expo/ui/swift-ui';
+import {
+  accessibilityLabel,
+  frame,
+  pickerStyle,
+  tag,
+} from '@expo/ui/swift-ui/modifiers';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '@/utils/haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SymbolView } from '@/components/ui/SymbolView';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { SearchPostList } from '@/components/search/SearchResultList';
+import { useThemeColors } from '@/theme/ThemeContext';
+import { Radius } from '@/theme';
+import { SkeletonList } from '../../../components/ui/Skeleton';
+import { searchPost } from '@/services/api/endpoints';
+import { usePagedList } from '@/hooks/usePagedList';
+import {
+  loadSearchHistory,
+  appendSearchHistory,
+  removeSearchHistory,
+  clearSearchHistory,
+  type SearchHistoryItem,
+} from '@/storage/searchHistory';
+import type { SearchPostResult } from '@/types';
+
+// ---------- Constants ----------
+const SORT_OPTIONS = [
+  { label: '按时间', value: '0' },
+  { label: '按相关性', value: '1' },
+];
+const FILTER_OPTIONS = [
+  { label: '全部', value: '0' },
+  { label: '仅主题贴', value: '1' },
+];
+const MAX_HISTORY_ITEMS = 10;
+
+// ---------- Main Page ----------
+export default function ForumSearchPage() {
+  const { name, forumId } = useLocalSearchParams<{ name: string; forumId: string }>();
+  const insets = useSafeAreaInsets();
+  const { colors } = useThemeColors();
+  const router = useRouter();
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortType, setSortType] = useState('0'); // 0=time, 1=relevance
+  const [filterType, setFilterType] = useState('0'); // 0=all, 1=only threads
+  const [searchedKeyword, setSearchedKeyword] = useState('');
+  const [searched, setSearched] = useState(false);
+  const paged = usePagedList<SearchPostResult, { kw: string }>({
+    fetcher: async (p, params, signal) => {
+      const data = await searchPost(
+        forumId,
+        params.kw,
+        name ?? '',
+        p,
+        parseInt(sortType, 10),
+        parseInt(filterType, 10),
+        signal,
+      );
+      return { items: data.items, hasMore: data.hasMore, nextPage: p + 1 };
+    },
+    params: { kw: searchedKeyword },
+    initialPage: 1,
+  });
+  const {
+    items: results,
+    hasMore,
+    loading,
+    refreshing,
+    loadingMore,
+    error,
+    load,
+    refresh,
+    loadMore,
+  } = paged;
+
+  // Search history
+  const [history, setHistory] = useState<SearchHistoryItem[]>([]);
+
+  // Load search history for this forum
+  useEffect(() => {
+    if (forumId) {
+      let mounted = true;
+      loadSearchHistory(forumId, MAX_HISTORY_ITEMS)
+        .then((items) => {
+          if (mounted) setHistory(items);
+        })
+        .catch(() => {});
+      return () => {
+        mounted = false;
+      };
+    }
+  }, [forumId]);
+
+  // Save keyword to history
+  const saveToHistory = useCallback(
+    async (kw: string) => {
+      if (!forumId || !kw.trim()) return;
+      const trimmed = kw.trim();
+      try {
+        setHistory(await appendSearchHistory(trimmed, forumId, MAX_HISTORY_ITEMS));
+      } catch {}
+    },
+    [forumId],
+  );
+
+  // Clear history
+  const clearHistory = useCallback(async () => {
+    hapticImpact(ImpactFeedbackStyle.Medium);
+    setHistory([]);
+    try {
+      await clearSearchHistory(forumId);
+    } catch {}
+  }, [forumId]);
+
+  // Delete a single history item
+  const removeHistoryItem = useCallback(
+    async (kw: string) => {
+      if (!forumId) return;
+      try {
+        setHistory(await removeSearchHistory(kw, forumId));
+      } catch {}
+    },
+    [forumId],
+  );
+
+  const handleHistoryLongPress = useCallback(
+    (kw: string) => {
+      Alert.alert('删除搜索历史', `确定删除“${kw}”？`, [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '删除',
+          style: 'destructive',
+          onPress: () => removeHistoryItem(kw),
+        },
+      ]);
+    },
+    [removeHistoryItem],
+  );
+
+  // Perform search
+  const doSearch = useCallback(
+    (kw: string, p: number = 1, isRefresh = false) => {
+      if (!kw.trim() || !forumId) return;
+      const trimmed = kw.trim();
+      setSearchedKeyword(trimmed);
+      setSearched(true);
+      saveToHistory(trimmed);
+      if (isRefresh || p === 1) {
+        load(1, { kw: trimmed });
+      } else {
+        loadMore();
+      }
+    },
+    [forumId, saveToHistory, load, loadMore],
+  );
+
+  // Re-search when sort/filter changes (if already searched)
+  useEffect(() => {
+    if (searched && searchQuery.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- re-run search after sort/filter change; load transitions are managed by usePagedList.
+      doSearch(searchQuery, 1, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only sort/filter changes should re-run the search; the latest query is captured by that render's closure.
+  }, [sortType, filterType]);
+
+  const handleRefresh = useCallback(async () => {
+    await refresh();
+  }, [refresh]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (!hasMore || loadingMore || loading) return;
+    await loadMore();
+  }, [hasMore, loadingMore, loading, loadMore]);
+
+  const handleSubmitSearch = useCallback(() => {
+    if (searchQuery.trim()) {
+      hapticImpact(ImpactFeedbackStyle.Light);
+      doSearch(searchQuery, 1, true);
+    }
+  }, [searchQuery, doSearch]);
+
+  const handleHistoryTap = useCallback((kw: string) => {
+    hapticSelection();
+    setSearchQuery(kw);
+    doSearch(kw, 1, true);
+  }, [doSearch]);
+
+  const handleOpenPost = useCallback(
+    (item: SearchPostResult) => {
+      // TODO(#30): SearchPostResult has no postInfo/postId/postFloor fields yet.
+      // When the search API exposes them, navigate to /thread/[tid]/subposts with
+      // threadId/postId/forumId/floor params instead of opening the thread page.
+      router.push({ pathname: '/thread/[id]', params: { id: item.id } });
+    },
+    [router],
+  );
+
+  // Show loading indicator
+  const showLoading = loading && results.length === 0;
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Search Bar */}
+      <View style={styles.searchBar}>
+        <View style={[styles.searchInputRow, { backgroundColor: colors.surfaceSecondary }]}>
+          <SymbolView name="magnifyingglass" size={16} tintColor={colors.textTertiary} style={{ marginRight: 8 }} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSubmitSearch}
+            placeholder="搜索吧内帖子..."
+            placeholderTextColor={colors.textTertiary}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            accessibilityLabel="搜索关键词"
+          />
+        </View>
+      </View>
+      {/* Sort & Filter native menus */}
+      <View style={styles.controlsRow}>
+        <Picker<string>
+          selection={sortType}
+          label={SORT_OPTIONS.find((opt) => opt.value === sortType)?.label ?? '排序'}
+          onSelectionChange={(value) => {
+            hapticSelection();
+            setSortType(String(value));
+          }}
+          modifiers={[
+            pickerStyle('menu'),
+            frame({ minWidth: 104 }),
+            accessibilityLabel('帖子排序'),
+          ]}
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <SWText key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</SWText>
+          ))}
+        </Picker>
+        <Picker<string>
+          selection={filterType}
+          label={FILTER_OPTIONS.find((opt) => opt.value === filterType)?.label ?? '筛选'}
+          onSelectionChange={(value) => {
+            hapticSelection();
+            setFilterType(String(value));
+          }}
+          modifiers={[
+            pickerStyle('menu'),
+            frame({ minWidth: 104 }),
+            accessibilityLabel('帖子筛选'),
+          ]}
+        >
+          {FILTER_OPTIONS.map((opt) => (
+            <SWText key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</SWText>
+          ))}
+        </Picker>
+      </View>
+      {/* Search History (only when no results and not searched) */}
+      {!searched && history.length > 0 && (
+        <View style={styles.historySection}>
+          <View style={styles.historyHeader}>
+            <Text style={[styles.historyTitle, { color: colors.textSecondary }]}>
+              搜索历史
+            </Text>
+            <Pressable onPress={clearHistory} hitSlop={8}>
+              <SymbolView
+                name={'trash' as any}
+                size={16}
+                weight="regular"
+                tintColor={colors.textTertiary}
+              />
+            </Pressable>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.historyChips}
+          >
+            {history.map((item, idx) => (
+              <Pressable
+                key={`${item.keyword}-${item.timestamp}-${idx}`}
+                style={[styles.historyChip, { backgroundColor: colors.surfaceSecondary }]}
+                onPress={() => handleHistoryTap(item.keyword)}
+                onLongPress={() => handleHistoryLongPress(item.keyword)}
+                accessibilityLabel={`删除搜索历史：${item.keyword}`}
+                accessibilityHint="长按删除该条搜索历史"
+              >
+                <Text style={[styles.historyChipText, { color: colors.textSecondary }]}>
+                  {item.keyword}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+      {/* Loading */}
+      {showLoading && (
+        <SkeletonList count={6} variant="thread" />
+      )}
+      {/* Error */}
+      {error && results.length === 0 && !showLoading && (
+        <ErrorState message={error} onRetry={() => doSearch(searchQuery, 1, true)} />
+      )}
+      {/* Empty */}
+      {!showLoading && !error && searched && results.length === 0 && (
+        <EmptyState
+          title="未找到相关内容"
+          description="换个关键词试试吧"
+          icon={'doc.text.magnifyingglass' as any}
+        />
+      )}
+      {/* Results */}
+      {!showLoading && results.length > 0 && (
+        <SearchPostList
+          items={results}
+          colors={colors}
+          onPressItem={handleOpenPost}
+          onEndReached={handleLoadMore}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 16 }]}
+        />
+      )}
+    </View>
+  );
+}
+
+// ---------- Styles ----------
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  searchInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: Radius.input,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  // History
+  historySection: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  historyTitle: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  historyChips: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  historyChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: Radius.chip,
+  },
+  historyChipText: {
+    fontSize: 13,
+  },
+  // Results
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+  },
+});
