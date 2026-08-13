@@ -31,7 +31,7 @@ import BottomSheetComponent, { BottomSheetScrollView } from '@expo/ui/community/
 import type { BottomSheet } from '@expo/ui/community/bottom-sheet';
 import { SymbolView } from '@/components/ui/SymbolView';
 import * as Clipboard from 'expo-clipboard';
-import { hapticImpact, hapticNotify, hapticSelection, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { Avatar } from '@/components/ui/Avatar';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -395,6 +395,7 @@ export default function ForumPage() {
       await doLoad(1);
     }
     setRefreshing(false);
+    hapticForScene('toggle');
   }, [isCustomTab, customTabs, currentTab, customPagedLoad, currentForum?.forumId, name, doLoad]);
 
   const handleLoadMore = useCallback(async () => {
@@ -412,7 +413,7 @@ export default function ForumPage() {
   // ── Follow / Unfollow (with tbs — now fixed in forumStore) ──
   const handleToggleFollow = useCallback(async () => {
     if (!currentForum) return;
-    hapticImpact(ImpactFeedbackStyle.Medium);
+    hapticForScene('favorite');
     try {
       if (currentForum.isLike) await unfollowForum(currentForum.forumId, name);
       else await followForum(currentForum.forumId, name);
@@ -429,7 +430,7 @@ export default function ForumPage() {
       Alert.alert('提示', '今天已经签到过了');
       return;
     }
-    hapticImpact(ImpactFeedbackStyle.Medium);
+    hapticForScene('action-success');
     try {
       const tbs = currentForum.tbs || '';
       const result = await signAPI(name, tbs, currentForum.forumId);
@@ -466,7 +467,7 @@ export default function ForumPage() {
 
   // ── Tab switch via SwiftUI Picker ──
   const handleSegmentChange = useCallback((value: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     const tab = parseInt(value, 10);
     if (!isNaN(tab)) setCurrentTab(tab);
   }, [setCurrentTab]);
@@ -480,13 +481,13 @@ export default function ForumPage() {
 
   const handleCopyForumLink = useCallback(async () => {
     await Clipboard.setStringAsync(`https://tieba.baidu.com/f?kw=${encodeURIComponent(name)}`);
-    hapticNotify(NotificationFeedbackType.Success);
+    hapticForScene('action-success');
     Alert.alert('已复制', '吧链接已复制到剪贴板');
   }, [name]);
 
   const handleUnfollowConfirm = useCallback(async () => {
     if (!currentForum) return;
-    hapticImpact(ImpactFeedbackStyle.Medium);
+    hapticForScene('favorite');
     try {
       await unfollowForum(currentForum.forumId, name);
     } catch (e: any) {
@@ -530,7 +531,7 @@ export default function ForumPage() {
   }, [fabScale]);
 
   const handleFabPress = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     animateFab();
     // 'post' (发帖) was removed together with the /compose feature — the FAB
     // now falls back to refresh for that preference.
@@ -556,7 +557,7 @@ export default function ForumPage() {
   const handleAvatarPreview = useCallback((event: any) => {
     event.stopPropagation?.();
     if (!avatar) return;
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     imageViewer.handleImagePress([getAvatarUrl(avatar)], 0);
   }, [avatar, imageViewer]);
 
@@ -736,7 +737,7 @@ export default function ForumPage() {
             {goodClassify.length > 0 && (
               <Pressable
                 onPress={() => {
-                  hapticImpact(ImpactFeedbackStyle.Light);
+                  hapticForScene('press');
                   setShowClassifyPicker(true);
                 }}
                 style={styles.classifyFilterBtn}
@@ -945,7 +946,7 @@ const ForumThreadCard = React.memo(function ForumThreadCard({
   const showHero = !!hasMedia && !mediaHidden;
 
   const handleShare = useCallback(async () => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     try {
       const url = buildThreadUrl(item.id);
       await Share.share({ message: url, url }, { dialogTitle: '分享帖子' });

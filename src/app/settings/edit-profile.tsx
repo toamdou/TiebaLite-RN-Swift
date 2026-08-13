@@ -4,7 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { hapticNotify, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import {
   Button,
   Form,
@@ -84,7 +84,7 @@ export default function EditProfilePage() {
         nick_name: nickNameState.get().trim(),
         stoken: getStokenSync(),
       });
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
       Alert.alert('已保存', '个人资料已更新');
       router.back();
     } catch (e: any) {
@@ -153,14 +153,14 @@ export default function EditProfilePage() {
           account: { ...account, portrait: uri },
         });
       }
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
       toastRef.current?.show({
         title: '头像已更新',
         type: 'success',
         icon: 'checkmark.circle.fill',
       });
     } catch (e: any) {
-      hapticNotify(NotificationFeedbackType.Error);
+      hapticForScene('action-fail');
       toastRef.current?.show({
         title: '头像上传失败',
         message: e?.message || '网络错误，请稍后重试',

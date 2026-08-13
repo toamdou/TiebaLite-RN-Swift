@@ -27,7 +27,7 @@ import { FlashList } from '@shopify/flash-list';
 import { GlassView } from 'expo-glass-effect';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { useAuthStore } from '@/stores/authStore';
 import { useForumStore } from '@/stores/forumStore';
@@ -242,17 +242,18 @@ function LoggedInHome() {
   }, [handleLoadFollowedForums]);
 
   const handleSign = useCallback(() => {
-    hapticNotify(NotificationFeedbackType.Success);
+    hapticForScene('action-success');
     startSign();
   }, [startSign]);
 
   const handleForumPress = useCallback((forum: ForumInfo) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     router.push(`/forum/${encodeURIComponent(forum.forumName)}`);
   }, [router]);
 
   const handleRefresh = useCallback(async () => {
     await handleLoadFollowedForums();
+    hapticForScene('toggle');
   }, [handleLoadFollowedForums]);
 
   const handleUnfollowConfirm = useCallback((forum: ForumInfo) => {
@@ -267,11 +268,11 @@ function LoggedInHome() {
           onPress: () => {
             unfollowForum(forum.forumId, forum.forumName)
               .then(() => {
-                hapticNotify(NotificationFeedbackType.Success);
+                hapticForScene('action-success');
                 return loadFollowedForums();
               })
               .catch(() => {
-                hapticNotify(NotificationFeedbackType.Error);
+                hapticForScene('action-fail');
               });
           },
         },

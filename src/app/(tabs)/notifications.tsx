@@ -25,7 +25,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { Avatar } from '@/components/ui/Avatar';
 import { SymbolView } from '@/components/ui/SymbolView';
@@ -303,12 +303,13 @@ export default function NotificationsScreen() {
   }, [isLoggedIn, refresh, loadNotificationCounts]);
 
   const handleTabChange = useCallback((value: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     setActiveTab(value as MessageTab);
   }, [setActiveTab]);
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([refresh(), loadNotificationCounts()]);
+    hapticForScene('toggle');
   }, [refresh, loadNotificationCounts]);
 
   // 错误态重试：走 initial 模式，让骨架屏重新出现
@@ -322,7 +323,7 @@ export default function NotificationsScreen() {
   }, [loadingMore, hasMore, loadMore]);
 
   const handleMessagePress = useCallback((msg: MessageItem) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     if (msg.threadId) {
       router.push(`/thread/${msg.threadId}${msg.postId ? `?postId=${msg.postId}` : ''}`);
     }
@@ -330,7 +331,7 @@ export default function NotificationsScreen() {
 
   const handleAuthorPress = useCallback((msg: MessageItem) => {
     if (!msg.fromUserId) return;
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     router.push(`/user/${msg.fromUserId}`);
   }, [router]);
 

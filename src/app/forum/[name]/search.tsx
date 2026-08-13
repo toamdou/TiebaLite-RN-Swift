@@ -24,7 +24,7 @@ import {
 } from '@expo/ui/swift-ui/modifiers';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import type { SearchBarCommands } from 'react-native-screens';
-import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { ThemedHost } from '@/components/ui/ThemedHost';
@@ -137,7 +137,7 @@ export default function ForumSearchPage() {
 
   // Clear history
   const clearHistory = useCallback(async () => {
-    hapticImpact(ImpactFeedbackStyle.Medium);
+    hapticForScene('press');
     setHistory([]);
     try {
       await clearSearchHistory(forumId);
@@ -197,6 +197,7 @@ export default function ForumSearchPage() {
 
   const handleRefresh = useCallback(async () => {
     await refresh();
+    hapticForScene('toggle');
   }, [refresh]);
 
   const handleLoadMore = useCallback(async () => {
@@ -207,7 +208,7 @@ export default function ForumSearchPage() {
   const handleSubmitSearch = useCallback(
     (text: string) => {
       if (text.trim()) {
-        hapticImpact(ImpactFeedbackStyle.Light);
+        hapticForScene('press');
         doSearch(text, 1, true);
       }
     },
@@ -215,7 +216,7 @@ export default function ForumSearchPage() {
   );
 
   const handleHistoryTap = useCallback((kw: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     setSearchQuery(kw);
     doSearch(kw, 1, true);
   }, [doSearch]);
@@ -258,7 +259,7 @@ export default function ForumSearchPage() {
           selection={sortType}
           label={SORT_OPTIONS.find((opt) => opt.value === sortType)?.label ?? '排序'}
           onSelectionChange={(value) => {
-            hapticSelection();
+            hapticForScene('toggle');
             setSortType(String(value));
           }}
           modifiers={[
@@ -275,7 +276,7 @@ export default function ForumSearchPage() {
           selection={filterType}
           label={FILTER_OPTIONS.find((opt) => opt.value === filterType)?.label ?? '筛选'}
           onSelectionChange={(value) => {
-            hapticSelection();
+            hapticForScene('toggle');
             setFilterType(String(value));
           }}
           modifiers={[

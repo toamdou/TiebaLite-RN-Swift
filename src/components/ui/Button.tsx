@@ -28,7 +28,7 @@ import {
 import { router } from 'expo-router';
 
 import { ThemedHost } from './ThemedHost';
-import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { IconSize } from '@/theme';
 
@@ -112,11 +112,7 @@ export function Button({
 
   const handlePress = useCallback(() => {
     if (haptic && !disabled) {
-      hapticImpact(
-        variant === 'destructive'
-          ? ImpactFeedbackStyle.Medium
-          : ImpactFeedbackStyle.Light,
-      );
+      hapticForScene('press');
     }
     onPress?.();
     if (href) {

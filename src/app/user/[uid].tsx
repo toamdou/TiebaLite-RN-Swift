@@ -33,7 +33,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, Stack, Link } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType , hapticSelection } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -177,7 +177,7 @@ export default function UserProfilePage() {
   }, [uid, loadProfile]);
 
   const handleTabChange = useCallback((value: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     setActiveTab(value);
   }, []);
 
@@ -198,7 +198,7 @@ export default function UserProfilePage() {
         await followUser(user?.portrait || '', account.tbs);
       }
       setIsFollowing((v) => !v);
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
     } catch {
       Alert.alert('错误', '操作失败');
     }
@@ -236,7 +236,7 @@ export default function UserProfilePage() {
     const uidToCopy = user.tiebaUid || user.id;
     try {
       await Clipboard.setStringAsync(uidToCopy);
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
       Alert.alert('已复制', `贴吧UID: ${uidToCopy}`);
     } catch {
       // Ignore clipboard errors
@@ -293,7 +293,7 @@ export default function UserProfilePage() {
           {/* 关注 — 点击进入关注列表 */}
           <Pressable
             onPress={() => {
-              hapticImpact(ImpactFeedbackStyle.Light);
+              hapticForScene('press');
               setSocialInitialMode('follows');
               setSocialVisible(true);
             }}
@@ -311,7 +311,7 @@ export default function UserProfilePage() {
           {/* 粉丝 — 点击进入粉丝列表 */}
           <Pressable
             onPress={() => {
-              hapticImpact(ImpactFeedbackStyle.Light);
+              hapticForScene('press');
               setSocialInitialMode('fans');
               setSocialVisible(true);
             }}
@@ -453,7 +453,7 @@ export default function UserProfilePage() {
               size="small"
               icon="envelope"
               onPress={() => {
-                hapticImpact(ImpactFeedbackStyle.Light);
+                hapticForScene('press');
                 Alert.alert('暂不支持', '私信功能开发中，敬请期待');
               }}
               style={[styles.actionBtn, { opacity: 0.45 }]}
@@ -789,13 +789,14 @@ function SocialTabList({
   }, [uid, mode, load]);
 
   const handleModeChange = useCallback((value: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
     setMode(value === 'follows' ? 'follows' : 'fans');
   }, []);
 
   const handleRefresh = useCallback(async () => {
     await refresh();
+    hapticForScene('toggle');
   }, [refresh]);
 
   const handleLoadMore = useCallback(async () => {

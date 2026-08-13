@@ -27,7 +27,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button as UIButton } from '@/components/ui/Button';
 import { ThemedHost } from '@/components/ui/ThemedHost';
@@ -85,17 +85,17 @@ export default function ProfileScreen() {
   }, [loadProfile]);
 
   const handleSign = useCallback(() => {
-    hapticNotify(NotificationFeedbackType.Success);
+    hapticForScene('action-success');
     startSign();
   }, [startSign]);
 
   const navigateTo = useCallback((route: string) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     router.push(route as any);
   }, [router]);
 
   const openServiceCenter = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     WebBrowser.openBrowserAsync('https://tieba.baidu.com/mo/').catch(() => {});
   }, []);
 
@@ -210,7 +210,7 @@ export default function ProfileScreen() {
           </View>
         </RNHostView>
 
-        <Form modifiers={[refreshable(() => loadProfile())]}>
+        <Form modifiers={[refreshable(async () => { await loadProfile(); hapticForScene('toggle'); })]}>
         {/* ── 签到（已登录） ── */}
         {isLoggedIn && (
           <Section>

@@ -37,7 +37,7 @@ import { useLocalSearchParams, Stack, Link, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { GlassView } from '@/components/ui/GlassView';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { Toast, type ToastRef } from '@/components/ui/Toast';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { Avatar } from '@/components/ui/Avatar';
@@ -448,17 +448,17 @@ export default function ThreadPage() {
   // ──────────────────────────────────────────────
 
   const handleToggleSeeLz = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     setSeeLz((v) => !v);
   }, []);
 
   const handleToggleSort = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     setReverse((v) => !v);
   }, []);
 
   const handleToggleImmersive = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     setImmersive((v) => !v);
   }, []);
 
@@ -468,7 +468,7 @@ export default function ThreadPage() {
       if (isCollected) await removeStore(id);
       else await addStore(id);
       setIsCollected((v) => !v);
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
     } catch { Alert.alert('错误', '操作失败'); }
   }, [isLoggedIn, isCollected, id]);
 
@@ -492,7 +492,7 @@ export default function ThreadPage() {
         await apiAgree(id, postId, 1);
         patchPost(postId, (p) => ({ isAgree: true, agreeNum: p.agreeNum + 1 }));
       }
-      hapticImpact(ImpactFeedbackStyle.Light);
+      hapticForScene('like');
     } catch { Alert.alert('错误', '操作失败'); }
   }, [isLoggedIn, id, posts, patchPost]);
 
@@ -508,7 +508,7 @@ export default function ThreadPage() {
         await apiDisagree(id, postId, 1);
         patchPost(postId, (p) => ({ isDisagree: true, disagreeNum: p.disagreeNum + 1 }));
       }
-      hapticImpact(ImpactFeedbackStyle.Light);
+      hapticForScene('like');
     } catch { Alert.alert('错误', '操作失败'); }
   }, [isLoggedIn, id, posts, patchPost]);
 
@@ -517,7 +517,7 @@ export default function ThreadPage() {
     if (!isLoggedIn) { Alert.alert('提示', '请先登录'); return; }
     if (!thread) return;
     try {
-      hapticImpact(ImpactFeedbackStyle.Light);
+      hapticForScene('like');
       // Agree to the first post as thread-level agree
       const opType = thread.hasAgree ? 0 : 1;
       await apiAgree(id, id, opType);
@@ -541,7 +541,7 @@ export default function ThreadPage() {
     if (!isLoggedIn) { Alert.alert('提示', '请先登录'); return; }
     try {
       await addStore(id, postId);
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
       Alert.alert('已收藏', '已收藏到此楼');
     } catch { Alert.alert('错误', '收藏失败'); }
   }, [isLoggedIn, id]);
@@ -733,7 +733,7 @@ export default function ThreadPage() {
             >
               <Pressable
                 style={styles.forumAvatarBtn}
-                onPressIn={() => hapticImpact(ImpactFeedbackStyle.Light)}
+                onPressIn={() => hapticForScene('press')}
               >
                 <Avatar
                   source={thread?.forumAvatar || undefined}
@@ -770,7 +770,7 @@ export default function ThreadPage() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={handleRefresh}
+            onRefresh={() => { void handleRefresh().then(() => hapticForScene('toggle')); }}
             tintColor={colors.primary}
           />
         }
@@ -815,7 +815,7 @@ export default function ThreadPage() {
           <GlassContainer spacing={0} style={styles.floatingBarInner}>
           {/* Copy link */}
           <Pressable
-            onPress={() => { hapticImpact(ImpactFeedbackStyle.Light); handleCopyLink(); }}
+            onPress={() => { hapticForScene('press'); handleCopyLink(); }}
             style={pressedScale}
           >
             <SymbolView name="link" size={20} tintColor={colors.text} />
@@ -840,7 +840,7 @@ export default function ThreadPage() {
 
           {/* Collect / Favorite */}
           <Pressable
-            onPress={() => { hapticImpact(ImpactFeedbackStyle.Light); handleToggleCollect(); }}
+            onPress={() => { hapticForScene('favorite'); handleToggleCollect(); }}
             style={pressedScale}
           >
             <SymbolView
@@ -855,7 +855,7 @@ export default function ThreadPage() {
           {/* More menu */}
           <Pressable
             onPress={() => {
-              hapticImpact(ImpactFeedbackStyle.Light);
+              hapticForScene('sheet-present');
               setMoreSheetVisible(true);
             }}
             style={pressedScale}

@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, Stack } from 'expo-router';
-import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SymbolView } from '@/components/ui/SymbolView';
@@ -319,10 +319,11 @@ export default function ForumRulesPage() {
   }, [forumId, load]);
 
   const handleRefresh = useCallback(async () => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     setError(null);
     setRefreshing(true);
     await load();
+    hapticForScene('toggle');
   }, [load]);
 
   // ── Loading ──

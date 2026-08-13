@@ -25,7 +25,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { Picker, Text as SWText } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import { SymbolView } from '@/components/ui/SymbolView';
@@ -193,7 +193,7 @@ export default function SearchPage() {
   }, []);
 
   const clearHistory = useCallback(async () => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     setHistory([]);
     try {
       await clearSearchHistory();
@@ -208,7 +208,7 @@ export default function SearchPage() {
 
   const handleHistoryLongPress = useCallback(
     (kw: string) => {
-      hapticImpact(ImpactFeedbackStyle.Medium);
+      hapticForScene('press');
       Alert.alert('删除搜索历史', `确定删除“${kw}”？`, [
         { text: '取消', style: 'cancel' },
         {
@@ -272,7 +272,7 @@ export default function SearchPage() {
   const handleSearch = useCallback((kw: string) => {
     const trimmed = kw.trim();
     if (!trimmed) return;
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     resetSuggestions();
     saveToHistory(trimmed);
     setSearchedKeyword(trimmed);
@@ -281,7 +281,7 @@ export default function SearchPage() {
   }, [resetSuggestions, saveToHistory, doSearch, activeTab]);
 
   const handleTabChange = useCallback((tab: SearchTab) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     setActiveTab(tab);
     if (searchedKeyword) {
       doSearch(searchedKeyword, tab);
@@ -290,7 +290,7 @@ export default function SearchPage() {
 
   const handleSortChange = useCallback(
     (value: string) => {
-      hapticSelection();
+      hapticForScene('toggle');
       setSortOrder(value);
       if (searchedKeyword) {
         doSearch(searchedKeyword, activeTab, parseInt(value, 10));
@@ -300,7 +300,7 @@ export default function SearchPage() {
   );
 
   const handleKeywordTap = useCallback((kw: string) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     resetSuggestions();
     setInputText(kw);
     setSearchedKeyword(kw);

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { Form, Section, Toggle, Button, Text, TextField, Picker } from '@expo/ui/swift-ui';
 import { pickerStyle, tag, font, foregroundStyle } from '@expo/ui/swift-ui/modifiers';
-import { hapticImpact, hapticNotify, hapticSelection, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeActions, useThemeColors } from '@/theme/ThemeContext';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -39,7 +39,7 @@ function CustomSettingsForm() {
   const [hexInput, setHexInput] = useState(preferences.customPrimaryColor);
 
   const handleColorSelect = useCallback((color: string) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     setHexInput(color);
     setCustomPrimaryColor(color);
   }, [setCustomPrimaryColor]);
@@ -53,7 +53,7 @@ function CustomSettingsForm() {
   }, [setCustomPrimaryColor]);
 
   const handleApply = useCallback(() => {
-    hapticNotify(NotificationFeedbackType.Success);
+    hapticForScene('action-success');
     setTheme('custom');
   }, [setTheme]);
 
@@ -90,7 +90,7 @@ function CustomSettingsForm() {
             label="导航栏使用主色调"
             systemImage="paintpalette.fill"
             isOn={preferences.toolbarPrimaryColor}
-            onIsOnChange={(v) => { hapticSelection(); setPreference('toolbarPrimaryColor', v); }}
+            onIsOnChange={(v) => { hapticForScene('toggle'); setPreference('toolbarPrimaryColor', v); }}
           >
             <Text>将导航栏标题与图标着色为主色调，并联动状态栏样式</Text>
           </Toggle>
@@ -99,7 +99,7 @@ function CustomSettingsForm() {
               label="状态栏深色字体"
               systemImage="textformat"
               isOn={preferences.statusBarFontDark}
-              onIsOnChange={(v) => { hapticSelection(); setPreference('statusBarFontDark', v); }}
+              onIsOnChange={(v) => { hapticForScene('toggle'); setPreference('statusBarFontDark', v); }}
             />
           )}
         </Section>

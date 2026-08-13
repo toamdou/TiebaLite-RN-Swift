@@ -17,7 +17,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, Link } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
-import { hapticNotify, NotificationFeedbackType , hapticSelection } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { MenuView, type MenuAction } from '@expo/ui/community/menu';
 
 import { Button } from '@/components/ui/Button';
@@ -83,6 +83,7 @@ export default function HistoryPage() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadHistory();
+    hapticForScene('toggle');
   }, [loadHistory]);
   const handleClearAll = useCallback(() => {
     Alert.alert('清空记录', '确定要清空所有浏览记录吗？此操作不可恢复。', [
@@ -94,7 +95,7 @@ export default function HistoryPage() {
           try {
             await clearVisitHistory(activeTab as 'thread' | 'forum');
             setHistory([]);
-            hapticNotify(NotificationFeedbackType.Success);
+            hapticForScene('action-success');
           } catch {
             Alert.alert('错误', '清空失败');
           }
@@ -157,7 +158,7 @@ export default function HistoryPage() {
                   h.forumName === item.forumName,
               );
               setHistory(filtered);
-              hapticNotify(NotificationFeedbackType.Success);
+              hapticForScene('action-success');
             } catch {
               Alert.alert('错误', '删除失败');
             }
@@ -280,7 +281,7 @@ export default function HistoryPage() {
         <Picker
           selection={activeTab}
           onSelectionChange={(value: string) => {
-            hapticSelection();
+            hapticForScene('toggle');
             setActiveTab(value);
           }}
           modifiers={[pickerStyle('segmented')]}

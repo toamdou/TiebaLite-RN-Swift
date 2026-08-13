@@ -3,7 +3,7 @@
  */
 
 import { useCallback } from 'react';
-import { hapticSelection } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import type { AppPreferences } from '@/types';
 
@@ -15,7 +15,7 @@ export function usePreferenceForm() {
   const makeToggle = useCallback(
     <K extends keyof AppPreferences>(key: K) =>
       (newValue: AppPreferences[K]) => {
-        hapticSelection();
+        hapticForScene('toggle');
         setPreference(key, newValue);
       },
     [setPreference],

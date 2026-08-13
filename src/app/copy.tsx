@@ -13,7 +13,7 @@ import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
 import * as Clipboard from 'expo-clipboard';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { Radius } from '@/theme';
 
@@ -33,9 +33,9 @@ export default function CopyPage() {
   }
 
   const handleCopyAll = useCallback(async () => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     await Clipboard.setStringAsync(decodedText);
-    hapticNotify(NotificationFeedbackType.Success);
+    hapticForScene('action-success');
     Alert.alert('已复制', '全部内容已复制到剪贴板');
   }, [decodedText]);
 

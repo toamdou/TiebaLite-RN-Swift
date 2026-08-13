@@ -19,7 +19,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 
 import { SymbolView } from '@/components/ui/SymbolView';
 import { Avatar } from '@/components/ui/Avatar';
@@ -101,12 +101,13 @@ export default function BawuTeamPage() {
     setError(null);
     setRefreshing(true);
     await load();
+    hapticForScene('toggle');
   }, [load]);
 
   const handleUserPress = useCallback(
     (user: BawuUser) => {
       if (!user.userId) return;
-      hapticImpact(ImpactFeedbackStyle.Light);
+      hapticForScene('press');
       router.push({ pathname: '/user/[uid]', params: { uid: user.userId } });
     },
     [router],

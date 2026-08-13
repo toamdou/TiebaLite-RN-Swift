@@ -3,7 +3,7 @@ import { Form, Section, Toggle, Button, Label, Text, Picker, ConfirmationDialog 
 import { foregroundStyle, pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import { useRouter } from 'expo-router';
 import { openSettings } from 'expo-linking';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { Directory, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { clearAuthCredentials } from '@/services/api/interceptors';
@@ -34,12 +34,12 @@ export default function MoreSettingsPage() {
   const [showClearAll, setShowClearAll] = useState(false);
 
   const navigateTo = useCallback((route: string) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     router.push(route as any);
   }, [router]);
 
   const handleOpenSystemSettings = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     openSettings().catch(() => {});
   }, []);
 
@@ -66,9 +66,9 @@ export default function MoreSettingsPage() {
       } catch {
         // Native cache is under Paths.cache too; this is a secondary cleanup.
       }
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
     } catch {
-      hapticNotify(NotificationFeedbackType.Error);
+      hapticForScene('action-fail');
     }
     setShowClearCache(false);
   }, []);
@@ -78,7 +78,7 @@ export default function MoreSettingsPage() {
       await resetPreferences();
       await BlockManager.clearAllBlocked();
       await clearLegacyStorage();
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
     } catch {}
     setShowReset(false);
   }, [resetPreferences]);
@@ -109,9 +109,9 @@ export default function MoreSettingsPage() {
         error: null,
         isLoading: false,
       });
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
     } catch {
-      hapticNotify(NotificationFeedbackType.Error);
+      hapticForScene('action-fail');
     }
     setShowClearAll(false);
   }, [resetPreferences]);

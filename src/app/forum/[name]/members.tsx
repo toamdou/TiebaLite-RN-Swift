@@ -30,7 +30,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Picker, Text as SWText } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
-import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 
 import { SymbolView } from '@/components/ui/SymbolView';
 import { Avatar } from '@/components/ui/Avatar';
@@ -156,7 +156,7 @@ export default function ForumMembersPage() {
   const [activeSegment, setActiveSegment] = useState<Segment>('members');
 
   const handleSegmentChange = useCallback((value: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     setActiveSegment(value as Segment);
   }, []);
 
@@ -242,11 +242,13 @@ export default function ForumMembersPage() {
   const handleRefresh = useCallback(async () => {
     if (activeSegment === 'rank') {
       await rankRefresh();
+      hapticForScene('toggle');
       return;
     }
     setError(null);
     setRefreshing(true);
     await load();
+    hapticForScene('toggle');
   }, [activeSegment, rankRefresh, load]);
 
   const handleRankLoadMore = useCallback(() => {
@@ -257,7 +259,7 @@ export default function ForumMembersPage() {
   const handleUserPress = useCallback(
     (user: MemberUser) => {
       if (!user.userId) return; // web 解析成员无 uid，无法跳转
-      hapticImpact(ImpactFeedbackStyle.Light);
+      hapticForScene('press');
       router.push({ pathname: '/user/[uid]', params: { uid: user.userId } });
     },
     [router],

@@ -20,7 +20,7 @@ import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, Stack, Link } from 'expo-router';
-import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -80,7 +80,7 @@ export default function UserPostsPage() {
   }, [uid, activeTab, load, setItems]);
 
   const handleTabChange = useCallback((value: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     setActiveTab(value);
   }, []);
 
@@ -93,7 +93,7 @@ export default function UserPostsPage() {
       return (
         <Link href={{ pathname: '/thread/[id]', params: { id: item.id || item.threadId } }} push asChild>
           <Pressable
-            onPress={() => hapticImpact(ImpactFeedbackStyle.Light)}
+            onPress={() => hapticForScene('press')}
             style={flattenStyle([styles.contentItem, { backgroundColor: colors.card }])}
           >
             {item.forumName ? (
@@ -209,7 +209,7 @@ export default function UserPostsPage() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={handleRefresh}
+            onRefresh={() => { void handleRefresh().then(() => hapticForScene('toggle')); }}
             tintColor={colors.primary}
           />
         }

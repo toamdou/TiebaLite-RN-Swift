@@ -34,7 +34,7 @@ import {
   tint,
 } from '@expo/ui/swift-ui/modifiers';
 import { Stack } from 'expo-router';
-import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useSignStore } from '@/stores/signStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -108,7 +108,7 @@ export default function OKSignSettingsPage() {
     if (isSigning) return;
 
     try {
-      hapticImpact(ImpactFeedbackStyle.Medium).catch(() => {});
+      hapticForScene('action-success');
       await startSign();
     } catch (e: any) {
       Alert.alert('签到失败', e?.message || '签到过程中出现未知错误');
@@ -121,7 +121,7 @@ export default function OKSignSettingsPage() {
 
   const handleAutoSignToggle = useCallback(
     async (value: boolean) => {
-      hapticImpact(ImpactFeedbackStyle.Light).catch(() => {});
+      hapticForScene('toggle');
       setPreference('autoSign', value);
       try {
         if (value) {
@@ -142,7 +142,7 @@ export default function OKSignSettingsPage() {
 
   const handleSlowModeToggle = useCallback(
     (value: boolean) => {
-      hapticImpact(ImpactFeedbackStyle.Light).catch(() => {});
+      hapticForScene('toggle');
       setPreference('slowSignMode', value);
     },
     [setPreference],
@@ -150,7 +150,7 @@ export default function OKSignSettingsPage() {
 
   const handleFailAutoStopToggle = useCallback(
     (value: boolean) => {
-      hapticImpact(ImpactFeedbackStyle.Light).catch(() => {});
+      hapticForScene('toggle');
       setPreference('failAutoStop', value);
     },
     [setPreference],
@@ -158,7 +158,7 @@ export default function OKSignSettingsPage() {
 
   const handleOfficialSignToggle = useCallback(
     (value: boolean) => {
-      hapticImpact(ImpactFeedbackStyle.Light).catch(() => {});
+      hapticForScene('toggle');
       setPreference('useOfficialSign', value);
     },
     [setPreference],
@@ -166,7 +166,7 @@ export default function OKSignSettingsPage() {
 
   const handleLiveActivityToggle = useCallback(
     (value: boolean) => {
-      hapticImpact(ImpactFeedbackStyle.Light).catch(() => {});
+      hapticForScene('toggle');
       setPreference('liveActivitySignEnabled', value);
       if (!value) {
         recoverStaleSignLiveActivities().catch(() => {});

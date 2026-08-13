@@ -3,7 +3,7 @@
  */
 
 import { Toggle, Text } from '@expo/ui/swift-ui';
-import { hapticSelection } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import type { AppPreferences } from '@/types';
@@ -31,7 +31,7 @@ export function PreferenceToggleRow({
         systemImage={systemImage as any}
         isOn={Boolean(value)}
         onIsOnChange={(next) => {
-          hapticSelection();
+          hapticForScene('toggle');
           setPreference(preferenceKey, next as never);
         }}
       >

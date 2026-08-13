@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 
 import { SymbolView } from '@/components/ui/SymbolView';
 import { Avatar } from '@/components/ui/Avatar';
@@ -92,11 +92,12 @@ export default function ForumDetailPage() {
     setError(null);
     setRefreshing(true);
     await load();
+    hapticForScene('toggle');
   }, [load]);
 
   const handleNav = useCallback(
     (route: string) => {
-      hapticImpact(ImpactFeedbackStyle.Light);
+      hapticForScene('press');
       router.push(
         `/forum/${encodeURIComponent(name || '')}/${route}?forumId=${encodeURIComponent(forumId || '')}`,
       );
@@ -105,7 +106,7 @@ export default function ForumDetailPage() {
   );
 
   const handleOpenInBrowser = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     void openLink(buildForumUrl(name || ''));
   }, [name]);
 

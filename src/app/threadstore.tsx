@@ -19,6 +19,7 @@ import { Link } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { hapticNotify, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { MenuView, type MenuAction } from '@expo/ui/community/menu';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -102,7 +103,7 @@ export default function ThreadStorePage() {
       try {
         await removeStore(item.id);
         setUndoRemoved(null);
-        hapticNotify(NotificationFeedbackType.Success);
+        hapticForScene('action-success');
       } catch {
         // Undo: put item back at its original index, not the end of the list.
         setItems((prev) => {
@@ -128,7 +129,7 @@ export default function ThreadStorePage() {
         return next;
       });
       setUndoRemoved(null);
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
     }
   }, [undoRemoved, setItems]);
 
@@ -264,7 +265,7 @@ export default function ThreadStorePage() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={refresh}
+            onRefresh={() => { void refresh().then(() => hapticForScene('toggle')); }}
             tintColor={colors.primary}
           />
         }

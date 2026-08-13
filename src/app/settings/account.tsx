@@ -6,7 +6,7 @@ import {
 } from '@expo/ui/swift-ui';
 import { labelStyle, buttonStyle, frame } from '@expo/ui/swift-ui/modifiers';
 import { useRouter } from 'expo-router';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useAuthStore } from '@/stores/authStore';
 import { getAccountListSync, deleteAccountSync } from '@/services/storage/AuthSQLiteStorage';
 import type { Account } from '@/types';
@@ -37,7 +37,7 @@ export default function AccountPage() {
       if (currentAccount?.uid === account.uid) return;
       try {
         await switchAccount(account);
-        hapticNotify(NotificationFeedbackType.Success);
+        hapticForScene('action-success');
       } catch {}
     },
     [currentAccount, switchAccount],
@@ -58,7 +58,7 @@ export default function AccountPage() {
             text: '移除',
             style: 'destructive',
             onPress: async () => {
-              hapticImpact(ImpactFeedbackStyle.Medium);
+              hapticForScene('press');
               try {
                 if (isCurrent) {
                   await logout();
@@ -66,7 +66,7 @@ export default function AccountPage() {
                   deleteAccountSync(account.uid);
                 }
                 setAccounts(getAccountListSync());
-                hapticNotify(NotificationFeedbackType.Success);
+                hapticForScene('action-success');
               } catch {}
             },
           },
@@ -79,7 +79,7 @@ export default function AccountPage() {
   const handleLogout = useCallback(async () => {
     try {
       await logout();
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
       router.back();
     } catch {}
     setShowLogoutDialog(false);
@@ -139,7 +139,7 @@ export default function AccountPage() {
               label="编辑个人资料"
               systemImage="person.crop.circle.badge.checkmark"
               onPress={() => {
-                hapticImpact(ImpactFeedbackStyle.Light);
+                hapticForScene('press');
                 router.push('/settings/edit-profile' as any);
               }}
             />
@@ -151,7 +151,7 @@ export default function AccountPage() {
             label="添加账号"
             systemImage="person.badge.plus"
             onPress={() => {
-              hapticImpact(ImpactFeedbackStyle.Light);
+              hapticForScene('press');
               router.push('/login');
             }}
           />

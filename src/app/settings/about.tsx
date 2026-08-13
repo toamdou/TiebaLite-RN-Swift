@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { Form, Section, Button, Text, Image, Label, VStack } from '@expo/ui/swift-ui';
 import { font, foregroundStyle, frame, padding } from '@expo/ui/swift-ui/modifiers';
-import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { APP_VERSION, APP_NAME } from '@/constants/app';
 import { openLink } from '@/utils/linkOpener';
 import { useThemeColors } from '@/theme/ThemeContext';
@@ -10,12 +10,12 @@ import { ThemedHost } from '@/components/ui/ThemedHost';
 export default function AboutPage() {
   const { colors } = useThemeColors();
   const openGitHub = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     openLink('https://github.com/HuanChengFly/TiebaLite');
   }, []);
 
   const openLicense = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     openLink('https://www.apache.org/licenses/LICENSE-2.0');
   }, []);
 

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { Form, Section, Toggle, Picker, Text } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
-import { hapticSelection } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { usePreferenceForm } from '@/hooks/usePreferenceForm';
@@ -14,12 +14,12 @@ export default function ExperimentalFeaturesPage() {
   const { makeToggle } = usePreferenceForm();
 
   const handleSortChange = useCallback((v: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     setPreference('defaultSortType', v);
   }, [setPreference]);
 
   const handleFabChange = useCallback((v: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     setPreference('forumFabFunction', v);
   }, [setPreference]);
 

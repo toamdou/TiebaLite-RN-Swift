@@ -31,7 +31,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { GlassView } from '@/components/ui/GlassView';
-import { hapticImpact, hapticNotify, hapticSelection, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { saveImageToGallery, shareFile } from '@/services/media';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -134,7 +134,7 @@ const ZoomableImage = memo(function ZoomableImage({
     baseScale.value = target;
     translateX.value = withSpring(0, MOMENTUM);
     translateY.value = withSpring(0, MOMENTUM);
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
   }, [scale, baseScale, translateX, translateY]);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -453,13 +453,13 @@ export default function ImageViewer({
   }, []);
 
   const handleClose = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     closeViewer();
   }, [closeViewer]);
 
   const handlePageSelected = useCallback(
     (e: any) => {
-      hapticSelection();
+      hapticForScene('toggle');
       setCurrentIndex(e.nativeEvent.position + pageWindowStart);
     },
     [pageWindowStart],
@@ -488,7 +488,7 @@ export default function ImageViewer({
     try {
       const wm = getWatermarkText(forumName);
       await saveImageToGallery(uri, imageWatermarkEnabled ? wm : '');
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
       Alert.alert('已保存', wm ? `图片已保存到相册（水印: ${wm}）` : '图片已保存到相册');
     } catch (e: any) {
       if (e?.message === 'PERMISSION_DENIED') {
@@ -503,7 +503,7 @@ export default function ImageViewer({
 
   // Share image
   const handleShare = useCallback(async () => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     const uri = images[currentIndex];
     if (!uri) return;
     try {

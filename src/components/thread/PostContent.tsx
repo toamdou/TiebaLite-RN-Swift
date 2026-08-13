@@ -24,7 +24,7 @@ import {
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { SymbolView } from '@/components/ui/SymbolView';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { openLink } from '@/utils/linkOpener';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
@@ -154,7 +154,7 @@ function ImageSegment({
   const handleSaveImage = useCallback(async (uri: string) => {
     try {
       await saveImageToGallery(uri, watermarkText ?? '');
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
       Alert.alert('已保存', '图片已保存到相册');
     } catch (e: any) {
       if (e?.message === 'PERMISSION_DENIED') {
@@ -215,16 +215,16 @@ function ImageSegment({
           <Pressable
             key={idx}
             onPress={() => {
-              hapticImpact(ImpactFeedbackStyle.Light);
+              hapticForScene('press');
               onPress?.(images.map((i) => i.originSrc || i.src), idx);
             }}
             onLongPress={() => {
-              hapticImpact(ImpactFeedbackStyle.Medium);
+              hapticForScene('press');
               Alert.alert('图片', '', [
                 {
                   text: '查看大图',
                   onPress: () => {
-                    hapticImpact(ImpactFeedbackStyle.Light);
+                    hapticForScene('press');
                     onPress?.(images.map((i) => i.originSrc || i.src), idx);
                   },
                 },
@@ -367,7 +367,7 @@ function VideoSegment({
   const effectiveWidth = expanded ? displayWidth * 1.5 : displayWidth;
 
   const handlePlay = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     setIsPlaying(true);
   }, []);
 
@@ -377,7 +377,7 @@ function VideoSegment({
   }, []);
 
   const handleToggleExpanded = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     setExpanded((prev) => !prev);
   }, []);
 
@@ -545,7 +545,7 @@ function ActiveAudio({
 
   /** Toggle play/pause */
   const handleToggle = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     try {
       if (isCurrentlyPlaying) {
         player.pause();
@@ -586,7 +586,7 @@ function AudioSegment({
   const [isActive, setIsActive] = useState(false);
 
   const handleActivate = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     setIsActive(true);
   }, []);
 
@@ -653,7 +653,7 @@ function PollSegment({
 
   const handleOptionPress = useCallback((index: number) => {
     if (!canVote) return;
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     if (multi) {
       setSelectedIndices((prev) =>
         prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index],
@@ -667,7 +667,7 @@ function PollSegment({
 
   const handleSubmit = useCallback(() => {
     if (!multi || selectedIndices.length === 0 || !canVote) return;
-    hapticNotify(NotificationFeedbackType.Success);
+    hapticForScene('action-success');
     setSubmitted(true);
     onVoteMulti?.(selectedIndices);
   }, [multi, selectedIndices, canVote, onVoteMulti]);

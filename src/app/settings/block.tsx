@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { Form, Section, Button, Text, TextField, Toggle, Picker, ConfirmationDialog, RNHostView, useNativeState } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
-import { hapticNotify, hapticSelection, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { BlockManager } from '@/utils/BlockManager';
 import type { BlockedWord, BlockedUser } from '@/types';
 import { ThemedHost } from '@/components/ui/ThemedHost';
@@ -129,7 +129,7 @@ export default function BlockPage() {
     addTextState.set('');
     setIsRegex(false);
     setIsWhitelist(false);
-    hapticNotify(NotificationFeedbackType.Success);
+    hapticForScene('action-success');
   }, [addTextState, activeTab, isRegex, isWhitelist]);
 
   const handleDeleteConfirm = useCallback(async () => {
@@ -141,7 +141,7 @@ export default function BlockPage() {
       await BlockManager.removeBlockedUser(deleteTarget);
       setUsers((prev) => prev.filter((u) => u.uid !== deleteTarget));
     }
-    hapticNotify(NotificationFeedbackType.Success);
+    hapticForScene('action-success');
     setDeleteTarget(null);
   }, [deleteTarget, activeTab]);
 
@@ -161,9 +161,9 @@ export default function BlockPage() {
               try {
                 await delBlacklist(user.uid);
                 setBlacklist((prev) => prev.filter((u) => u.uid !== user.uid));
-                hapticNotify(NotificationFeedbackType.Success);
+                hapticForScene('action-success');
               } catch (e: any) {
-                hapticNotify(NotificationFeedbackType.Error);
+                hapticForScene('action-fail');
                 Alert.alert('解除失败', e?.message || '网络错误，请稍后重试');
               } finally {
                 setRemovingUid(null);
@@ -282,7 +282,7 @@ export default function BlockPage() {
 
   // tab 切换时清空输入与辅助开关（受控 state 同步清空输入框）
   const handleTabChange = useCallback((v: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     setActiveTab(v);
     addTextState.set('');
     setIsRegex(false);
@@ -317,12 +317,12 @@ export default function BlockPage() {
                   <Toggle
                     label="使用正则表达式"
                     isOn={isRegex}
-                    onIsOnChange={(v) => { hapticSelection(); setIsRegex(v); }}
+                    onIsOnChange={(v) => { hapticForScene('toggle'); setIsRegex(v); }}
                   />
                   <Toggle
                     label="设为白名单"
                     isOn={isWhitelist}
-                    onIsOnChange={(v) => { hapticSelection(); setIsWhitelist(v); }}
+                    onIsOnChange={(v) => { hapticForScene('toggle'); setIsWhitelist(v); }}
                   />
                 </>
               )}

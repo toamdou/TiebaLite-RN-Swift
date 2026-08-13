@@ -24,7 +24,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
-import { hapticImpact, hapticNotify, hapticSelection, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { typographyStyles } from '@/theme/typography';
 import { useAuthStore } from '@/stores/authStore';
@@ -286,10 +286,10 @@ const NativeThreadCell = memo(function NativeThreadCell({
         uid: authorId,
         username: thread.authorNameShow || thread.authorName || undefined,
       });
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
       onBlockAuthor(item);
     } catch {
-      hapticNotify(NotificationFeedbackType.Error);
+      hapticForScene('action-fail');
     }
   }, [thread, item, onBlockAuthor]);
 
@@ -341,7 +341,7 @@ const NativeThreadCell = memo(function NativeThreadCell({
         <Pressable
           style={[styles.nativeHeroOverlay, { height: NATIVE_HERO_HEIGHT }]}
           onPress={() => {
-            hapticImpact(ImpactFeedbackStyle.Light);
+            hapticForScene('press');
             onImagePress(heroImages, 0);
           }}
           accessibilityRole="button"
@@ -405,7 +405,7 @@ export default function ExploreScreen() {
   const [lastFeedSegment, setLastFeedSegment] = useState<'personalized' | 'concern'>('personalized');
 
   const handleSegmentChange = useCallback((value: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     const seg = value as ExploreSegment;
     setActiveSegment(seg);
     if (seg !== 'hot') setLastFeedSegment(seg);
@@ -499,7 +499,7 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
 
   // 打开“不感兴趣”原因面板
   const handleDislikePress = useCallback((item: FeedItem) => {
-    hapticImpact(ImpactFeedbackStyle.Medium);
+    hapticForScene('sheet-present');
     setSelectedReasons([]);
     setDislikeTarget(item);
   }, []);
@@ -510,14 +510,14 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
   }, [setItems]);
 
   const toggleReason = useCallback((id: string) => {
-    hapticSelection();
+    hapticForScene('toggle');
     setSelectedReasons((prev) => (prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]));
   }, []);
 
   const dislikeMutation = useMutation({
     mutationFn: submitDislike,
     onSuccess: () => {
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
       if (dislikeTarget) {
         setItems((prev) => prev.filter((i) => i !== dislikeTarget));
       }
@@ -525,7 +525,7 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
       setSelectedReasons([]);
     },
     onError: () => {
-      hapticNotify(NotificationFeedbackType.Error);
+      hapticForScene('action-fail');
       setDislikeTarget(null);
       setSelectedReasons([]);
     },
@@ -547,9 +547,10 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
   }, [load]);
 
   // 下拉刷新：走 refresh 模式（refreshing 置 true，spinner 有状态可依）
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = useCallback(async () => {
     pageTagRef.current = '';
-    refresh();
+    await refresh();
+    hapticForScene('toggle');
   }, [refresh]);
 
   useEffect(() => {
@@ -576,17 +577,17 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
 
   // ── 原生 FeedCell 帖子卡片交互（对齐 FeedCard 既有行为，仅换实现载体） ──
   const handleThreadPress = useCallback((thread: ThreadInfo) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     router.push(`/thread/${thread.id}`);
   }, [router]);
 
   const handleThreadShare = useCallback(async (thread: ThreadInfo) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     try {
       await Clipboard.setStringAsync(thread.id ? buildThreadUrl(thread.id) : (thread.title || ''));
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
     } catch {
-      hapticNotify(NotificationFeedbackType.Error);
+      hapticForScene('action-fail');
     }
   }, []);
 
@@ -595,12 +596,12 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
       router.push('/login');
       return;
     }
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('like');
     try {
       await agree(thread.id, thread.id, thread.hasAgree ? 0 : 1);
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
     } catch {
-      hapticNotify(NotificationFeedbackType.Error);
+      hapticForScene('action-fail');
     }
   }, [isLoggedIn, router]);
 
@@ -843,6 +844,7 @@ function HotListContent() {
     } finally {
       setRefreshing(false);
     }
+    hapticForScene('toggle');
   }, [activeTab, loadHot]);
 
   const loadHot = useCallback(async (tabCode = 'all', silent = false) => {
@@ -889,7 +891,7 @@ function HotListContent() {
           { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
         ]}
         onPress={() => {
-          hapticImpact(ImpactFeedbackStyle.Light);
+          hapticForScene('press');
           router.push(`/thread/${item.threadId}`);
         }}
       >
@@ -905,7 +907,7 @@ function HotListContent() {
               <Pressable
                 onPress={(event) => {
                   event.stopPropagation?.();
-                  hapticImpact(ImpactFeedbackStyle.Light);
+                  hapticForScene('press');
                   router.push(`/user/${item.authorId}`);
                 }}
                 onPressIn={(event) => event.stopPropagation?.()}

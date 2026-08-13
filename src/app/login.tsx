@@ -21,7 +21,7 @@ import { Stack, router } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import type { WebViewNavigation } from 'react-native-webview';
 import { SymbolView } from '@/components/ui/SymbolView';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useAppTheme } from '@/theme/ThemeContext';
 import { Radius } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
@@ -152,7 +152,7 @@ export default function LoginPage() {
       if (!loginProcessedRef.current) {
         updateLoadingState('error');
         setError('登录超时，请在页面中完成百度账号登录后重试');
-        hapticNotify(NotificationFeedbackType.Error);
+        hapticForScene('action-fail');
       }
     }, TIMEOUT_MS);
     return () => clearTimeout(timeout);
@@ -182,7 +182,7 @@ export default function LoginPage() {
       ) {
         loginProcessedRef.current = true;
         updateLoadingState('extracting');
-        hapticImpact(ImpactFeedbackStyle.Medium);
+        hapticForScene('press');
 
         // Wait for native cookie sync (sharedCookiesEnabled → NSHTTPCookieStorage)
         // Kotlin: cookies are already available when shouldOverrideUrlLoading fires
@@ -223,7 +223,7 @@ export default function LoginPage() {
               zid: nativeZid,
             });
 
-            hapticNotify(NotificationFeedbackType.Success);
+            hapticForScene('action-success');
             updateLoadingState('success');
             return;
           } catch (e: any) {
@@ -233,7 +233,7 @@ export default function LoginPage() {
                 ? `登录信息提取失败：${e.message}`
                 : '登录信息提取失败，请重试。',
             );
-            hapticNotify(NotificationFeedbackType.Error);
+            hapticForScene('action-fail');
             loginProcessedRef.current = false;
           }
         } else {
@@ -242,7 +242,7 @@ export default function LoginPage() {
             '无法读取登录凭据（BDUSS）。\n\n' +
             '请在开发构建中登录，或确认系统 Cookie 已写入。',
           );
-          hapticNotify(NotificationFeedbackType.Error);
+          hapticForScene('action-fail');
           loginProcessedRef.current = false;
         }
       } else if (loadingStateRef.current === 'loading' && url.includes('passport.baidu.com')) {

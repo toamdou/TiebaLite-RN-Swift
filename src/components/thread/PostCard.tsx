@@ -20,7 +20,7 @@ import {
 import { Link, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { SymbolView } from '@/components/ui/SymbolView';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import * as Clipboard from 'expo-clipboard';
 import { Menu, Button } from '@expo/ui/swift-ui';
 import { buttonStyle, labelStyle } from '@expo/ui/swift-ui/modifiers';
@@ -155,25 +155,25 @@ const PostCard = React.memo(function PostCard({
   const router = useRouter();
 
   const handleLongPress = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Medium);
+    hapticForScene('press');
     const textContent = contentToText(post.content);
     router.push({ pathname: '/copy', params: { text: encodeURIComponent(textContent || '[图片/视频/音频]') } });
   }, [post.content, router]);
 
   const handleCopyPress = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     const textContent = contentToText(post.content);
     router.push({ pathname: '/copy', params: { text: encodeURIComponent(textContent || '[图片/视频/音频]') } });
   }, [post.content, router]);
 
   const handleCopyLink = useCallback(async () => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     await Clipboard.setStringAsync(`https://tieba.baidu.com/p/${post.threadId}?pid=${post.id}`);
-    hapticNotify(NotificationFeedbackType.Success);
+    hapticForScene('action-success');
   }, [post.threadId, post.id]);
 
   const handleShare = useCallback(async () => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     try {
       await Share.share({
         message: `https://tieba.baidu.com/p/${post.threadId}?pid=${post.id}`,
@@ -184,7 +184,7 @@ const PostCard = React.memo(function PostCard({
   }, [post.threadId, post.id]);
 
   const handleAgreePress = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('like');
     onAgree?.(post.id, post.isAgree ? 0 : 1);
   }, [onAgree, post.id, post.isAgree]);
 

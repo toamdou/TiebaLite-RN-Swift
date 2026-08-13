@@ -10,7 +10,7 @@ import {
   foregroundStyle,
 } from '@expo/ui/swift-ui/modifiers';
 import { useRouter } from 'expo-router';
-import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors, useThemeActions } from '@/theme/ThemeContext';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { ThemedHost } from '@/components/ui/ThemedHost';
@@ -38,24 +38,24 @@ export default function SettingsPage() {
   const hapticFeedback = usePreferencesStore((s) => s.preferences.hapticFeedback);
 
   const handleFollowSystem = useCallback((follow: boolean) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     setFollowSystemDarkMode(follow);
   }, [setFollowSystemDarkMode]);
 
   const handleHapticFeedback = useCallback((enabled: boolean) => {
     setPreference('hapticFeedback', enabled);
     if (enabled) {
-      hapticImpact(ImpactFeedbackStyle.Light);
+      hapticForScene('toggle');
     }
   }, [setPreference]);
 
   const handleDarkMode = useCallback((enabled: boolean) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     setDarkMode(enabled);
   }, [setDarkMode]);
 
   const navigateTo = useCallback((route: string) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     router.push(route as any);
   }, [router]);
 

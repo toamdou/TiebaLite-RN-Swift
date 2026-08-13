@@ -30,7 +30,7 @@ import { GradientBlurView } from '@/components/ui/GradientBlurView';
 import { Link, useRouter } from 'expo-router';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { Avatar } from '@/components/ui/Avatar';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import * as Clipboard from 'expo-clipboard';
 import { MenuView, type MenuAction } from '@expo/ui/community/menu';
 import { ThemedHost } from '@/components/ui/ThemedHost';
@@ -238,7 +238,7 @@ const FeedCard = React.memo(function FeedCard({ item, onDislike, onBlockAuthor, 
   }, [scale, reduceMotion]);
 
   const handlePress = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     if (item.type === 'thread' && item.threadInfo) {
       router.push(`/thread/${item.threadInfo.id}`);
     } else if (item.type === 'forum' && item.forumInfo) {
@@ -263,22 +263,22 @@ const FeedCard = React.memo(function FeedCard({ item, onDislike, onBlockAuthor, 
         uid: authorId,
         username: item.threadInfo?.authorNameShow || item.threadInfo?.authorName || undefined,
       });
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
       onBlockAuthor?.(item);
     } catch {
-      hapticNotify(NotificationFeedbackType.Error);
+      hapticForScene('action-fail');
     }
   }, [item, onBlockAuthor]);
 
   const handleShare = useCallback(async () => {
     const thread = item.threadInfo;
     if (!thread) return;
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     try {
       await Clipboard.setStringAsync(thread.id ? buildThreadUrl(thread.id) : (thread.title || ''));
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
     } catch {
-      hapticNotify(NotificationFeedbackType.Error);
+      hapticForScene('action-fail');
     }
   }, [item]);
 
@@ -289,12 +289,12 @@ const FeedCard = React.memo(function FeedCard({ item, onDislike, onBlockAuthor, 
       router.push('/login');
       return;
     }
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('like');
     try {
       await agree(thread.id, thread.id, thread.hasAgree ? 0 : 1);
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
     } catch {
-      hapticNotify(NotificationFeedbackType.Error);
+      hapticForScene('action-fail');
     }
   }, [item, isLoggedIn, router]);
 
@@ -324,7 +324,7 @@ const FeedCard = React.memo(function FeedCard({ item, onDislike, onBlockAuthor, 
     if (item.type === 'thread' && item.threadInfo?.mediaList && item.threadInfo.mediaList.length > 0) {
       const images = item.threadInfo.mediaList.map(m => m.originSrc || m.src);
       if (onImagePress) {
-        hapticImpact(ImpactFeedbackStyle.Light);
+        hapticForScene('press');
         onImagePress(images, 0);
         return;
       }
@@ -372,7 +372,7 @@ const FeedCard = React.memo(function FeedCard({ item, onDislike, onBlockAuthor, 
             <Pressable
               onPress={(event) => {
                 event.stopPropagation?.();
-                hapticImpact(ImpactFeedbackStyle.Light);
+                hapticForScene('press');
                 router.push(`/user/${thread.authorId}`);
               }}
               onPressIn={(event) => event.stopPropagation?.()}

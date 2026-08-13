@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { Form, Section, Toggle, Button, Text, Picker, Slider } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
-import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useRouter } from 'expo-router';
 import { useThemeColors, useThemeActions } from '@/theme/ThemeContext';
 import type { ThemeName } from '@/types';
@@ -60,22 +60,22 @@ function ThemeSelectionForm() {
   }, [fontScale, setPreference]);
 
   const handleFollowSystem = useCallback((follow: boolean) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     setFollowSystemDarkMode(follow);
   }, [setFollowSystemDarkMode]);
 
   const handleDarkMode = useCallback((enabled: boolean) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     setDarkMode(enabled);
   }, [setDarkMode]);
 
   const handleLightTheme = useCallback((key: string) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     setLightTheme(key as ThemeName);
   }, [setLightTheme]);
 
   const handleDarkTheme = useCallback((key: string) => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('toggle');
     setDarkTheme(key as ThemeName);
   }, [setDarkTheme]);
 

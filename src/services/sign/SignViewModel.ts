@@ -6,6 +6,7 @@
 import * as Notifications from 'expo-notifications';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import { hapticNotify, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { useAuthStore } from '@/stores/authStore';
 import { ensureNotificationPermissionAsync } from '@/services/NotificationPoller';
 import { setTbsSync } from '@/services/storage/AuthSQLiteStorage';
@@ -80,11 +81,11 @@ export function createSignViewModel(): UseBoundStore<StoreApi<SignState>> {
       });
 
       if (state.failCount === 0 && state.successCount > 0) {
-        await hapticNotify(NotificationFeedbackType.Success);
+        await hapticForScene('action-success');
       } else if (state.successCount > 0) {
         await hapticNotify(NotificationFeedbackType.Warning);
       } else {
-        await hapticNotify(NotificationFeedbackType.Error);
+        await hapticForScene('action-fail');
       }
 
       if (state.successCount > 0 || state.failCount > 0) {
@@ -268,7 +269,7 @@ export function createSignViewModel(): UseBoundStore<StoreApi<SignState>> {
               });
             }
             await Notifications.setBadgeCountAsync(0);
-            await hapticNotify(NotificationFeedbackType.Success);
+            await hapticForScene('action-success');
             set({
               status: 'completed',
               isSigning: false,

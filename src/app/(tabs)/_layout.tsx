@@ -23,6 +23,7 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useSignStore } from '@/stores/signStore';
+import { hapticForScene } from '@/theme/hapticsMap';
 
 const TAB_RESELECT_EVENT = 'tieba:tab-reselect';
 
@@ -37,6 +38,7 @@ export default function TabLayout() {
   // tab is already focused so a repeated tap refreshes without double-loading
   // during a normal tab switch.
   const handleTabReselect = (tabName: string, tabPath: string) => {
+    hapticForScene('press');
     if (pathname === tabPath || (tabPath === '/' && (pathname === '' || pathname === '/'))) {
       DeviceEventEmitter.emit(TAB_RESELECT_EVENT, tabName);
     }

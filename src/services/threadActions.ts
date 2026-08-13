@@ -6,7 +6,7 @@ import { useCallback } from 'react';
 import { Alert, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
-import { hapticNotify, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { checkReportPost, delPost, delThread } from '@/services/api/endpoints';
 import { buildThreadUrl } from '@/utils';
 
@@ -68,10 +68,10 @@ export function useThreadActions({
   const copy = useCallback(async () => {
     try {
       await copyThreadLink(threadId);
-      hapticNotify(NotificationFeedbackType.Success);
+      hapticForScene('action-success');
       return true;
     } catch {
-      hapticNotify(NotificationFeedbackType.Error);
+      hapticForScene('action-fail');
       Alert.alert('错误', THREAD_ACTION_ERRORS.copy);
       return false;
     }
@@ -91,7 +91,7 @@ export function useThreadActions({
         }
         return true;
       } catch {
-        hapticNotify(NotificationFeedbackType.Error);
+        hapticForScene('action-fail');
         Alert.alert('错误', THREAD_ACTION_ERRORS.report);
         return false;
       }
@@ -108,10 +108,10 @@ export function useThreadActions({
         } else {
           await deletePostAction(forumId || '', forumName || '', threadId, postId);
         }
-        hapticNotify(NotificationFeedbackType.Success);
+        hapticForScene('action-success');
         return true;
       } catch {
-        hapticNotify(NotificationFeedbackType.Error);
+        hapticForScene('action-fail');
         Alert.alert('错误', THREAD_ACTION_ERRORS.delete);
         return false;
       }

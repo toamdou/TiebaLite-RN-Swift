@@ -23,7 +23,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, Stack, Link, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
-import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
+import { hapticForScene } from '@/theme/hapticsMap';
 import * as Clipboard from 'expo-clipboard';
 import { Avatar } from '@/components/ui/Avatar';
 import { ThemedHost } from '@/components/ui/ThemedHost';
@@ -148,7 +148,7 @@ const ReplyItem = React.memo(function ReplyItem({
   }, [isOwn]);
 
   const handleMenuAction = useCallback((event: string) => {
-    hapticImpact(ImpactFeedbackStyle.Medium);
+    hapticForScene('press');
     switch (event) {
       case 'copy':
         Clipboard.setStringAsync(contentToText(item.content) || '[内容已删除]');
@@ -365,7 +365,7 @@ export default function SubPostsPage() {
     async (item: SubPostInfo) => {
       if (!threadId || !item.id) return;
       try {
-        hapticImpact(ImpactFeedbackStyle.Light);
+        hapticForScene('like');
         await agree(threadId, item.id, item.isAgree ? 0 : 1);
       } catch { /* silently fail */ }
     },
@@ -410,7 +410,7 @@ export default function SubPostsPage() {
             try {
               await delPost(forumId || '', decodedForumName, threadId || '', item.id, false);
               setSubPosts((prev) => prev.filter((p) => p.id !== item.id));
-              hapticNotify(NotificationFeedbackType.Success);
+              hapticForScene('action-success');
             } catch {
               Alert.alert('错误', '删除失败');
             }
