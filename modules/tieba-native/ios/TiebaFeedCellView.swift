@@ -348,9 +348,21 @@ public final class TiebaFeedCellView: ExpoView {
     return ceil(label.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height)
   }
 
+  /// 回复数格式化：语义与 RN `formatCount`（src/utils/index.ts）完全对齐——
+  /// ≥1e8 → "x.x亿"，≥1e4 → "x.x万"，≥1e3 → "x.xk"，其余原样（保留 k）。
+  /// 否则探索原生卡的回复数（原生格式）与同卡操作栏点赞数（RN formatCount）
+  /// 相邻展示时格式打架（1500 回复 "1500" vs 1500 赞 "1.5k"；
+  /// ≥1 亿原生 "x万" vs RN "x亿"）。
   private static func formatReplyCount(_ count: Int) -> String {
-    if count >= 10000 {
-      return String(format: "%.1f万", Double(count) / 10000.0)
+    let c = Double(count)
+    if c >= 100_000_000 {
+      return String(format: "%.1f亿", c / 100_000_000)
+    }
+    if c >= 10_000 {
+      return String(format: "%.1f万", c / 10_000)
+    }
+    if c >= 1_000 {
+      return String(format: "%.1fk", c / 1_000)
     }
     return "\(count)"
   }

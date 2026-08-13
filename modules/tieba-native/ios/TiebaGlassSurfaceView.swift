@@ -48,7 +48,8 @@ public final class TiebaGlassSurfaceView: ExpoView {
     didSet { updateHighlight() }
   }
 
-  /// 可选按压回调（导航下浮条等可点场景用；不需要时仅注册，手势仍可安全存在）
+  /// 可选按压回调（导航下浮条等可点场景用；不需要时仅注册）。
+  /// 手势常驻注册但 `cancelsTouchesInView = false`，不吞/不延迟内部 Link、Pressable 的点击。
   let onPress = EventDispatcher()
 
   // MARK: - Private
@@ -71,7 +72,17 @@ public final class TiebaGlassSurfaceView: ExpoView {
   /// RN 子视图插入在其后，保证盖在玻璃材质之上。
   private static let decorativeSubviewCount = 3
 
-  private lazy var tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
+  /// 点按手势：常驻注册，但 `cancelsTouchesInView = false`（不吞子视图触摸）+
+  /// `delaysTouchesBegan = false`（不延迟子视图点击）。帖详情页主楼卡（作者行 Link、
+  /// PostContent 图片/投票）与回复工具条（只看楼主/正倒序 Pressable）内部均为交互密集区，
+  /// 父容器手势不得在识别时取消子级触摸——语义与 TiebaFeedCellView 长按手势
+  /// （cancelsTouchesInView = false）保持一致。
+  private lazy var tapGesture: UITapGestureRecognizer = {
+    let gesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
+    gesture.cancelsTouchesInView = false
+    gesture.delaysTouchesBegan = false
+    return gesture
+  }()
 
   public required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
