@@ -275,6 +275,24 @@ const NativeThreadCell = memo(function NativeThreadCell({
   const cardBackground = glassTokens.tint[isDark ? 'dark' : 'light'];
   const hasTags = thread.isTop || thread.isGood;
 
+  // 屏蔽作者：先写 BlockManager 黑名单（持久化），成功后才移除条目。
+  // 对齐 FeedCard 内部同款实现（FeedCard.tsx handleBlockAuthor）。
+  const handleBlockAuthorPress = useCallback(async () => {
+    const authorId = thread.authorId;
+    if (!authorId) return;
+    try {
+      await BlockManager.addBlockedUser({
+        id: Date.now().toString(),
+        uid: authorId,
+        username: thread.authorNameShow || thread.authorName || undefined,
+      });
+      hapticNotify(NotificationFeedbackType.Success);
+      onBlockAuthor(item);
+    } catch {
+      hapticNotify(NotificationFeedbackType.Error);
+    }
+  }, [thread, item, onBlockAuthor]);
+
   const handleMenuAction = useCallback(
     (event: { nativeEvent: { event: string } }) => {
       switch (event.nativeEvent.event) {
@@ -282,14 +300,14 @@ const NativeThreadCell = memo(function NativeThreadCell({
           onDislike(item);
           break;
         case 'block':
-          onBlockAuthor(item);
+          handleBlockAuthorPress();
           break;
         case 'copy-title':
           onCopyTitle(thread);
           break;
       }
     },
-    [onDislike, onBlockAuthor, onCopyTitle, item, thread],
+    [onDislike, onCopyTitle, item, thread, handleBlockAuthorPress],
   );
 
   return (
@@ -319,7 +337,7 @@ const NativeThreadCell = memo(function NativeThreadCell({
         onPress={() => onPress(thread)}
       />
       {/* 有图帖 Hero 区透明叠加：恢复 FeedCard 的点图打开图片浏览器交互 */}
-      {heroImage && heroImages.length > 0 ? (
+      {heroImages.length > 0 ? (
         <Pressable
           style={[styles.nativeHeroOverlay, { height: NATIVE_HERO_HEIGHT }]}
           onPress={() => {
