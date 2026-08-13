@@ -8,7 +8,8 @@ import UIKit
 /// 先例，列表滚动复用场景下纯 UIKit 的开销最小、尺寸可控性最强。
 ///
 /// 动效：
-/// - 按压：原生 spring 缩放至 0.97（阻尼感参考 PRESS_ENTER/PRESS_EXIT）+ Light 震动
+/// - 按压：原生 spring 缩放至 0.97（阻尼感参考 PRESS_ENTER/PRESS_EXIT）+ Light 震动；
+///   反馈带确认窗口 + 位移判定取消，滚动意图（手指位移 > 10pt）不产生任何反馈、不触发 onPress
 /// - 入场：首帧 fade + 8pt 上移 + 35ms stagger；滚动复用的单元格不重放入场动画
 ///   （entryPlayed 标记 + 递增计数器，仅每个原生视图实例首次挂载时播放一次）
 /// - 图片：经 TiebaImageIO（内存 + 磁盘缓存）加载 Hero 图，200pt
@@ -88,6 +89,21 @@ public final class TiebaFeedCellView: ExpoView {
   private var heroLoadGeneration = 0
   private var lastImageUrl: String?
 
+  // MARK: 按压状态（滚动协调）
+  // .began 后进入确认窗口：位移未超阈值才显示缩放 + 震动；
+  // 位移超阈值判定为滚动意图 → 撤销反馈且后续不触发 onPress。
+  private var pressStartPoint = CGPoint.zero
+  private var pressConfirmed = false
+  private var pressCancelled = false
+  private var pressTimer: Timer?
+
+  /// 位移判定阈值（pt）：手指从按下点移出该距离即视为滚动意图。
+  /// 不宜过小——原地轻微抖动（< 阈值）仍应保留按压反馈与 onPress。
+  private static let pressMovementThreshold: CGFloat = 10
+  /// 按压反馈确认延迟（s）：窗口内位移未超阈值才进入按压态。
+  /// 滚动触摸通常在窗口内就已移出阈值，全程无缩放、无震动。
+  private static let pressConfirmDelay: TimeInterval = 0.12
+
   // 入场 stagger：递增计数器跨实例共享，保证首屏按 35ms 级联。
   private static let staggerStep: TimeInterval = 0.035
   private static let staggerCap = 8
@@ -130,6 +146,7 @@ public final class TiebaFeedCellView: ExpoView {
   }
 
   deinit {
+    pressTimer?.invalidate()
     NotificationCenter.default.removeObserver(self)
   }
 
@@ -379,19 +396,85 @@ public final class TiebaFeedCellView: ExpoView {
     let point = gesture.location(in: self)
     switch gesture.state {
     case .began:
+      // 触摸即起跟踪，但不立刻给反馈：先进入确认窗口。
+      pressStartPoint = point
+      pressConfirmed = false
+      pressCancelled = false
       hapticGenerator.prepare()
-      hapticGenerator.impactOccurred()
-      animateScale(0.97, duration: 0.14, damping: 0.55, velocity: 1.0)
+      schedulePressConfirm()
+    case .changed:
+      // 位移超过阈值 → 判定为滚动意图，撤销按压反馈。
+      guard !pressCancelled else { break }
+      let dx = point.x - pressStartPoint.x
+      let dy = point.y - pressStartPoint.y
+      if dx * dx + dy * dy > Self.pressMovementThreshold * Self.pressMovementThreshold {
+        cancelPressForScroll()
+      }
     case .ended:
-      animateScale(1.0, duration: 0.22, damping: 0.55, velocity: 2.0)
+      pressTimer?.invalidate()
+      pressTimer = nil
+      if pressCancelled {
+        // 已被位移判定为滚动：不触发 onPress。
+        restoreScaleIfNeeded()
+        resetPressState()
+        return
+      }
+      if pressConfirmed {
+        pressConfirmed = false
+        animateScale(1.0, duration: 0.22, damping: 0.55, velocity: 2.0)
+      }
       if bounds.contains(point) {
         onPress()
       }
+      resetPressState()
     case .cancelled, .failed:
-      animateScale(1.0, duration: 0.22, damping: 0.55, velocity: 2.0)
+      pressTimer?.invalidate()
+      pressTimer = nil
+      restoreScaleIfNeeded()
+      resetPressState()
     default:
       break
     }
+  }
+
+  /// 确认窗口：窗口内位移未超阈值才进入按压态（缩放 + 震动）。
+  /// 用 .common run loop mode，保证拖拽 tracking 期间仍能按时触发。
+  private func schedulePressConfirm() {
+    pressTimer?.invalidate()
+    let timer = Timer(timeInterval: Self.pressConfirmDelay, repeats: false) { [weak self] _ in
+      self?.confirmPress()
+    }
+    RunLoop.main.add(timer, forMode: .common)
+    pressTimer = timer
+  }
+
+  private func confirmPress() {
+    pressTimer = nil
+    guard !pressCancelled else { return }
+    pressConfirmed = true
+    hapticGenerator.impactOccurred()
+    animateScale(0.97, duration: 0.14, damping: 0.55, velocity: 1.0)
+  }
+
+  /// 位移超阈值：撤销按压视觉、不再震动、后续 .ended 不触发 onPress。
+  private func cancelPressForScroll() {
+    pressCancelled = true
+    pressTimer?.invalidate()
+    pressTimer = nil
+    restoreScaleIfNeeded()
+  }
+
+  private func restoreScaleIfNeeded() {
+    guard pressConfirmed else { return }
+    pressConfirmed = false
+    animateScale(1.0, duration: 0.22, damping: 0.55, velocity: 2.0)
+  }
+
+  private func resetPressState() {
+    pressConfirmed = false
+    pressCancelled = false
+    pressTimer?.invalidate()
+    pressTimer = nil
   }
 
   /// 阻尼感参考 PRESS_ENTER（damping 18 / stiffness 320 ≈ dampingRatio 0.55，轻回弹）。
