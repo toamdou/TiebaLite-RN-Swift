@@ -47,6 +47,7 @@ import ImageViewer from '@/components/ImageViewer';
 import PostCard from '@/components/thread/PostCard';
 import PostContent from '@/components/thread/PostContent';
 import ThreadMoreSheet from '@/components/thread/ThreadMoreSheet';
+import { GlassSurface } from '../../../modules/tieba-native/src/TiebaGlassSurface';
 import { LoadMoreFooter } from '@/components/ui/LoadMoreFooter';
 import { SkeletonList } from '../../components/ui/Skeleton';
 import { useThemeColors } from '@/theme/ThemeContext';
@@ -120,8 +121,13 @@ const ThreadHeader = memo(function ThreadHeader({
 
   return (
     <View>
-      {/* ── Main Post (OP) — visually distinct card section ── */}
-      <View style={[styles.mainPostSection, { backgroundColor: colors.card, borderRadius: Radius.card, marginHorizontal: 12, padding: 16, marginBottom: 8, borderWidth: 0.5, borderColor: colors.divider }]}>
+      {/* ── Main Post (OP) — visually distinct glass card section ── */}
+      <GlassSurface
+        material="regular"
+        cornerRadius={Radius.card}
+        borderColor={colors.divider}
+        style={[styles.mainPostSection, { marginHorizontal: 12, marginBottom: 8, paddingHorizontal: 16, paddingBottom: 12 }]}
+      >
         {/* Author row */}
         <Link href={{ pathname: '/user/[uid]', params: { uid: thread.authorId } }} push asChild>
           <Pressable style={styles.authorRow}>
@@ -158,10 +164,15 @@ const ThreadHeader = memo(function ThreadHeader({
             />
           </View>
         )}
-      </View>
+      </GlassSurface>
 
       {/* ── Reply Toolbar (below main post) ── */}
-      <View style={[styles.replyToolbar, { borderTopColor: colors.divider }]}>
+      <GlassSurface
+        material="regular"
+        cornerRadius={Radius.card}
+        borderColor={colors.divider}
+        style={[styles.replyToolbar, { marginHorizontal: 12, marginBottom: 8 }]}
+      >
         <Text style={[styles.replyCount, { color: colors.text }]}>
           回复 {formatCount(replyCount)}
         </Text>
@@ -197,7 +208,7 @@ const ThreadHeader = memo(function ThreadHeader({
             </Text>
           </Pressable>
         </View>
-      </View>
+      </GlassSurface>
     </View>
   );
 });
@@ -995,7 +1006,7 @@ const styles = StyleSheet.create({
   // ── Reply toolbar ──
   replyToolbar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 12, paddingHorizontal: 16, borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 12, paddingHorizontal: 16,
   },
   replyCount: { fontSize: 16, fontWeight: '700' },
   replyToolbarRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
