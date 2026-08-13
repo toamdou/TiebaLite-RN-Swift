@@ -27,6 +27,7 @@ import {
 } from '@expo/ui/swift-ui/modifiers';
 import { router } from 'expo-router';
 
+import { ThemedHost } from './ThemedHost';
 import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { IconSize } from '@/theme';
@@ -165,23 +166,27 @@ export function Button({
       ]}
     >
       {trailingIcon ? (
-        <NativeButton
-          onPress={handlePress}
-          role={variant === 'destructive' ? 'destructive' : undefined}
-          testID={testID}
-          modifiers={modifiers}
-        >
-          {buttonChildren}
-        </NativeButton>
+        <ThemedHost matchContents>
+          <NativeButton
+            onPress={handlePress}
+            role={variant === 'destructive' ? 'destructive' : undefined}
+            testID={testID}
+            modifiers={modifiers}
+          >
+            {buttonChildren}
+          </NativeButton>
+        </ThemedHost>
       ) : (
-        <NativeButton
-          label={title}
-          systemImage={icon as any}
-          onPress={handlePress}
-          role={variant === 'destructive' ? 'destructive' : undefined}
-          testID={testID}
-          modifiers={modifiers}
-        />
+        <ThemedHost matchContents>
+          <NativeButton
+            label={title}
+            systemImage={icon as any}
+            onPress={handlePress}
+            role={variant === 'destructive' ? 'destructive' : undefined}
+            testID={testID}
+            modifiers={modifiers}
+          />
+        </ThemedHost>
       )}
     </View>
   );

@@ -23,6 +23,7 @@ import { MenuView, type MenuAction } from '@expo/ui/community/menu';
 import { Button } from '@/components/ui/Button';
 import { Picker, Text as SWText } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/Skeleton';
@@ -251,24 +252,29 @@ export default function HistoryPage() {
   // Loading state
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.skeletonWrap}>
-          <SkeletonList variant="row" count={8} />
+      <ThemedHost style={{ flex: 1 }}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <View style={styles.skeletonWrap}>
+            <SkeletonList variant="row" count={8} />
+          </View>
         </View>
-      </View>
+      </ThemedHost>
     );
   }
   // Error state
   if (error) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ErrorState message={error} onRetry={handleRefresh} />
-      </View>
+      <ThemedHost style={{ flex: 1 }}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <ErrorState message={error} onRetry={handleRefresh} />
+        </View>
+      </ThemedHost>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ThemedHost style={{ flex: 1 }}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Tabs Row */}
       <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.separator }]}>
         <Picker
@@ -332,7 +338,8 @@ export default function HistoryPage() {
         }
         ItemSeparatorComponent={HistoryRowSeparator}
       />
-    </View>
+      </View>
+    </ThemedHost>
   );
 }
 

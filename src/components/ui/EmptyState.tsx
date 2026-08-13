@@ -12,6 +12,7 @@ import {
 import { ContentUnavailableView } from '@expo/ui/swift-ui';
 
 import { Spacing } from '@/theme';
+import { ThemedHost } from './ThemedHost';
 import { Button } from './Button';
 
 // ---------- EmptyState Props ----------
@@ -61,11 +62,13 @@ export function EmptyState({
         `空状态：${title}${subtext ? `，${subtext}` : ''}`
       }
     >
-      <ContentUnavailableView
-        title={title}
-        description={subtext}
-        systemImage={icon as any}
-      />
+      <ThemedHost matchContents>
+        <ContentUnavailableView
+          title={title}
+          description={subtext}
+          systemImage={icon as any}
+        />
+      </ThemedHost>
 
       {actionLabel && (onAction || actionHref) ? (
         <View style={styles.actionContainer}>

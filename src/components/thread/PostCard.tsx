@@ -22,8 +22,9 @@ import { Image } from 'expo-image';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
 import * as Clipboard from 'expo-clipboard';
-import { Host, Menu, Button } from '@expo/ui/swift-ui';
+import { Menu, Button } from '@expo/ui/swift-ui';
 import { buttonStyle, labelStyle } from '@expo/ui/swift-ui/modifiers';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { useAppPreference } from '@/hooks/useAppPreference';
 import { Radius } from '@/theme/spacing';
@@ -294,7 +295,7 @@ const PostCard = React.memo(function PostCard({
       {/* ── Bottom bar: "..." menu (moved from top-right) ── */}
       {!immersive && (
         <View style={[s.bottomBar, { borderTopColor: colors.divider }]}>
-          <Host matchContents>
+          <ThemedHost matchContents>
             <Menu label="" systemImage="ellipsis" modifiers={[labelStyle('iconOnly'), buttonStyle('plain')]}>
               <Button label="复制内容" systemImage="doc.on.doc" onPress={handleCopyPress} />
               <Button label="分享" systemImage="square.and.arrow.up" onPress={handleShare} />
@@ -304,7 +305,7 @@ const PostCard = React.memo(function PostCard({
                 <Button label="删除" systemImage="trash" role="destructive" onPress={() => onDelete(post.id)} />
               )}
             </Menu>
-          </Host>
+          </ThemedHost>
         </View>
       )}
     </View>

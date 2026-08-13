@@ -15,7 +15,6 @@ import {
   DeviceEventEmitter,
   StyleSheet,
   Text,
-  useColorScheme,
   View,
 } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider, usePathname } from 'expo-router';
@@ -29,8 +28,7 @@ const TAB_RESELECT_EVENT = 'tieba:tab-reselect';
 
 // ── Main Tab Layout ──
 export default function TabLayout() {
-  const { colors } = useThemeColors();
-  const colorScheme = useColorScheme();
+  const { colors, isDark } = useThemeColors();
   const pathname = usePathname();
   const totalUnread = useNotificationStore((s) => s.counts.total);
   const isSigning = useSignStore((s) => s.isSigning);
@@ -52,7 +50,10 @@ export default function TabLayout() {
   // consider a config-plugin-level approach or a separate layout.
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    // 使用应用自身的 isDark（而非系统 useColorScheme）驱动 react-navigation
+    // ThemeProvider，使 tab 标签/图标配色与应用内容主题一致——应用"强制深色 +
+    // 系统浅色"时不再出现 tab 亮色标签配深色内容页的脱节。
+    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       {/* §2.4: ThemeProvider prevents white background flash and liquid
           glass flicker on iOS 26 dark mode. */}
       <NativeTabs
@@ -68,6 +69,12 @@ export default function TabLayout() {
           // material (Liquid Glass on iOS 26); shadowColor 'transparent'
           // removes the hairline separator.
           backgroundColor="transparent"
+          // 评估（保持）：expo-router 57 的 NativeTabsBlurEffect 虽支持
+          // systemMaterialDark 等暗色变体，但 NativeTabsProps 无全局
+          // colorScheme/UIUserInterfaceStyle 开关，未选中 tab 的 icon/label
+          // 颜色仍跟随系统外观。若应用强制深色+系统浅色时强行切暗材质，
+          // 系统浅色驱动下的黑色未选中项会贴暗玻璃不可见。故保持跟随系统的
+          // 'systemDefault'，避免引入比现有问题更严重的可见性缺陷。
           blurEffect="systemDefault"
           shadowColor="transparent"
           // Tint color for selected tab icon + label.

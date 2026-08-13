@@ -25,7 +25,7 @@ import { useLocalSearchParams, Stack, Link, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Picker, Text as SWText, Host, Menu, ConfirmationDialog, Button as SWButton } from '@expo/ui/swift-ui';
+import { Picker, Text as SWText, Menu, ConfirmationDialog, Button as SWButton } from '@expo/ui/swift-ui';
 import { pickerStyle, tag, labelStyle, buttonStyle } from '@expo/ui/swift-ui/modifiers';
 import BottomSheetComponent, { BottomSheetScrollView } from '@expo/ui/community/bottom-sheet';
 import type { BottomSheet } from '@expo/ui/community/bottom-sheet';
@@ -900,7 +900,7 @@ export default function ForumPage() {
       />
 
       {/* ── Unfollow ConfirmationDialog (SwiftUI) ── */}
-      <Host matchContents style={{ position: 'absolute', width: 0, height: 0 }}>
+      <ThemedHost matchContents style={{ position: 'absolute', width: 0, height: 0 }}>
         <ConfirmationDialog
           title="取消关注"
           isPresented={unfollowConfirmVisible}
@@ -913,7 +913,7 @@ export default function ForumPage() {
           </ConfirmationDialog.Actions>
           <ConfirmationDialog.Message><SWText>{`确定要取消关注${name}吧吗？`}</SWText></ConfirmationDialog.Message>
         </ConfirmationDialog>
-      </Host>
+      </ThemedHost>
     </View>
   );
 }

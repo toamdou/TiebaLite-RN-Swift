@@ -151,6 +151,7 @@ export default function BawuTeamPage() {
             styles.userRow,
             {
               backgroundColor: colors.card,
+              borderColor: colors.divider,
               opacity: pressed ? 0.85 : 1,
               transform: [{ scale: pressed ? 0.985 : 1 }],
             },
@@ -318,7 +319,6 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: Radius.card,
     borderWidth: 0.5,
-    borderColor: 'rgba(128,128,128,0.12)',
   },
   userTextCol: { flex: 1 },
   userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

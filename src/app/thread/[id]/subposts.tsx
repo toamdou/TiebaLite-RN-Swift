@@ -26,6 +26,7 @@ import { SymbolView } from '@/components/ui/SymbolView';
 import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
 import * as Clipboard from 'expo-clipboard';
 import { Avatar } from '@/components/ui/Avatar';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useThemeColors } from '@/theme/ThemeContext';
@@ -481,25 +482,30 @@ export default function SubPostsPage() {
   // States
   if (loading && subPosts.length === 0) {
     return (
-      <View style={flattenStyle([s.container, { backgroundColor: colors.background }])}>
-        <Stack.Screen options={{ title: `第${floor}楼回复` }} />
-        <View style={s.loadingSkeleton}>
-          <SkeletonList count={8} variant="row" />
+      <ThemedHost style={{ flex: 1 }}>
+        <View style={flattenStyle([s.container, { backgroundColor: colors.background }])}>
+          <Stack.Screen options={{ title: `第${floor}楼回复` }} />
+          <View style={s.loadingSkeleton}>
+            <SkeletonList count={8} variant="row" />
+          </View>
         </View>
-      </View>
+      </ThemedHost>
     );
   }
   if (error && subPosts.length === 0) {
     return (
-      <View style={flattenStyle([s.container, { backgroundColor: colors.background }])}>
-        <Stack.Screen options={{ title: `第${floor}楼回复` }} />
-        <ErrorState message={error} onRetry={handleRefresh} />
-      </View>
+      <ThemedHost style={{ flex: 1 }}>
+        <View style={flattenStyle([s.container, { backgroundColor: colors.background }])}>
+          <Stack.Screen options={{ title: `第${floor}楼回复` }} />
+          <ErrorState message={error} onRetry={handleRefresh} />
+        </View>
+      </ThemedHost>
     );
   }
 
   return (
-    <View style={flattenStyle([s.container, { backgroundColor: colors.background }])}>
+    <ThemedHost style={{ flex: 1 }}>
+      <View style={flattenStyle([s.container, { backgroundColor: colors.background }])}>
       <Stack.Screen options={{ title: `第${floor || '?'}楼回复` }} />
       <FlashList
         data={subPosts}
@@ -530,7 +536,8 @@ export default function SubPostsPage() {
         onClose={imageViewer.closeImageViewer}
         forumName={decodedForumName}
       />
-    </View>
+      </View>
+    </ThemedHost>
   );
 }
 

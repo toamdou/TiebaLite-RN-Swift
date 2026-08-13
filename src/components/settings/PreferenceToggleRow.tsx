@@ -5,6 +5,7 @@
 import { Toggle, Text } from '@expo/ui/swift-ui';
 import { hapticSelection } from '@/utils/haptics';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import type { AppPreferences } from '@/types';
 
 export interface PreferenceToggleRowProps {
@@ -24,16 +25,18 @@ export function PreferenceToggleRow({
   const setPreference = usePreferencesStore((s) => s.setPreference);
 
   return (
-    <Toggle
-      label={label}
-      systemImage={systemImage as any}
-      isOn={Boolean(value)}
-      onIsOnChange={(next) => {
-        hapticSelection();
-        setPreference(preferenceKey, next as never);
-      }}
-    >
-      {description ? <Text>{description}</Text> : null}
-    </Toggle>
+    <ThemedHost matchContents>
+      <Toggle
+        label={label}
+        systemImage={systemImage as any}
+        isOn={Boolean(value)}
+        onIsOnChange={(next) => {
+          hapticSelection();
+          setPreference(preferenceKey, next as never);
+        }}
+      >
+        {description ? <Text>{description}</Text> : null}
+      </Toggle>
+    </ThemedHost>
   );
 }

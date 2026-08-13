@@ -33,6 +33,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
 import * as Clipboard from 'expo-clipboard';
 import { MenuView, type MenuAction } from '@expo/ui/community/menu';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { PRESS_ENTER, PRESS_EXIT, PRESS_SCALE } from '@/theme/springs';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -69,15 +70,17 @@ function CardMenuButton({
   style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <MenuView style={style} actions={FEED_MENU_ACTIONS} onPressAction={onAction}>
-      <Pressable
-        style={[styles.cardMenuButton, style]}
-        accessibilityRole="button"
-        accessibilityLabel="更多操作"
-      >
-        <SymbolView name="ellipsis" size={15} weight="bold" tintColor={tintColor} />
-      </Pressable>
-    </MenuView>
+    <ThemedHost matchContents>
+      <MenuView style={style} actions={FEED_MENU_ACTIONS} onPressAction={onAction}>
+        <Pressable
+          style={[styles.cardMenuButton, style]}
+          accessibilityRole="button"
+          accessibilityLabel="更多操作"
+        >
+          <SymbolView name="ellipsis" size={15} weight="bold" tintColor={tintColor} />
+        </Pressable>
+      </MenuView>
+    </ThemedHost>
   );
 }
 

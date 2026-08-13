@@ -27,6 +27,7 @@ import type { SearchBarCommands } from 'react-native-screens';
 import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SearchPostList } from '@/components/search/SearchResultList';
@@ -248,8 +249,9 @@ export default function ForumSearchPage() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen options={{ headerSearchBarOptions: searchBarOptions }} />
+    <ThemedHost style={{ flex: 1 }}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ headerSearchBarOptions: searchBarOptions }} />
       {/* Sort & Filter native menus */}
       <View style={styles.controlsRow}>
         <Picker<string>
@@ -355,7 +357,8 @@ export default function ForumSearchPage() {
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 16 }]}
         />
       )}
-    </View>
+      </View>
+    </ThemedHost>
   );
 }
 

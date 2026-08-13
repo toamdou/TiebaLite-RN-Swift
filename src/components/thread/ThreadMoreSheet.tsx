@@ -214,6 +214,7 @@ export default function ThreadMoreSheet({
       snapPoints={['45%', '75%']}
       enablePanDownToClose
       onClose={handleSheetClosed}
+      backgroundStyle={{ backgroundColor: colors.card }}
     >
       <BottomSheetScrollView
         style={styles.scrollContainer}

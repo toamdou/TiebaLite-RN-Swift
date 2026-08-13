@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { hapticNotify, NotificationFeedbackType } from '@/utils/haptics';
 import { MenuView, type MenuAction } from '@expo/ui/community/menu';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/Skeleton';
@@ -214,25 +215,30 @@ export default function ThreadStorePage() {
   // Loading
   if (loading && items.length === 0) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.skeletonWrap}>
-          <SkeletonList variant="row" count={8} />
+      <ThemedHost style={{ flex: 1 }}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <View style={styles.skeletonWrap}>
+            <SkeletonList variant="row" count={8} />
+          </View>
         </View>
-      </View>
+      </ThemedHost>
     );
   }
 
   // Error
   if (error && items.length === 0) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ErrorState message={error} onRetry={refresh} />
-      </View>
+      <ThemedHost style={{ flex: 1 }}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <ErrorState message={error} onRetry={refresh} />
+        </View>
+      </ThemedHost>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ThemedHost style={{ flex: 1 }}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlashList
         data={items}
         keyExtractor={favoriteKeyExtractor}
@@ -276,7 +282,8 @@ export default function ThreadStorePage() {
           </View>
         </View>
       )}
-    </View>
+      </View>
+    </ThemedHost>
   );
 }
 

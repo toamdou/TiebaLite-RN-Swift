@@ -12,6 +12,7 @@ import {
 import { ContentUnavailableView } from '@expo/ui/swift-ui';
 
 import { Spacing } from '@/theme';
+import { ThemedHost } from './ThemedHost';
 import { Button } from './Button';
 
 // ---------- ErrorState Props ----------
@@ -51,11 +52,13 @@ export function ErrorState({
         `错误：${title}${message ? `，${message}` : ''}`
       }
     >
-      <ContentUnavailableView
-        title={title}
-        description={message}
-        systemImage={icon as any}
-      />
+      <ThemedHost matchContents>
+        <ContentUnavailableView
+          title={title}
+          description={message}
+          systemImage={icon as any}
+        />
+      </ThemedHost>
 
       {onRetry ? (
         <View style={styles.retryContainer}>

@@ -21,7 +21,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import {
-  Host, ConfirmationDialog, Button as SWButton, Text as SWText,
+  ConfirmationDialog, Button as SWButton, Text as SWText,
   Alert as SWAlert, TextField, useNativeState,
 } from '@expo/ui/swift-ui';
 import { keyboardType } from '@expo/ui/swift-ui/modifiers';
@@ -39,6 +39,7 @@ import { SymbolView } from '@/components/ui/SymbolView';
 import { GlassView } from '@/components/ui/GlassView';
 import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
 import { Toast, type ToastRef } from '@/components/ui/Toast';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import { Avatar } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -856,7 +857,7 @@ export default function ThreadPage() {
       )}
 
       {/* Jump-to-page dialog (SwiftUI Alert + TextField) */}
-      <Host matchContents style={{ position: 'absolute', width: 0, height: 0 }}>
+      <ThemedHost matchContents style={{ position: 'absolute', width: 0, height: 0 }}>
         <SWAlert title="跳转页面" isPresented={jumpDialogVisible} onIsPresentedChange={setJumpDialogVisible}>
           <SWAlert.Actions>
             <SWButton label="跳转" onPress={handleJumpConfirm} />
@@ -866,10 +867,10 @@ export default function ThreadPage() {
             <TextField placeholder={`1-${totalPages > 0 ? totalPages : '?'}`} text={jumpText} modifiers={[keyboardType('numeric')]} autoFocus />
           </SWAlert.Message>
         </SWAlert>
-      </Host>
+      </ThemedHost>
 
       {/* Confirmation dialog (report / delete) */}
-      <Host matchContents style={{ position: 'absolute', width: 0, height: 0 }}>
+      <ThemedHost matchContents style={{ position: 'absolute', width: 0, height: 0 }}>
         <ConfirmationDialog
           title={confirmState.title}
           isPresented={confirmState.visible}
@@ -882,7 +883,7 @@ export default function ThreadPage() {
           </ConfirmationDialog.Actions>
           <ConfirmationDialog.Message><SWText>{confirmState.message}</SWText></ConfirmationDialog.Message>
         </ConfirmationDialog>
-      </Host>
+      </ThemedHost>
 
       {/* Image Viewer */}
       <ImageViewer

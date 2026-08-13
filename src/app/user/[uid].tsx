@@ -37,8 +37,9 @@ import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackTy
 import { SymbolView } from '@/components/ui/SymbolView';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
-import { Host, Picker, Text as SWText } from '@expo/ui/swift-ui';
+import { Picker, Text as SWText } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/Skeleton';
@@ -469,12 +470,14 @@ export default function UserProfilePage() {
 
   if (loadingProfile && !user) {
     return (
-      <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
-        <Stack.Screen options={{ title: '用户' }} />
-        <View style={styles.skeletonWrap}>
-          <SkeletonList variant="row" count={8} />
+      <ThemedHost style={{ flex: 1 }}>
+        <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
+          <Stack.Screen options={{ title: '用户' }} />
+          <View style={styles.skeletonWrap}>
+            <SkeletonList variant="row" count={8} />
+          </View>
         </View>
-      </View>
+      </ThemedHost>
     );
   }
 
@@ -482,17 +485,20 @@ export default function UserProfilePage() {
 
   if (error && !user) {
     return (
-      <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
-        <Stack.Screen options={{ title: '用户' }} />
-        <ErrorState message={error} onRetry={loadProfile} />
-      </View>
+      <ThemedHost style={{ flex: 1 }}>
+        <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
+          <Stack.Screen options={{ title: '用户' }} />
+          <ErrorState message={error} onRetry={loadProfile} />
+        </View>
+      </ThemedHost>
     );
   }
 
   // ---------- Main render ----------
 
   return (
-    <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
+    <ThemedHost style={{ flex: 1 }}>
+      <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
       <Stack.Screen options={{ title: user?.nameShow || user?.name || '用户' }} />
 
       {socialVisible ? (
@@ -507,7 +513,7 @@ export default function UserProfilePage() {
         <>
           {/* SegmentedControl tabs rendered outside FlatList */}
           <View style={styles.tabsRow}>
-            <Host matchContents>
+            <ThemedHost matchContents>
               <Picker
               selection={displayedTab}
                 onSelectionChange={handleTabChange}
@@ -517,7 +523,7 @@ export default function UserProfilePage() {
                   <SWText key={tab.value} modifiers={[tag(tab.value)]}>{tab.label}</SWText>
                 ))}
               </Picker>
-            </Host>
+            </ThemedHost>
           </View>
 
           {/* 懒挂载：仅挂载当前激活的 tab，切换时才 mount/加载，避免预渲染多份 FlashList */}
@@ -545,7 +551,8 @@ export default function UserProfilePage() {
         visible={avatarPreviewVisible}
         onClose={() => setAvatarPreviewVisible(false)}
       />
-    </View>
+      </View>
+    </ThemedHost>
   );
 }
 
@@ -809,7 +816,7 @@ function SocialTabList({
           >
             <SymbolView name="xmark" size={16} weight="semibold" tintColor={colors.textSecondary} />
           </Pressable>
-          <Host matchContents>
+          <ThemedHost matchContents>
             <Picker
               selection={mode}
               onSelectionChange={handleModeChange}
@@ -818,7 +825,7 @@ function SocialTabList({
               <SWText modifiers={[tag('fans')]}>粉丝</SWText>
               <SWText modifiers={[tag('follows')]}>关注</SWText>
             </Picker>
-          </Host>
+          </ThemedHost>
           {/* 平衡左侧关闭按钮占位，让分段居中 */}
           <View style={styles.socialCloseBtn} />
         </View>

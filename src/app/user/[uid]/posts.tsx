@@ -15,8 +15,9 @@ import {
   Text,
   RefreshControl,
 } from 'react-native';
-import { Host, Picker, Text as SWText } from '@expo/ui/swift-ui';
+import { Picker, Text as SWText } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, Stack, Link } from 'expo-router';
 import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '@/utils/haptics';
@@ -172,23 +173,24 @@ export default function UserPostsPage() {
   // ---------- Main render ----------
 
   return (
-    <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
-      <Stack.Screen options={{ title: headerTitle }} />
+    <ThemedHost style={{ flex: 1 }}>
+      <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
+        <Stack.Screen options={{ title: headerTitle }} />
 
-      {/* Segmented tabs */}
-      <View style={styles.tabsRow}>
-        <Host matchContents>
-          <Picker
-            selection={activeTab}
-            onSelectionChange={handleTabChange}
-            modifiers={[pickerStyle('segmented')]}
-          >
-            {POST_TABS.map((tab) => (
-              <SWText key={tab.value} modifiers={[tag(tab.value)]}>{tab.label}</SWText>
-            ))}
-          </Picker>
-        </Host>
-      </View>
+        {/* Segmented tabs */}
+        <View style={styles.tabsRow}>
+          <ThemedHost matchContents>
+            <Picker
+              selection={activeTab}
+              onSelectionChange={handleTabChange}
+              modifiers={[pickerStyle('segmented')]}
+            >
+              {POST_TABS.map((tab) => (
+                <SWText key={tab.value} modifiers={[tag(tab.value)]}>{tab.label}</SWText>
+              ))}
+            </Picker>
+          </ThemedHost>
+        </View>
 
       <FlashList
         data={items}
@@ -216,7 +218,8 @@ export default function UserPostsPage() {
         ListFooterComponent={listFooter}
         ItemSeparatorComponent={UserPostsItemSeparator}
       />
-    </View>
+      </View>
+    </ThemedHost>
   );
 }
 

@@ -84,6 +84,22 @@ const queryClient = new QueryClient({
 // Global error boundary — catches render errors in the app tree and shows a
 // fallback UI with a retry button instead of a hard crash. Retry remounts the
 // subtree via a changing key so stale render state cannot survive.
+
+// ErrorBoundary 是 class 组件，无法直接使用 useThemeColors Hook；
+// 兜底 UI 作为独立函数组件渲染，在 ThemeProvider 内读取 colors.text，
+// 保证深色模式下"出错了/重试"文字可见。
+function ErrorFallback({ onRetry }: { onRetry: () => void }) {
+  const { colors } = useThemeColors();
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+      <Text style={{ fontSize: 16, color: colors.text }}>出错了</Text>
+      <Pressable onPress={onRetry}>
+        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>重试</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; attempt: number }
@@ -104,14 +120,9 @@ class ErrorBoundary extends React.Component<
   };
   render() {
     if (this.state.hasError) {
-      return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
-          <Text style={{ fontSize: 16 }}>出错了</Text>
-          <Pressable onPress={this.handleRetry}>
-            <Text style={{ fontSize: 16, fontWeight: '600' }}>重试</Text>
-          </Pressable>
-        </View>
-      );
+      // ErrorFallback 是函数组件，可在 ThemeProvider 内读取 useThemeColors，
+      // 保证深色模式下兜底文字（colors.text）可见。
+      return <ErrorFallback onRetry={this.handleRetry} />;
     }
     return (
       <View key={this.state.attempt} style={{ flex: 1 }}>
@@ -178,7 +189,11 @@ function RootLayoutInner() {
     gestureEnabled: true,
     headerTintColor: headerTint,
     headerBackButtonDisplayMode: 'minimal' as const,
-    headerBlurEffect: 'systemMaterial' as const,
+    // react-native-screens 的 BlurEffectTypes 提供 *_Dark / *_Light 显式变体。
+    // 应用"强制深色 + 系统浅色"（或反之）时 'systemMaterial' 跟随系统外观，
+    // 会使导航栏玻璃明暗与 headerTint 文字取色（isDark 决定）脱节。
+    // 按 isDark 显式切换暗/亮材质，保证深色下浅字贴暗玻璃、浅色下黑字贴亮玻璃。
+    headerBlurEffect: isDark ? ('systemMaterialDark' as const) : ('systemMaterialLight' as const),
     headerShadowVisible: false,
     headerStyle: { backgroundColor: 'transparent' },
     // SDK 57 / react-native-screens iOS 26: expo-router defaults every edge
@@ -195,7 +210,7 @@ function RootLayoutInner() {
     },
     contentStyle: { backgroundColor: colors.background },
     freezeOnBlur: true,
-  }), [headerTint, colors.background]);
+  }), [headerTint, colors.background, isDark]);
 
   useEffect(() => {
     let cancelled = false;
@@ -291,7 +306,9 @@ function RootLayoutInner() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar style={toolbarPrimaryColor ? (statusBarFontDark ? 'dark' : 'light') : isDark ? 'light' : 'dark'} />
+      {/* toolbarPrimaryColor=true 时深色模式一律浅字（白字贴深色导航栏），
+          浅色模式才尊重 statusBarFontDark 偏好——与 headerTint 的取色同源。 */}
+      <StatusBar style={toolbarPrimaryColor ? (isDark ? 'light' : (statusBarFontDark ? 'dark' : 'light')) : isDark ? 'light' : 'dark'} />
       <Stack screenOptions={screenOpts}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
         <Stack.Screen name="login" options={{ title: '登录', presentation: 'formSheet' as const, headerBackVisible: false, sheetGrabberVisible: true, contentStyle: { backgroundColor: colors.background } }} />

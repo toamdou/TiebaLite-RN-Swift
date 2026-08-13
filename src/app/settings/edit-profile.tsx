@@ -265,43 +265,47 @@ export default function EditProfilePage() {
         transparent={false}
         onRequestClose={() => setPickerVisible(false)}
       >
-        <View style={[styles.modal, { backgroundColor: colors.windowBackground, paddingTop: insets.top + Spacing.lg }]}>
-          <View style={styles.modalHeader}>
-            <RNText style={[typographyStyles.headline, { color: colors.text }]}>选择头像</RNText>
-            <Pressable
-              onPress={() => setPickerVisible(false)}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="取消选择头像"
-            >
-              <RNText style={[typographyStyles.subhead, { color: colors.tint }]}>取消</RNText>
-            </Pressable>
-          </View>
-          {pickerLoading ? (
-            <View style={styles.modalLoading}>
-              <ProgressView modifiers={[progressViewStyle('circular')]} />
+        {/* Modal 在页面 ThemedHost 之外，ProgressView 等 SwiftUI 组件默认按系统
+            浅色渲染；包一层 ThemedHost 让原生组件跟随应用 isDark。 */}
+        <ThemedHost style={{ flex: 1 }}>
+          <View style={[styles.modal, { backgroundColor: colors.windowBackground, paddingTop: insets.top + Spacing.lg }]}>
+            <View style={styles.modalHeader}>
+              <RNText style={[typographyStyles.headline, { color: colors.text }]}>选择头像</RNText>
+              <Pressable
+                onPress={() => setPickerVisible(false)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="取消选择头像"
+              >
+                <RNText style={[typographyStyles.subhead, { color: colors.tint }]}>取消</RNText>
+              </Pressable>
             </View>
-          ) : (
-            <ScrollView contentContainerStyle={styles.grid}>
-              {photos.map((p) => (
-                <Pressable
-                  key={p.id}
-                  onPress={() => handleUploadPortrait(p.uri)}
-                  accessibilityRole="imagebutton"
-                  accessibilityLabel="选择此照片作为头像"
-                  style={styles.cell}
-                >
-                  <Image
-                    source={{ uri: p.uri }}
-                    style={styles.thumb}
-                    contentFit="cover"
-                    transition={150}
-                  />
-                </Pressable>
-              ))}
-            </ScrollView>
-          )}
-        </View>
+            {pickerLoading ? (
+              <View style={styles.modalLoading}>
+                <ProgressView modifiers={[progressViewStyle('circular')]} />
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={styles.grid}>
+                {photos.map((p) => (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => handleUploadPortrait(p.uri)}
+                    accessibilityRole="imagebutton"
+                    accessibilityLabel="选择此照片作为头像"
+                    style={styles.cell}
+                  >
+                    <Image
+                      source={{ uri: p.uri }}
+                      style={styles.thumb}
+                      contentFit="cover"
+                      transition={150}
+                    />
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </ThemedHost>
       </Modal>
 
       {/* In-page toast (no global ToastProvider mounted) */}

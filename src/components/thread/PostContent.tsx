@@ -798,7 +798,9 @@ function PollSegment({
             },
           ]}
         >
-          <Text style={[styles.pollSubmitText, { color: selectedIndices.length === 0 ? colors.textDisabled : '#FFF' }]}>
+          {/* textOnPrimary：跟随主题主色（withPrimary 高亮主色下为深色字），
+              避免硬编码 '#FFF' 在浅色主色（如粉色主题）下白字贴浅底不可见 */}
+          <Text style={[styles.pollSubmitText, { color: selectedIndices.length === 0 ? colors.textDisabled : colors.textOnPrimary }]}>
             提交投票{selectedIndices.length > 0 ? ` (${selectedIndices.length})` : ''}
           </Text>
         </Pressable>
@@ -877,8 +879,10 @@ function PostContent({
     let key = 0;
 
     // BlockTip — matches Kotlin Block.kt BlockTip composable
+    // textSecondary 是 rgba() 字符串，不能直接拼 alpha 后缀（会得非法色值），
+    // 改用 isDark 显式分支的屏蔽提示底色（与 ThreadMoreSheet groupBg 同源）。
     const renderBlockTip = (k: number) => (
-      <View key={`blocked-${k}`} style={[styles.blockTip, { backgroundColor: colors.textSecondary + '1A' }]}>
+      <View key={`blocked-${k}`} style={[styles.blockTip, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(120,120,128,0.08)' }]}>
         <SymbolView name="eye.slash" size={12} tintColor={colors.textSecondary} />
         <Text style={[styles.blockTipText, { color: colors.textSecondary }]}>内容已屏蔽</Text>
       </View>
@@ -1051,6 +1055,7 @@ function PostContent({
   }, [
     content,
     colors,
+    isDark,
     hideMedia,
     blockVideo,
     hideBlockedContent,
