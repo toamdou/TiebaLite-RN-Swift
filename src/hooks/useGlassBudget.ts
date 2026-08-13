@@ -23,7 +23,7 @@
 import {
   useCallback,
   useLayoutEffect,
-  useRef,
+  useState,
   useSyncExternalStore,
 } from 'react';
 import { useIsFocused, useRoute } from 'expo-router';
@@ -69,12 +69,9 @@ export function useGlassBudget(): GlassBudgetInfo {
   const routeKey = useRoute().key;
   const isFocused = useIsFocused();
 
-  // 每个实例唯一的自增 id（首帧分配，顺序即挂载顺序）
-  const idRef = useRef(0);
-  if (idRef.current === 0) {
-    idRef.current = ++nextInstanceId;
-  }
-  const instanceId = idRef.current;
+  // 每个实例唯一的自增 id。useState 惰性初始化是官方允许的初始化器路径，
+  // 不触发 react-hooks/refs「渲染期访问 ref」规则；自增顺序即挂载顺序。
+  const [instanceId] = useState(() => ++nextInstanceId);
 
   // 订阅本屏计数变化（其他实例挂载/卸载时触发重渲染，重算排名）
   const subscribe = useCallback(
