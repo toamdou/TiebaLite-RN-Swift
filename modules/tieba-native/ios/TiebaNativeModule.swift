@@ -263,6 +263,66 @@ public final class TiebaNativeModule: Module {
         view.inactiveColor = color ?? .secondaryLabel
       }
     }
+
+    // ── iOS 26 美化波（P1）：原生按压 + 原生信息流卡片 ──
+
+    View(TiebaPressableView.self) {
+      Events("onPress")
+
+      Prop("scalePressed") { (view, scale: Double) in
+        view.scalePressed = scale
+      }
+      Prop("highlightColor") { (view, color: UIColor?) in
+        view.highlightColor = color
+      }
+      Prop("disabled") { (view, disabled: Bool) in
+        view.disabled = disabled
+      }
+    }
+
+    View(TiebaFeedCellView.self) {
+      Events("onPress")
+
+      Prop("title") { (view, title: String) in
+        view.title = title
+      }
+      Prop("summary") { (view, summary: String?) in
+        view.summary = summary
+      }
+      Prop("author") { (view, author: String) in
+        view.author = author
+      }
+      Prop("forumName") { (view, forumName: String?) in
+        view.forumName = forumName
+      }
+      Prop("replyCount") { (view, replyCount: Int) in
+        view.replyCount = replyCount
+      }
+      Prop("timeText") { (view, timeText: String) in
+        view.timeText = timeText
+      }
+      Prop("imageUrl") { (view, imageUrl: String?) in
+        view.imageUrl = imageUrl
+      }
+      Prop("accentColor") { (view, color: UIColor?) in
+        view.accentColor = color
+      }
+      Prop("textPrimary") { (view, color: UIColor) in
+        view.textPrimary = color
+      }
+      Prop("textSecondary") { (view, color: UIColor) in
+        view.textSecondary = color
+      }
+      Prop("cardBackground") { (view, color: UIColor?) in
+        view.cardBackground = color
+      }
+      Prop("radius") { (view, radius: Double) in
+        view.radius = radius
+      }
+      Prop("enterIndex") { (view, index: Int) in
+        view.enterIndex = index
+      }
+    }
   }
 
   private var supportsLiveActivities: Bool {
