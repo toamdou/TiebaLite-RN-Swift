@@ -3,3 +3,4 @@ export type { ProtoPostRequest, TiebaNativeModule } from './TiebaNative';
 export { TiebaRichText } from './TiebaRichText';
 export type { TiebaRichTextProps, TiebaRichTextRun } from './TiebaRichText';
 export { FeedCell } from './TiebaFeedCell';
+export { PressableScale } from './TiebaPressable';
