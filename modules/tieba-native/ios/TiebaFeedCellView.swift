@@ -9,7 +9,8 @@ import UIKit
 ///
 /// 动效：
 /// - 按压：原生 spring 缩放至 0.97（阻尼感参考 PRESS_ENTER/PRESS_EXIT）+ Light 震动；
-///   反馈带确认窗口 + 位移判定取消，滚动意图（手指位移 > 10pt）不产生任何反馈、不触发 onPress
+///   反馈带确认窗口 + 窗口坐标系位移判定取消，
+///   滚动意图（屏幕位移 > 10pt）不产生反馈、不触发 onPress（快慢滚一致）
 /// - 入场：首帧 fade + 8pt 上移 + 35ms stagger；滚动复用的单元格不重放入场动画
 ///   （entryPlayed 标记 + 递增计数器，仅每个原生视图实例首次挂载时播放一次）
 /// - 图片：经 TiebaImageIO（内存 + 磁盘缓存）加载 Hero 图，200pt
@@ -90,19 +91,23 @@ public final class TiebaFeedCellView: ExpoView {
   private var lastImageUrl: String?
 
   // MARK: 按压状态（滚动协调）
-  // .began 后进入确认窗口：位移未超阈值才显示缩放 + 震动；
+  // .began 后进入确认窗口：屏幕位移未超阈值才显示缩放 + 震动；
   // 位移超阈值判定为滚动意图 → 撤销反馈且后续不触发 onPress。
-  private var pressStartPoint = CGPoint.zero
+  // 位移统一在【窗口坐标系】测量：滚动时 UIScrollView 内容跟手 1:1，
+  // cell 局部坐标的位移会被内容移动抵消（慢速滚动近乎为零），
+  // 窗口（屏幕）坐标位移不受内容跟手影响，快慢滚都能可靠判别。
+  private var pressStartWindowPoint = CGPoint.zero
   private var pressConfirmed = false
   private var pressCancelled = false
   private var pressTimer: Timer?
 
-  /// 位移判定阈值（pt）：手指从按下点移出该距离即视为滚动意图。
+  /// 位移判定阈值（pt，窗口坐标系）：手指从按下点移出该距离即视为滚动意图。
   /// 不宜过小——原地轻微抖动（< 阈值）仍应保留按压反馈与 onPress。
   private static let pressMovementThreshold: CGFloat = 10
   /// 按压反馈确认延迟（s）：窗口内位移未超阈值才进入按压态。
-  /// 滚动触摸通常在窗口内就已移出阈值，全程无缩放、无震动。
-  private static let pressConfirmDelay: TimeInterval = 0.12
+  /// 0.08s 兼顾两点：滚动通常在窗口内就已移出阈值（无反馈、无误触），
+  /// 常规点按（≥ 0.08s）保留缩放 + 震动 + onPress。
+  private static let pressConfirmDelay: TimeInterval = 0.08
 
   // 入场 stagger：递增计数器跨实例共享，保证首屏按 35ms 级联。
   private static let staggerStep: TimeInterval = 0.035
@@ -393,20 +398,20 @@ public final class TiebaFeedCellView: ExpoView {
   }
 
   @objc private func handlePress(_ gesture: UILongPressGestureRecognizer) {
-    let point = gesture.location(in: self)
     switch gesture.state {
     case .began:
-      // 触摸即起跟踪，但不立刻给反馈：先进入确认窗口。
-      pressStartPoint = point
+      // 触摸即起跟踪（窗口坐标系，滚动时 cell 局部坐标会因内容跟手而抵消）。
+      pressStartWindowPoint = gesture.location(in: nil)
       pressConfirmed = false
       pressCancelled = false
       hapticGenerator.prepare()
       schedulePressConfirm()
     case .changed:
-      // 位移超过阈值 → 判定为滚动意图，撤销按压反馈。
+      // 屏幕位移超过阈值 → 判定为滚动意图，撤销按压反馈。
       guard !pressCancelled else { break }
-      let dx = point.x - pressStartPoint.x
-      let dy = point.y - pressStartPoint.y
+      let windowPoint = gesture.location(in: nil)
+      let dx = windowPoint.x - pressStartWindowPoint.x
+      let dy = windowPoint.y - pressStartWindowPoint.y
       if dx * dx + dy * dy > Self.pressMovementThreshold * Self.pressMovementThreshold {
         cancelPressForScroll()
       }
@@ -419,6 +424,7 @@ public final class TiebaFeedCellView: ExpoView {
         resetPressState()
         return
       }
+      let point = gesture.location(in: self)
       if pressConfirmed {
         pressConfirmed = false
         animateScale(1.0, duration: 0.22, damping: 0.55, velocity: 2.0)
