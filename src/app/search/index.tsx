@@ -499,6 +499,7 @@ export default function SearchPage() {
           )}
         </View>
       )}
+      </View>
     </ThemedHost>
   );
 }
