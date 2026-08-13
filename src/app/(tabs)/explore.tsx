@@ -35,18 +35,22 @@ import { useImageViewer } from '@/hooks/useImageViewer';
 import { BlockManager } from '@/utils/BlockManager';
 import { Avatar } from '@/components/ui/Avatar';
 import { SymbolView } from '@/components/ui/SymbolView';
-import { formatCount } from '@/utils';
+import { formatCount, relativeTime, buildThreadUrl } from '@/utils';
 import { LoadType } from '@/types';
-import type { FeedItem, ForumInfo, HotTopic, HotTabInfo, HotThreadInfo } from '@/types';
+import type { FeedItem, ForumInfo, HotTopic, HotTabInfo, HotThreadInfo, ThreadInfo } from '@/types';
 import {
   personalized as apiPersonalized,
   userLike as apiUserLike,
   hotThreadList,
   submitDislike,
   mapProtoThread,
+  agree,
 } from '@/services/api/endpoints';
 import { usePagedList } from '@/hooks/usePagedList';
 import FeedCard from '@/components/FeedCard';
+import { FeedCell } from '../../../modules/tieba-native/src/TiebaFeedCell';
+import * as Clipboard from 'expo-clipboard';
+import { MenuView, type MenuAction } from '@expo/ui/community/menu';
 import ImageViewer from '@/components/ImageViewer';
 import { LoadMoreFooter } from '@/components/ui/LoadMoreFooter';
 import { ThemedHost } from '@/components/ui/ThemedHost';
@@ -57,7 +61,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import { DURATION, EASE_OUT, Shadows, Spacing } from '@/theme';
+import { DURATION, EASE_OUT, Shadows, Spacing, Radius, glassTokens } from '@/theme';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 const TAB_RESELECT_EVENT = 'tieba:tab-reselect';
@@ -206,6 +210,173 @@ function SegmentFade({ segment, children }: { segment: string; children: React.R
   const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return <Animated.View style={[styles.segmentFade, animatedStyle]}>{children}</Animated.View>;
 }
+
+// ── 原生 FeedCell 帖子卡片（wave 2：原生入场级联 + RN 薄操作栏保留全部交互） ──
+
+/** 原生 FeedCell 有图帖 Hero 高度，与 TiebaFeedCellView.swift 的 heroImageHeight=200 保持一致 */
+const NATIVE_HERO_HEIGHT = 200;
+
+/** 帖子卡片更多菜单（不感兴趣/屏蔽作者/复制标题），对齐 FeedCard.FEED_MENU_ACTIONS */
+const THREAD_FEED_MENU_ACTIONS: MenuAction[] = [
+  { id: 'dislike', title: '不感兴趣', image: 'hand.thumbsdown' },
+  { id: 'block', title: '屏蔽作者', image: 'person.badge.minus' },
+  { id: 'copy-title', title: '复制标题', image: 'doc.on.doc' },
+];
+
+/** 有图帖首图原址（视频取 poster）。原址直接交给原生 TiebaImageIO 做缩略缓存，
+ *  原生 targetWidth 750 的效果优于 RN 侧传 200px 缩略图。 */
+function threadHeroImage(thread: ThreadInfo): string | undefined {
+  const hero = thread.mediaList?.[0];
+  if (!hero) return undefined;
+  return hero.type === 'video' && hero.poster ? hero.poster : hero.src || undefined;
+}
+
+/**
+ * 帖子类目原生单元格复合：
+ * - FeedCell（原生展示 + 原生入场级联，enterIndex=FlashList index，滚动复用不重放入场）
+ * - 有图帖 Hero 区叠透明 Pressable：恢复 FeedCard 的“点图打开图片浏览器”交互
+ * - 底部 RN 薄操作栏（EntranceRow 同步入场）：分享 | 点赞 | 更多（不感兴趣/屏蔽/复制标题）
+ *
+ * 操作栏选择理由：FeedCard 的操作栏含实际交互（点赞/分享/不感兴趣/屏蔽/copy），
+ * 按 brief 采用“FeedCell 展示主体 + RN 薄操作栏叠加在底部”，原生滚动收益保留、交互不丢；
+ * 回复数由 FeedCell 自带操作栏展示（纯展示）。
+ */
+const NativeThreadCell = memo(function NativeThreadCell({
+  item,
+  index,
+  animateEntry,
+  onPress,
+  onShare,
+  onLike,
+  onDislike,
+  onBlockAuthor,
+  onCopyTitle,
+  onImagePress,
+}: {
+  item: FeedItem;
+  index: number;
+  animateEntry: boolean;
+  onPress: (thread: ThreadInfo) => void;
+  onShare: (thread: ThreadInfo) => void;
+  onLike: (thread: ThreadInfo) => void;
+  onDislike: (item: FeedItem) => void;
+  onBlockAuthor: (item: FeedItem) => void;
+  onCopyTitle: (thread: ThreadInfo) => void;
+  onImagePress: (images: string[], index: number) => void;
+}) {
+  const { colors, isDark } = useThemeColors();
+  const thread = item.threadInfo as ThreadInfo;
+  const heroImage = threadHeroImage(thread);
+  const heroImages = useMemo(
+    () => (thread.mediaList ?? []).map((m) => m.originSrc || m.src),
+    [thread.mediaList],
+  );
+  // 玻璃语义：优先 glassTokens.tint 主题色（iOS 26 液态玻璃卡片）
+  const cardBackground = glassTokens.tint[isDark ? 'dark' : 'light'];
+  const hasTags = thread.isTop || thread.isGood;
+
+  const handleMenuAction = useCallback(
+    (event: { nativeEvent: { event: string } }) => {
+      switch (event.nativeEvent.event) {
+        case 'dislike':
+          onDislike(item);
+          break;
+        case 'block':
+          onBlockAuthor(item);
+          break;
+        case 'copy-title':
+          onCopyTitle(thread);
+          break;
+      }
+    },
+    [onDislike, onBlockAuthor, onCopyTitle, item, thread],
+  );
+
+  return (
+    <View
+      style={[
+        styles.nativeThreadCardWrap,
+        {
+          backgroundColor: cardBackground,
+          borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+        },
+      ]}
+    >
+      <FeedCell
+        title={hasTags ? `${thread.isTop ? '置顶 ' : ''}${thread.isGood ? '精品 ' : ''}${thread.title}` : thread.title}
+        summary={thread.abstract || undefined}
+        author={thread.authorNameShow || thread.authorName}
+        forumName={thread.forumName}
+        replyCount={thread.replyNum}
+        timeText={thread.createTime ? relativeTime(thread.createTime) : ''}
+        imageUrl={heroImage}
+        accentColor={colors.primary}
+        textPrimary={colors.text}
+        textSecondary={colors.textSecondary}
+        cardBackground={cardBackground}
+        radius={Radius.card}
+        enterIndex={index}
+        onPress={() => onPress(thread)}
+      />
+      {/* 有图帖 Hero 区透明叠加：恢复 FeedCard 的点图打开图片浏览器交互 */}
+      {heroImage && heroImages.length > 0 ? (
+        <Pressable
+          style={[styles.nativeHeroOverlay, { height: NATIVE_HERO_HEIGHT }]}
+          onPress={() => {
+            hapticImpact(ImpactFeedbackStyle.Light);
+            onImagePress(heroImages, 0);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="查看图片"
+        />
+      ) : null}
+      {/* RN 薄操作栏：分享 | 点赞 | 更多菜单（交互不可丢） */}
+      <EntranceRow index={index} animateEntry={animateEntry}>
+        <View style={[styles.nativeThreadActionBar, { backgroundColor: cardBackground }]}>
+          <Pressable
+            onPress={() => onShare(thread)}
+            hitSlop={4}
+            style={({ pressed }) => [styles.nativeActionItem, pressed && styles.nativeActionItemPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="分享"
+          >
+            <SymbolView name="arrowshape.turn.up.left" size={15} tintColor={colors.textTertiary} />
+            <RNText style={[styles.nativeActionText, { color: colors.textTertiary }]}>分享</RNText>
+          </Pressable>
+          <Pressable
+            onPress={() => onLike(thread)}
+            hitSlop={4}
+            style={({ pressed }) => [styles.nativeActionItem, pressed && styles.nativeActionItemPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="点赞"
+          >
+            <SymbolView name="hand.thumbsup" size={15} tintColor={colors.textTertiary} />
+            <RNText style={[styles.nativeActionText, { color: colors.textTertiary }]}>
+              {formatCount(thread.zanNum ?? 0)}
+            </RNText>
+          </Pressable>
+          <View style={styles.nativeActionSpacer} />
+          <ThemedHost matchContents>
+            <MenuView
+              style={styles.nativeActionMenu}
+              actions={THREAD_FEED_MENU_ACTIONS}
+              onPressAction={handleMenuAction}
+            >
+              <Pressable
+                hitSlop={8}
+                style={({ pressed }) => [styles.nativeActionItem, pressed && styles.nativeActionItemPressed]}
+                accessibilityRole="button"
+                accessibilityLabel="更多操作"
+              >
+                <SymbolView name="ellipsis" size={15} weight="bold" tintColor={colors.textTertiary} />
+              </Pressable>
+            </MenuView>
+          </ThemedHost>
+        </View>
+      </EntranceRow>
+    </View>
+  );
+});
 
 // ── 主页面 ──
 export default function ExploreScreen() {
@@ -385,16 +556,72 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
     loadMore();
   }, [hasMore, loadingMore, loading, loadMore]);
 
-  const renderItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => (
-    <EntranceRow index={index} animateEntry={!entranceDoneRef.current}>
-      <FeedCard
-        item={item}
-        onImagePress={imageViewer.handleImagePress}
-        onDislike={handleDislikePress}
-        onBlockAuthor={handleBlockAuthor}
-      />
-    </EntranceRow>
-  ), [imageViewer.handleImagePress, handleDislikePress, handleBlockAuthor]);
+  // ── 原生 FeedCell 帖子卡片交互（对齐 FeedCard 既有行为，仅换实现载体） ──
+  const handleThreadPress = useCallback((thread: ThreadInfo) => {
+    hapticImpact(ImpactFeedbackStyle.Light);
+    router.push(`/thread/${thread.id}`);
+  }, [router]);
+
+  const handleThreadShare = useCallback(async (thread: ThreadInfo) => {
+    hapticImpact(ImpactFeedbackStyle.Light);
+    try {
+      await Clipboard.setStringAsync(thread.id ? buildThreadUrl(thread.id) : (thread.title || ''));
+      hapticNotify(NotificationFeedbackType.Success);
+    } catch {
+      hapticNotify(NotificationFeedbackType.Error);
+    }
+  }, []);
+
+  const handleThreadLike = useCallback(async (thread: ThreadInfo) => {
+    if (!isLoggedIn) {
+      router.push('/login');
+      return;
+    }
+    hapticImpact(ImpactFeedbackStyle.Light);
+    try {
+      await agree(thread.id, thread.id, thread.hasAgree ? 0 : 1);
+      hapticNotify(NotificationFeedbackType.Success);
+    } catch {
+      hapticNotify(NotificationFeedbackType.Error);
+    }
+  }, [isLoggedIn, router]);
+
+  const handleCopyTitle = useCallback((thread: ThreadInfo) => {
+    const title = thread.title ?? '';
+    if (title) {
+      Clipboard.setStringAsync(title).catch(() => {});
+    }
+  }, []);
+
+  const renderItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => {
+    if (item.type === 'thread' || item.type === 'video_thread') {
+      // 帖子类目：原生 FeedCell（入场级联 enterIndex）+ RN 薄操作栏（分享/点赞/更多）
+      return (
+        <NativeThreadCell
+          item={item}
+          index={index}
+          animateEntry={!entranceDoneRef.current}
+          onPress={handleThreadPress}
+          onShare={handleThreadShare}
+          onLike={handleThreadLike}
+          onDislike={handleDislikePress}
+          onBlockAuthor={handleBlockAuthor}
+          onCopyTitle={handleCopyTitle}
+          onImagePress={imageViewer.handleImagePress}
+        />
+      );
+    }
+    return (
+      <EntranceRow index={index} animateEntry={!entranceDoneRef.current}>
+        <FeedCard
+          item={item}
+          onImagePress={imageViewer.handleImagePress}
+          onDislike={handleDislikePress}
+          onBlockAuthor={handleBlockAuthor}
+        />
+      </EntranceRow>
+    );
+  }, [imageViewer.handleImagePress, handleDislikePress, handleBlockAuthor, handleThreadPress, handleThreadShare, handleThreadLike, handleCopyTitle]);
 
   const keyExtractor = useCallback((item: FeedItem, index: number) => {
     const id = item.threadInfo?.id || item.forumInfo?.forumId || item.topicInfo?.topicId || '';
@@ -885,6 +1112,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   dislikeChipText: { fontSize: 14, fontWeight: '600', letterSpacing: 0 },
+  // ── 原生 FeedCell 帖子卡片（wave 2）──
+  nativeThreadCardWrap: {
+    marginHorizontal: Spacing.lg,
+    marginVertical: 6,
+    borderRadius: Radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  // 有图帖 Hero 区透明叠加：点图打开图片浏览器（高度对齐原生 heroImageHeight=200）
+  nativeHeroOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  nativeThreadActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128,128,128,0.15)',
+  },
+  nativeActionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
+    minHeight: 28,
+    justifyContent: 'center',
+  },
+  nativeActionItemPressed: { opacity: 0.5 },
+  nativeActionText: { fontSize: 13, fontWeight: '500', letterSpacing: 0 },
+  nativeActionSpacer: { flex: 1 },
+  nativeActionMenu: { minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center' },
   // 话题横向滚动
   topicSection: { paddingTop: 16, paddingBottom: 6 },
   topicSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 12 },
