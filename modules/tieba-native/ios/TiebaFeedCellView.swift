@@ -56,7 +56,7 @@ public final class TiebaFeedCellView: ExpoView {
   var radius: Double = 20 {
     didSet { scheduleContentUpdate() }
   }
-  /// 可选：RN 传入的 stagger 序号（> 0 时覆盖内部递增计数器；-1 = 内部计数器）。
+  /// 可选：RN 传入的 stagger 序号（>= 0 时覆盖内部递增计数器；-1 = 内部计数器）。
   var enterIndex: Int = -1 {
     didSet { scheduleContentUpdate() }
   }
@@ -148,6 +148,10 @@ public final class TiebaFeedCellView: ExpoView {
     )
 
     setupPressGesture()
+
+    // 无障碍：整卡作为单一 button role 元素，VoiceOver 可聚焦整卡并双击激活打开帖子。
+    isAccessibilityElement = true
+    accessibilityTraits = [.button]
   }
 
   deinit {
@@ -268,6 +272,21 @@ public final class TiebaFeedCellView: ExpoView {
     if !showHero {
       heroImageView.image = nil
     }
+
+    updateAccessibilityLabel()
+  }
+
+  /// 无障碍朗读：标题 + 作者 + 回复数（VoiceOver 聚焦整卡时的 label）。
+  private func updateAccessibilityLabel() {
+    var parts: [String] = []
+    if !title.isEmpty {
+      parts.append(title)
+    }
+    if !author.isEmpty {
+      parts.append("作者：\(author)")
+    }
+    parts.append("回复数：\(Self.formatReplyCount(replyCount))")
+    accessibilityLabel = parts.joined(separator: "，")
   }
 
   private func applyFrames() {
@@ -425,12 +444,9 @@ public final class TiebaFeedCellView: ExpoView {
         return
       }
       let point = gesture.location(in: self)
-      if pressConfirmed {
-        pressConfirmed = false
-        animateScale(1.0, duration: 0.22, damping: 0.55, velocity: 2.0)
-      }
+      restoreScaleIfNeeded()
       if bounds.contains(point) {
-        onPress()
+        firePress()
       }
       resetPressState()
     case .cancelled, .failed:
@@ -459,6 +475,8 @@ public final class TiebaFeedCellView: ExpoView {
     guard !pressCancelled else { return }
     pressConfirmed = true
     hapticGenerator.impactOccurred()
+    // 减少动态效果（无障碍）：保留震动与 onPress，跳过按压缩放（同旧 FeedCard onPressIn）。
+    guard !UIAccessibility.isReduceMotionEnabled else { return }
     animateScale(0.97, duration: 0.14, damping: 0.55, velocity: 1.0)
   }
 
@@ -473,6 +491,8 @@ public final class TiebaFeedCellView: ExpoView {
   private func restoreScaleIfNeeded() {
     guard pressConfirmed else { return }
     pressConfirmed = false
+    // reduceMotion：从未进入按压缩放，无需复位动画。
+    guard !UIAccessibility.isReduceMotionEnabled else { return }
     animateScale(1.0, duration: 0.22, damping: 0.55, velocity: 2.0)
   }
 
@@ -498,12 +518,25 @@ public final class TiebaFeedCellView: ExpoView {
     )
   }
 
+  // MARK: - 无障碍（VoiceOver）
+
+  /// 与手势 .ended 共用 onPress 触发路径：无障碍激活也走这里，无状态依赖。
+  private func firePress() {
+    onPress()
+  }
+
+  /// VoiceOver 双击激活 → 打开帖子（等同手势点按的 onPress 路径）。
+  public override func accessibilityActivate() -> Bool {
+    firePress()
+    return true
+  }
+
   // MARK: - 入场动画（防重复）
 
   /// 仅首次收到 props 时分配 stagger 序号：优先用 enterIndex，否则取内部递增计数器。
   private func claimStaggerIndex() {
     guard claimedIndex == 0 else { return }
-    if enterIndex > 0 {
+    if enterIndex >= 0 {
       claimedIndex = enterIndex
     } else {
       Self.counterLock.lock()
