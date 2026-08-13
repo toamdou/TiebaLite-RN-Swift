@@ -148,7 +148,9 @@ public final class TiebaPressableView: ExpoView {
     }
   }
 
-  /// 高光覆盖层淡出，完成后预置下一轮的起点位姿并隐藏
+  /// 高光覆盖层淡出，完成后预置下一轮的起点位姿并隐藏。
+  /// 注意：completion 在动画被新动画取代时仍会触发（finished=false），
+  /// 若此期间用户已再次按下（isPressed），必须保留新动画显示出的高光。
   private func hideHighlight() {
     let slide = bounds.height * highlightSlideRatio
     let from = CGAffineTransform(translationX: 0, y: slide)
@@ -159,7 +161,8 @@ public final class TiebaPressableView: ExpoView {
     ) {
       self.highlightView.alpha = 0
       self.highlightView.transform = from
-    } completion: { _ in
+    } completion: { finished in
+      guard !self.isPressed, finished || self.highlightView.alpha == 0 else { return }
       self.highlightView.isHidden = true
       self.highlightView.alpha = 0
       self.highlightView.transform = from
