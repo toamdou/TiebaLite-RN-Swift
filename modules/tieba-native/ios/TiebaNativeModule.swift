@@ -323,6 +323,26 @@ public final class TiebaNativeModule: Module {
         view.enterIndex = index
       }
     }
+
+    View(TiebaGlassSurfaceView.self) {
+      Events("onPress")
+
+      Prop("material") { (view, material: String) in
+        view.material = material
+      }
+      Prop("tintColor") { (view, color: UIColor?) in
+        view.tintColor = color
+      }
+      Prop("cornerRadius") { (view, radius: Double) in
+        view.cornerRadius = radius
+      }
+      Prop("borderColor") { (view, color: UIColor?) in
+        view.borderColor = color
+      }
+      Prop("highlight") { (view, highlight: Bool) in
+        view.highlight = highlight
+      }
+    }
   }
 
   private var supportsLiveActivities: Bool {
