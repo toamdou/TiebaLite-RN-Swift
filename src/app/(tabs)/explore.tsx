@@ -577,7 +577,6 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
 
   // ── 原生 FeedCell 帖子卡片交互（对齐 FeedCard 既有行为，仅换实现载体） ──
   const handleThreadPress = useCallback((thread: ThreadInfo) => {
-    hapticForScene('press');
     router.push(`/thread/${thread.id}`);
   }, [router]);
 

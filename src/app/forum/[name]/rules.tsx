@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 35,
     letterSpacing: -0.4,
-    paddingHorizontal: 4,
+    paddingHorizontal: Spacing.xs,
   },
 
   // Author row
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 11,
     marginTop: Spacing.lg,
-    paddingHorizontal: 4,
+    paddingHorizontal: Spacing.xs,
   },
   authorTextCol: { flex: 1 },
   authorName: { ...typographyStyles.subheadBold },

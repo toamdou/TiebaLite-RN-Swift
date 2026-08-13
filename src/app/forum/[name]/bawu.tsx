@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
     marginHorizontal: Spacing.lg,
-    marginVertical: 4,
+    marginVertical: Spacing.xs,
     paddingHorizontal: 14,
     paddingVertical: 11,
     borderRadius: Radius.card,
