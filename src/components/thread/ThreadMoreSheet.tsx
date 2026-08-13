@@ -6,7 +6,7 @@
  * screen's API calls and navigation semantics.
  */
 
-import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useCallback, useRef, type ReactNode } from 'react';
 import {
   Alert,
   Pressable,
@@ -105,13 +105,9 @@ export default function ThreadMoreSheet({
   const actions = useThreadActions({ threadId, forumId, forumName });
   const { share, copy, report, remove } = actions;
 
-  // sheet-present：可见性翻转（打开）时触发 Soft 震动。
-  // @expo/ui community BottomSheet 无 onPresent 事件，用 visible 打开调用点触发。
-  useEffect(() => {
-    if (visible) {
-      hapticForScene('sheet-present');
-    }
-  }, [visible]);
+  // 注意：sheet-present（Soft）震动由调用点 thread/[id].tsx 的"更多"按钮
+  // 既有 hapticForScene('sheet-present') 触发（与 explore.tsx 单点触发先例一致），
+  // 组件内不再重复触发，避免点击一次连续两次 Soft 震动。
 
   const runAfterClose = useCallback((action: () => void) => {
     if (!sheetRef.current) {
