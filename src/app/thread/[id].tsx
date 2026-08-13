@@ -126,7 +126,7 @@ const ThreadHeader = memo(function ThreadHeader({
         material="regular"
         cornerRadius={Radius.card}
         borderColor={colors.divider}
-        style={[styles.mainPostSection, { marginHorizontal: 12, marginBottom: 8, paddingHorizontal: 16, paddingBottom: 12 }]}
+        style={[styles.mainPostSection, { marginHorizontal: 12, marginBottom: 8, padding: 16 }]}
       >
         {/* Author row */}
         <Link href={{ pathname: '/user/[uid]', params: { uid: thread.authorId } }} push asChild>
