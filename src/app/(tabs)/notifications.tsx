@@ -48,7 +48,8 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { DURATION, EASE_OUT, PRESS_ENTER } from '@/theme';
+import { DURATION, EASE_OUT, PRESS_ENTER, Spacing, Radius } from '@/theme';
+import { typographyStyles } from '@/theme/typography';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { MessageItem } from '@/types';
 
@@ -518,10 +519,10 @@ const styles = StyleSheet.create({
   // 分段内容区：crossfade 动画容器需占满剩余空间
   segmentFade: { flex: 1 },
   // 骨架屏容器
-  messageSkeleton: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
+  messageSkeleton: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, paddingBottom: 24 },
   messageListContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
     paddingBottom: 24,
   },
   messageRow: {
@@ -529,12 +530,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 10,
     borderRadius: 14,
-    padding: 12,
-    marginBottom: 8,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
     position: 'relative',
   },
   messageAvatarPressable: {
-    borderRadius: 20,
+    borderRadius: Radius.card,
   },
   messageNamePressable: {
     flexShrink: 1,
@@ -550,15 +551,15 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   messageBody: { flex: 1, gap: 3 },
-  messageHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  messageName: { flexShrink: 1, fontSize: 15, fontWeight: '600' },
+  messageHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  messageName: { flexShrink: 1, ...typographyStyles.subheadBold },
   messageContent: { fontSize: 14, lineHeight: 20 },
-  messageThread: { fontSize: 12 },
-  messageTime: { fontSize: 11 },
+  messageThread: { ...typographyStyles.caption1 },
+  messageTime: { ...typographyStyles.caption2 },
   messageFooter: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: Spacing.lg,
   },
-  messageFooterText: { fontSize: 13, fontWeight: '600' },
+  messageFooterText: { ...typographyStyles.footnoteBold },
 });

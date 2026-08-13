@@ -32,7 +32,8 @@ import { Avatar } from '@/components/ui/Avatar';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius, Shadows } from '@/theme';
+import { Radius, Shadows, Spacing } from '@/theme';
+import { typographyStyles } from '@/theme/typography';
 import { SkeletonList } from '../../../components/ui/Skeleton';
 import { forumRuleDetail } from '@/services/api/endpoints';
 import { openLink } from '@/utils/linkOpener';
@@ -441,8 +442,8 @@ export default function ForumRulesPage() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
-  loadingText: { fontSize: 13 },
-  scrollContent: { paddingTop: 16, paddingHorizontal: 16 },
+  loadingText: { ...typographyStyles.footnote },
+  scrollContent: { paddingTop: Spacing.lg, paddingHorizontal: Spacing.lg },
 
   // Title
   title: {
@@ -458,19 +459,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
-    marginTop: 16,
+    marginTop: Spacing.lg,
     paddingHorizontal: 4,
   },
   authorTextCol: { flex: 1 },
-  authorName: { fontSize: 15, fontWeight: '600' },
-  publishTime: { fontSize: 12, marginTop: 2 },
+  authorName: { ...typographyStyles.subheadBold },
+  publishTime: { ...typographyStyles.caption1, marginTop: 2 },
 
   // Preface
   prefaceCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 9,
-    marginTop: 16,
+    marginTop: Spacing.lg,
     padding: 14,
     borderRadius: Radius.card,
   },
@@ -480,7 +481,7 @@ const styles = StyleSheet.create({
   ruleCard: {
     marginTop: 14,
     borderRadius: Radius.card,
-    padding: 16,
+    padding: Spacing.lg,
   },
   ruleTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   ruleIndex: {
@@ -510,8 +511,8 @@ const styles = StyleSheet.create({
   quoteBlock: {
     width: '100%',
     borderLeftWidth: 3,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     marginTop: 10,
     borderRadius: Radius.chip,
   },
@@ -519,20 +520,20 @@ const styles = StyleSheet.create({
   linkChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: Spacing.xs,
     marginTop: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
     borderRadius: Radius.chip,
   },
-  linkText: { fontSize: 13, flexShrink: 1 },
-  lineBreak: { width: '100%', height: 8 },
+  linkText: { ...typographyStyles.footnote, flexShrink: 1 },
+  lineBreak: { width: '100%', height: Spacing.sm },
 
   // Footer
   footerNote: {
     textAlign: 'center',
-    fontSize: 12,
+    ...typographyStyles.caption1,
     marginTop: 24,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
   },
 });

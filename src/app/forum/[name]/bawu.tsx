@@ -26,7 +26,8 @@ import { Avatar } from '@/components/ui/Avatar';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius } from '@/theme';
+import { Radius, Spacing } from '@/theme';
+import { typographyStyles } from '@/theme/typography';
 import { SkeletonList } from '../../../components/ui/Skeleton';
 import { getBawuInfo } from '@/services/api/endpoints';
 import { getLevelColor } from '@/utils';
@@ -269,15 +270,15 @@ export default function BawuTeamPage() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
-  loadingText: { fontSize: 13 },
-  listContent: { paddingTop: 12 },
+  loadingText: { ...typographyStyles.footnote },
+  listContent: { paddingTop: Spacing.md },
 
   // Summary card
   summaryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginHorizontal: 16,
+    gap: Spacing.md,
+    marginHorizontal: Spacing.lg,
     marginBottom: 6,
     paddingHorizontal: 14,
     paddingVertical: 13,
@@ -291,8 +292,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   summaryTextCol: { flex: 1 },
-  summaryTitle: { fontSize: 16, fontWeight: '600' },
-  summarySubtitle: { fontSize: 12, marginTop: 2 },
+  summaryTitle: { ...typographyStyles.calloutBold },
+  summarySubtitle: { ...typographyStyles.caption1, marginTop: 2 },
 
   // Role section header
   roleHeader: {
@@ -300,21 +301,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 18,
-    marginBottom: 8,
-    marginHorizontal: 28,
+    marginBottom: Spacing.sm,
+    marginHorizontal: Spacing.xxl,
   },
   roleHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   roleDot: { width: 4, height: 14, borderRadius: 2 },
   roleName: { fontSize: 15, fontWeight: '700', letterSpacing: 0.2 },
-  roleCountChip: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.chip },
-  roleCountText: { fontSize: 11, fontWeight: '600' },
+  roleCountChip: { paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.chip },
+  roleCountText: { ...typographyStyles.caption2Bold },
 
   // User row
   userRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginHorizontal: 16,
+    gap: Spacing.md,
+    marginHorizontal: Spacing.lg,
     marginVertical: 4,
     paddingHorizontal: 14,
     paddingVertical: 11,
@@ -323,8 +324,8 @@ const styles = StyleSheet.create({
   },
   userTextCol: { flex: 1 },
   userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  userName: { fontSize: 16, fontWeight: '600', flexShrink: 1 },
+  userName: { ...typographyStyles.calloutBold, flexShrink: 1 },
   levelBadge: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: Radius.chip },
   levelBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 14 },
-  userSubtitle: { fontSize: 12, marginTop: 2 },
+  userSubtitle: { ...typographyStyles.caption1, marginTop: 2 },
 });

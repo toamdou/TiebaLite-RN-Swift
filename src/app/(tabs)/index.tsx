@@ -47,7 +47,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { DURATION, EASE_OUT, PRESS_ENTER, Radius } from '@/theme';
+import { DURATION, EASE_OUT, PRESS_ENTER, Radius, Spacing } from '@/theme';
 import { typographyStyles } from '@/theme/typography';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { ForumInfo } from '@/types';
@@ -154,7 +154,7 @@ export default function HomeScreen() {
     return (
       <ThemedHost style={{ flex: 1 }}>
         <VStack spacing={0}>
-          <HStack spacing={0} modifiers={[padding({ horizontal: 16 })]}>
+          <HStack spacing={0} modifiers={[padding({ horizontal: Spacing.lg })]}>
             <RNHostView>
               <SearchBarPill onPress={() => router.push('/search' as any)} />
             </RNHostView>
@@ -333,7 +333,7 @@ function LoggedInHome() {
       <View style={[styles.container, { paddingTop: insets.top }]}>
       <VStack spacing={0}>
         {/* §5.7: 搜索栏 (flex-1) + 一键签到 同一行，签到按钮在右上 */}
-        <HStack spacing={10} modifiers={[padding({ horizontal: 16, top: 8 })]}>
+        <HStack spacing={10} modifiers={[padding({ horizontal: Spacing.lg, top: Spacing.sm })]}>
           <RNHostView>
             <SearchBarPill onPress={() => router.push('/search' as any)} />
           </RNHostView>
@@ -352,7 +352,7 @@ function LoggedInHome() {
         {showHistoryForum && recentForums.length > 0 && (
           <HStack
             spacing={8}
-            modifiers={[padding({ horizontal: 16, top: 6, bottom: 4 })]}
+            modifiers={[padding({ horizontal: Spacing.lg, top: 6, bottom: Spacing.xs })]}
           >
             <Text modifiers={[font({ textStyle: 'subheadline', weight: 'semibold' })]}>
               最近访问
@@ -371,7 +371,7 @@ function LoggedInHome() {
         )}
         {showHistoryForum && historyExpanded && recentForums.length > 0 && (
           <ScrollView axes="horizontal" showsIndicators={false}>
-            <HStack spacing={8} modifiers={[padding({ horizontal: 16, bottom: 8 })]}>
+            <HStack spacing={8} modifiers={[padding({ horizontal: Spacing.lg, bottom: Spacing.sm })]}>
               {recentForums.map((f) => (
                 <Button
                   key={f.forumName}
@@ -437,7 +437,7 @@ function SearchBarPill({ onPress }: { onPress: () => void }) {
   const router = useRouter();
 
   return (
-    <View style={[searchStyles.wrapper, { paddingTop: 4 }]}>
+    <View style={[searchStyles.wrapper, { paddingTop: Spacing.xs }]}>
       <View style={searchStyles.row}>
         {/* Left: User Avatar */}
         <Pressable
@@ -472,7 +472,7 @@ function SearchBarPill({ onPress }: { onPress: () => void }) {
             theme={isDark ? 'dark' : 'light'}
           />
           <View style={searchStyles.pillInner}>
-            <SymbolView name="magnifyingglass" size={15} tintColor={colors.textTertiary} style={{ marginRight: 8 }} />
+            <SymbolView name="magnifyingglass" size={15} tintColor={colors.textTertiary} style={{ marginRight: Spacing.sm }} />
             <RNText style={[searchStyles.text, { color: colors.textTertiary }]} numberOfLines={1}>
               搜吧、搜贴、搜人
             </RNText>
@@ -491,13 +491,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   forumSkeleton: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
     paddingBottom: 24,
   },
   forumListContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
     paddingBottom: 24,
   },
   forumRow: {
@@ -506,8 +506,8 @@ const styles = StyleSheet.create({
     gap: 10,
     borderRadius: Radius.card,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 8,
+    paddingVertical: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   forumRowText: { flex: 1, gap: 2 },
   forumRowName: { ...typographyStyles.subheadBold },
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
 
 const searchStyles = StyleSheet.create({
   wrapper: {
-    paddingBottom: 8,
+    paddingBottom: Spacing.sm,
   },
   row: {
     flexDirection: 'row',

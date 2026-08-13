@@ -33,6 +33,8 @@ import { Button as UIButton } from '@/components/ui/Button';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { useThemeColors } from '@/theme/ThemeContext';
+import { Spacing } from '@/theme';
+import { typographyStyles } from '@/theme/typography';
 import { useAuthStore } from '@/stores/authStore';
 import { useSignStore } from '@/stores/signStore';
 import { profile as fetchProfile } from '@/services/api/endpoints';
@@ -281,7 +283,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   profileSkeleton: {
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     paddingTop: 24,
     alignSelf: 'stretch',
   },
@@ -291,26 +293,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   userCard: {
-    marginHorizontal: 16,
-    marginTop: 12,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
     borderRadius: 14,
     paddingVertical: 18,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     alignItems: 'center',
   },
   userCardPressable: {
     alignItems: 'center',
     alignSelf: 'stretch',
-    gap: 8,
+    gap: Spacing.sm,
   },
   userName: {
-    fontSize: 22,
-    fontWeight: '700',
+    ...typographyStyles.title2,
     textAlign: 'center',
   },
   userLevel: {
-    fontSize: 13,
-    fontWeight: '600',
+    ...typographyStyles.footnoteBold,
     textAlign: 'center',
   },
   userIntro: {
@@ -319,8 +319,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   userTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    ...typographyStyles.title3,
     textAlign: 'center',
   },
   userSubtitle: {
@@ -328,12 +327,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   loginButton: {
-    marginTop: 8,
+    marginTop: Spacing.sm,
   },
   statsRow: {
     flexDirection: 'row',
     gap: 24,
-    marginTop: 8,
+    marginTop: Spacing.sm,
   },
   statItem: {
     alignItems: 'center',
@@ -344,6 +343,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   statLabel: {
-    fontSize: 12,
+    ...typographyStyles.caption1,
   },
 });

@@ -38,7 +38,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import ImageViewer from '@/components/ImageViewer';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { DURATION, EASE_OUT, HERO, MOMENTUM, PRESS_ENTER, Radius, Shadows } from '@/theme';
+import { DURATION, EASE_OUT, HERO, MOMENTUM, PRESS_ENTER, Radius, Shadows, Spacing } from '@/theme';
+import { typographyStyles } from '@/theme/typography';
 import { useAppPreference } from '@/hooks/useAppPreference';
 import { useBlockFilter } from '@/hooks/useBlockFilter';
 import { useImageViewer } from '@/hooks/useImageViewer';
@@ -849,7 +850,7 @@ export default function ForumPage() {
 
       {/* ── FAB ── */}
       {fabVisible && (
-      <Animated.View style={[styles.fabContainer, { bottom: insets.bottom + 12 }, fabAnimatedStyle]}>
+      <Animated.View style={[styles.fabContainer, { bottom: insets.bottom + Spacing.md }, fabAnimatedStyle]}>
         <Pressable
           onPress={handleFabPress}
           style={({ pressed }) => [
@@ -1156,7 +1157,6 @@ function ClassifyPickerSheet({
       snapPoints={['50%', '80%']}
       enablePanDownToClose
       onClose={onClose}
-      backgroundStyle={{ backgroundColor: colors.card }}
     >
       <BottomSheetScrollView
         style={styles.classifySheetScroll}
@@ -1219,27 +1219,27 @@ function ClassifyPickerSheet({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listContent: { paddingTop: 4 },
+  listContent: { paddingTop: Spacing.xs },
 
   // ── Header section ──
-  headerSection: { paddingTop: 8 },
+  headerSection: { paddingTop: Spacing.sm },
   forumCard: {
-    padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 12,
+    padding: Spacing.xl,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
     borderRadius: Radius.card,
     overflow: 'hidden',
   },
   forumInfoRow: { flexDirection: 'row', alignItems: 'center' },
   forumInfoPressable: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  forumTextCol: { flex: 1, marginLeft: 16 },
-  forumTitle: { fontSize: 20, fontWeight: '700', letterSpacing: 0, marginBottom: 4 },
+  forumTextCol: { flex: 1, marginLeft: Spacing.lg },
+  forumTitle: { fontSize: 20, fontWeight: '700', letterSpacing: 0, marginBottom: Spacing.xs },
   forumLevelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   levelBadgeSmall: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
   levelBadgeSmallText: { color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 14 },
   forumLevelName: { fontSize: 12, fontWeight: '500' },
   followBtn: {
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: 10,
     borderRadius: Radius.capsule,
   },
@@ -1253,8 +1253,8 @@ const styles = StyleSheet.create({
   // ── Segmented Picker (SwiftUI) ──
   segmentedHost: {
     height: 36,
-    marginHorizontal: 16,
-    marginBottom: 8,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
 
   // ── Good classify row ──
@@ -1262,29 +1262,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginBottom: 4,
+    paddingHorizontal: Spacing.xl,
+    marginBottom: Spacing.xs,
   },
   classifyIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: Spacing.xs,
     borderRadius: Radius.chip,
   },
-  classifyIndicatorText: { fontSize: 13, fontWeight: '600' },
+  classifyIndicatorText: { ...typographyStyles.footnoteBold },
   classifyFilterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
   },
   classifyFilterText: { fontSize: 13, fontWeight: '500' },
 
   // ── Unified card (双层结构：外层shadow + 内层bg + overflow:hidden) ──
   cardOuter: {
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: 6,
   },
   cardOuterGrid: {
@@ -1313,10 +1313,10 @@ const styles = StyleSheet.create({
     height: 240,
   },
   textContent: {
-    padding: 16,
+    padding: Spacing.lg,
   },
-  threadTitle: { fontSize: 18, fontWeight: '700', lineHeight: 26, marginBottom: 8, letterSpacing: -0.2 },
-  threadAbstract: { fontSize: 15, lineHeight: 22, marginBottom: 12, letterSpacing: 0, opacity: 0.85 },
+  threadTitle: { fontSize: 18, fontWeight: '700', lineHeight: 26, marginBottom: Spacing.sm, letterSpacing: -0.2 },
+  threadAbstract: { fontSize: 15, lineHeight: 22, marginBottom: Spacing.md, letterSpacing: 0, opacity: 0.85 },
 
   // ── Hero image overlay styles (card structure handled by cardWrapper/cardInner) ──
   heroGradient: {
@@ -1328,8 +1328,8 @@ const styles = StyleSheet.create({
   },
   heroVideoBadge: {
     position: 'absolute',
-    top: 12,
-    left: 12,
+    top: Spacing.md,
+    left: Spacing.md,
     width: 28,
     height: 28,
     borderRadius: 14,
@@ -1348,7 +1348,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
     lineHeight: 24,
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
@@ -1366,12 +1366,12 @@ const styles = StyleSheet.create({
   videoPlaceholder: {
     borderRadius: Radius.input,
     paddingVertical: 18,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   videoPlaceholderText: { fontSize: 14, fontWeight: '600' },
 
@@ -1379,13 +1379,13 @@ const styles = StyleSheet.create({
   originThreadCard: {
     borderRadius: Radius.input,
     padding: 10,
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
-  originThreadTitle: { fontSize: 13, fontWeight: '700', lineHeight: 18, marginBottom: 4 },
-  originThreadContent: { fontSize: 13, lineHeight: 18, marginBottom: 8 },
+  originThreadTitle: { fontSize: 13, fontWeight: '700', lineHeight: 18, marginBottom: Spacing.xs },
+  originThreadContent: { ...typographyStyles.footnote, marginBottom: Spacing.sm },
   originForumChip: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 8,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: Radius.chip,
   },
@@ -1406,15 +1406,15 @@ const styles = StyleSheet.create({
   cardAuthorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   cardAuthorInfo: { flex: 1, marginLeft: 10 },
   cardAuthorNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  cardAuthorName: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
+  cardAuthorName: { ...typographyStyles.subheadBold, flexShrink: 1 },
   cardLevelBadge: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
   cardLevelBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 14 },
-  cardTime: { fontSize: 12, marginTop: 2 },
+  cardTime: { ...typographyStyles.caption1, marginTop: 2 },
 
   // ── FAB ──
   // bottom 由调用处传入 insets.bottom + 12（对齐 thread/[id].tsx 浮动栏），
   // 避免全面屏 Home Indicator 遮挡。静态样式只保留 right。
-  fabContainer: { position: 'absolute', right: 20, zIndex: 100 },
+  fabContainer: { position: 'absolute', right: Spacing.xl, zIndex: 100 },
   fab: {
     width: 52, height: 52, borderRadius: Radius.capsule,
     justifyContent: 'center', alignItems: 'center',
@@ -1422,24 +1422,24 @@ const styles = StyleSheet.create({
 
   // ── Header buttons ──
   headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  headerButton: { padding: 8 },
+  headerButton: { padding: Spacing.sm },
 
   // ── Good classify picker (native bottom sheet) ──
   classifySheetScroll: {
     flex: 1,
   },
   classifySheetContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
     paddingBottom: 24,
   },
-  menuTitle: { fontSize: 14, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14 },
-  menuItemText: { fontSize: 16 },
+  menuTitle: { fontSize: 14, fontWeight: '700', textAlign: 'center', marginBottom: Spacing.sm },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: Spacing.xl, paddingVertical: 14 },
+  menuItemText: { ...typographyStyles.callout },
   menuCancelItem: {
     justifyContent: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: 4,
+    marginTop: Spacing.xs,
   },
-  menuCancelText: { fontSize: 16, fontWeight: '600' },
+  menuCancelText: { ...typographyStyles.calloutBold },
 });

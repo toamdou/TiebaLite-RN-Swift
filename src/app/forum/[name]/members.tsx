@@ -39,7 +39,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadMoreFooter } from '@/components/ui/LoadMoreFooter';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius } from '@/theme';
+import { Radius, Spacing } from '@/theme';
+import { typographyStyles } from '@/theme/typography';
 import { SkeletonList } from '../../../components/ui/Skeleton';
 import {
   getMemberInfo,
@@ -542,19 +543,19 @@ const styles = StyleSheet.create({
   segmentBar: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     paddingTop: 10,
-    paddingBottom: 4,
+    paddingBottom: Spacing.xs,
   },
 
   // Shared list content
-  listContent: { paddingTop: 12 },
-  rankListContent: { paddingTop: 8, paddingHorizontal: 12 },
-  rankSkeleton: { paddingHorizontal: 16, paddingTop: 12 },
+  listContent: { paddingTop: Spacing.md },
+  rankListContent: { paddingTop: Spacing.sm, paddingHorizontal: Spacing.md },
+  rankSkeleton: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
 
   // My membership card
   myCard: {
-    marginHorizontal: 16,
+    marginHorizontal: Spacing.lg,
     marginBottom: 6,
     paddingHorizontal: 14,
     paddingVertical: 13,
@@ -564,8 +565,8 @@ const styles = StyleSheet.create({
   myLevelBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: Radius.chip },
   myLevelBadgeText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
   myTextCol: { flex: 1 },
-  myTitle: { fontSize: 15, fontWeight: '600' },
-  mySubtitle: { fontSize: 12, marginTop: 1 },
+  myTitle: { ...typographyStyles.subheadBold },
+  mySubtitle: { ...typographyStyles.caption1, marginTop: 1 },
   myTrack: { height: 4, borderRadius: 2, overflow: 'hidden', marginTop: 11 },
   myFill: { height: 4, borderRadius: 2 },
 
@@ -575,34 +576,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 18,
-    marginBottom: 8,
-    marginHorizontal: 28,
+    marginBottom: Spacing.sm,
+    marginHorizontal: Spacing.xxl,
   },
   groupHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   groupDot: { width: 4, height: 14, borderRadius: 2 },
   groupLabel: { fontSize: 15, fontWeight: '700', letterSpacing: 0.2 },
-  groupCountChip: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.chip },
-  groupCountText: { fontSize: 11, fontWeight: '600' },
+  groupCountChip: { paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.chip },
+  groupCountText: { ...typographyStyles.caption2Bold },
 
   // Member grid
   gridRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
   },
   gridCell: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 4,
+    paddingHorizontal: Spacing.xs,
     borderRadius: Radius.card,
     minHeight: 108,
   },
-  cellName: { fontSize: 13, fontWeight: '600', marginTop: 8, maxWidth: '100%' },
+  cellName: { ...typographyStyles.footnoteBold, marginTop: Spacing.sm, maxWidth: '100%' },
   cellLevelBadge: { paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: Radius.chip, marginTop: 5 },
   cellLevelText: { color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 13 },
-  cellLevelName: { fontSize: 11, marginTop: 5, maxWidth: '100%' },
+  cellLevelName: { ...typographyStyles.caption2, marginTop: 5, maxWidth: '100%' },
 
   // Rank rows
   rankRow: {
@@ -624,8 +625,8 @@ const styles = StyleSheet.create({
   },
   rankBody: { flex: 1, gap: 2 },
   rankNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rankName: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  rankSub: { fontSize: 12 },
+  rankName: { ...typographyStyles.subheadBold, flexShrink: 1 },
+  rankSub: { ...typographyStyles.caption1 },
   rankLevelBadge: {
     paddingHorizontal: 7,
     paddingVertical: 3,

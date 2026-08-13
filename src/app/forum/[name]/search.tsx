@@ -32,7 +32,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SearchPostList } from '@/components/search/SearchResultList';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius } from '@/theme';
+import { Radius, Spacing } from '@/theme';
+import { typographyStyles } from '@/theme/typography';
 import { SkeletonList } from '../../../components/ui/Skeleton';
 import { searchPost } from '@/services/api/endpoints';
 import { usePagedList } from '@/hooks/usePagedList';
@@ -376,20 +377,20 @@ const styles = StyleSheet.create({
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: 6,
-    gap: 8,
+    gap: Spacing.sm,
   },
   // History
   historySection: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
   },
   historyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: Spacing.sm,
   },
   historyTitle: {
     fontSize: 13,
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
   },
   historyChips: {
     flexDirection: 'row',
-    gap: 8,
+    gap: Spacing.sm,
   },
   historyChip: {
     paddingHorizontal: 14,
@@ -405,11 +406,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.chip,
   },
   historyChipText: {
-    fontSize: 13,
+    ...typographyStyles.footnote,
   },
   // Results
   listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 4,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xs,
   },
 });

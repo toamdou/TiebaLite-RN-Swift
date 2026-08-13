@@ -26,7 +26,8 @@ import { SymbolView } from '@/components/ui/SymbolView';
 import { Avatar } from '@/components/ui/Avatar';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius, Shadows } from '@/theme';
+import { Radius, Shadows, Spacing } from '@/theme';
+import { typographyStyles } from '@/theme/typography';
 import { forumDetail, getForumDetail } from '@/services/api/endpoints';
 import { contentToText, formatCount, buildForumUrl } from '@/utils';
 import { openLink } from '@/utils/linkOpener';
@@ -307,64 +308,63 @@ export default function ForumDetailPage() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
-  loadingText: { fontSize: 13 },
-  scrollContent: { paddingTop: 12 },
+  loadingText: { ...typographyStyles.footnote },
+  scrollContent: { paddingTop: Spacing.md },
 
   // Hero
   heroCard: {
     alignItems: 'center',
-    marginHorizontal: 16,
+    marginHorizontal: Spacing.lg,
     paddingVertical: 24,
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     borderRadius: Radius.card,
     overflow: 'hidden',
   },
-  heroTitle: { fontSize: 24, fontWeight: '700', marginTop: 12, letterSpacing: -0.3 },
+  heroTitle: { fontSize: 24, fontWeight: '700', marginTop: Spacing.md, letterSpacing: -0.3 },
   heroSlogan: {
     fontSize: 13,
     lineHeight: 19,
     marginTop: 6,
     textAlign: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: Spacing.md,
   },
   followedChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: Spacing.xs,
     marginTop: 10,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: Spacing.xs,
     borderRadius: Radius.chip,
   },
-  followedChipText: { fontSize: 12, fontWeight: '600' },
+  followedChipText: { ...typographyStyles.caption1Bold },
 
   // Stats
   statsCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 12,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
     paddingVertical: 18,
     borderRadius: Radius.card,
     overflow: 'hidden',
   },
   statItem: { flex: 1, alignItems: 'center', gap: 3 },
   statValue: { fontSize: 21, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  statLabel: { fontSize: 12 },
+  statLabel: { ...typographyStyles.caption1 },
   statDivider: { width: StyleSheet.hairlineWidth, height: 30 },
 
   // Section title
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
+    ...typographyStyles.footnoteBold,
     marginTop: 22,
-    marginBottom: 8,
-    marginHorizontal: 28,
+    marginBottom: Spacing.sm,
+    marginHorizontal: Spacing.xxl,
     letterSpacing: 0.3,
   },
 
   // Grouped list container (iOS settings style)
-  group: { marginHorizontal: 16, borderRadius: Radius.card, overflow: 'hidden' },
+  group: { marginHorizontal: Spacing.lg, borderRadius: Radius.card, overflow: 'hidden' },
   rowSeparator: { height: StyleSheet.hairlineWidth, marginLeft: 62 },
 
   // Nav rows
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 13,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
   },
   iconCircle: {
     width: 34,
@@ -384,16 +384,16 @@ const styles = StyleSheet.create({
   },
   navTextCol: { flex: 1 },
   navTitle: { fontSize: 16, fontWeight: '500' },
-  navSubtitle: { fontSize: 12, marginTop: 1 },
+  navSubtitle: { ...typographyStyles.caption1, marginTop: 1 },
 
   // Intro / data center card
   introCard: {
-    marginHorizontal: 16,
+    marginHorizontal: Spacing.lg,
     borderRadius: Radius.card,
-    padding: 16,
+    padding: Spacing.lg,
   },
   introText: { fontSize: 15, lineHeight: 23 },
-  dataRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 4 },
+  dataRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, paddingVertical: Spacing.xs },
   dataRowText: { flex: 1, fontSize: 14, lineHeight: 21 },
 
   // Info rows
@@ -401,11 +401,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: 13,
-    gap: 12,
+    gap: Spacing.md,
   },
-  infoLabel: { fontSize: 15 },
+  infoLabel: { ...typographyStyles.subhead },
   infoValue: { fontSize: 15, fontWeight: '500', flexShrink: 1 },
-  infoValueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  infoValueRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
 });
