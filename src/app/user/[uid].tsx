@@ -396,7 +396,7 @@ export default function UserProfilePage() {
               name="doc.on.doc"
               size={11}
               tintColor={colors.onChip || colors.textTertiary}
-              style={{ marginLeft: 4 }}
+              style={{ marginLeft: Spacing.xs }}
             />
           </Pressable>
 
@@ -722,7 +722,7 @@ function UserTabList({
       ListEmptyComponent={listEmpty}
       contentContainerStyle={[
         styles.listContent,
-        { paddingBottom: insets.bottom + 16 },
+        { paddingBottom: insets.bottom + Spacing.lg },
       ]}
       refreshControl={
         <RefreshControl
@@ -931,7 +931,7 @@ function SocialTabList({
       ListEmptyComponent={listEmpty}
       contentContainerStyle={[
         styles.listContent,
-        { paddingBottom: insets.bottom + 16 },
+        { paddingBottom: insets.bottom + Spacing.lg },
       ]}
       refreshControl={
         <RefreshControl
@@ -955,13 +955,13 @@ function SocialTabList({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  skeletonWrap: { paddingHorizontal: 16, paddingTop: 20 },
-  listEmptySkeleton: { paddingTop: 12 },
-  listContent: { paddingHorizontal: 16 },
+  skeletonWrap: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl },
+  listEmptySkeleton: { paddingTop: Spacing.md },
+  listContent: { paddingHorizontal: Spacing.lg },
 
   // Profile Header
   profileHeader: {
-    paddingTop: 20,
+    paddingTop: Spacing.xl,
     paddingBottom: 4,
   },
 
@@ -969,7 +969,7 @@ const styles = StyleSheet.create({
   avatarSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: Spacing.lg,
     marginBottom: 18,
   },
   nameSection: { gap: 3 },
@@ -984,7 +984,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
   statItem: { alignItems: 'center', gap: 2, flex: 1 },
   statValue: typographyStyles.headline,
@@ -1005,7 +1005,7 @@ const styles = StyleSheet.create({
   badgeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Spacing.sm,
     marginBottom: 10,
   },
   verifyBadge: {
@@ -1016,17 +1016,14 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: Radius.input,
   },
-  verifyBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  verifyBadgeText: typographyStyles.caption1Bold,
 
   // Chips Row
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
   chip: {
     flexDirection: 'row',
@@ -1041,11 +1038,11 @@ const styles = StyleSheet.create({
   },
 
   // Action Buttons
-  actionRow: { flexDirection: 'row', gap: 8 },
+  actionRow: { flexDirection: 'row', gap: Spacing.sm },
   actionBtn: { flex: 1 },
 
   // Tabs
-  tabsRow: { paddingVertical: 12 },
+  tabsRow: { paddingVertical: Spacing.md },
   tabLists: { flex: 1 },
   tabListWrap: { flex: 1 },
 
@@ -1068,34 +1065,34 @@ const styles = StyleSheet.create({
   contentItem: { padding: 14, borderRadius: Radius.input },
   contentTitle: { fontSize: 14, lineHeight: 20, marginBottom: 6 },
   contentMeta: { flexDirection: 'row', justifyContent: 'space-between' },
-  contentForum: { fontSize: 12 },
-  contentTime: { fontSize: 11 },
+  contentForum: typographyStyles.caption1,
+  contentTime: typographyStyles.caption2,
 
   // Forum Items
   forumItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: Spacing.md,
     borderRadius: Radius.input,
     gap: 10,
   },
   forumInfo: { flex: 1, gap: 2 },
   forumName: { fontSize: 14, fontWeight: '600' },
-  forumLevel: { fontSize: 11 },
+  forumLevel: typographyStyles.caption2,
 
   // Social Items (粉丝/关注)
   socialItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: Spacing.md,
     borderRadius: Radius.input,
     gap: 10,
   },
   socialInfo: { flex: 1, gap: 2 },
   socialName: { fontSize: 14, fontWeight: '600' },
-  socialSub: { fontSize: 11 },
+  socialSub: typographyStyles.caption2,
 
   loadingItems: { paddingVertical: 32 },
-  loadingMore: { paddingVertical: 16 },
-  noMore: { textAlign: 'center', paddingVertical: 16, fontSize: 13 },
+  loadingMore: { paddingVertical: Spacing.lg },
+  noMore: { textAlign: 'center', paddingVertical: Spacing.lg, ...typographyStyles.footnote },
 });

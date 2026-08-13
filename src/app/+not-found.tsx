@@ -10,6 +10,7 @@ import { buttonBorderShape, buttonStyle } from '@expo/ui/swift-ui/modifiers';
 
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { useThemeColors } from '@/theme/ThemeContext';
+import { Spacing } from '@/theme';
 
 /**
  * Catch-all 404 page — renders when no other route matches the URL.
@@ -23,7 +24,7 @@ export default function NotFoundScreen() {
     <ThemedHost style={{ flex: 1 }}>
       <Stack.Screen options={{ title: '找不到页面', headerStyle: { backgroundColor: colors.toolbar } }} />
 
-      <VStack alignment="center" spacing={16}>
+      <VStack alignment="center" spacing={Spacing.lg}>
         <Spacer />
         <ContentUnavailableView
           systemImage="questionmark.folder"

@@ -28,7 +28,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius, Spacing } from '@/theme';
+import { Radius, Spacing, typographyStyles } from '@/theme';
 import { relativeTime } from '@/utils';
 import { flattenGroupRows, type GroupedRow } from '@/utils/forumUsers';
 import type { HistoryItem } from '@/types';
@@ -327,7 +327,7 @@ export default function HistoryPage() {
         }
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: insets.bottom + 16 },
+          { paddingBottom: insets.bottom + Spacing.lg },
           history.length === 0 && styles.emptyList,
         ]}
         refreshControl={
@@ -347,9 +347,9 @@ export default function HistoryPage() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  skeletonWrap: { paddingHorizontal: 12, paddingTop: 12 },
+  skeletonWrap: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md },
   header: {
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
@@ -357,19 +357,19 @@ const styles = StyleSheet.create({
   clearRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
   },
-  listContent: { paddingHorizontal: 12 },
+  listContent: { paddingHorizontal: Spacing.md },
   emptyList: { flex: 1 },
   // Section Header
   sectionHeader: {
-    paddingTop: 16,
+    paddingTop: Spacing.lg,
     paddingBottom: 6,
-    paddingHorizontal: 4,
+    paddingHorizontal: Spacing.xs,
   },
-  sectionTitle: { fontSize: 13, fontWeight: '600' },
+  sectionTitle: typographyStyles.footnoteBold,
   // Item
   historyRow: {
     flexDirection: 'row',
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
-    gap: 12,
+    gap: Spacing.md,
   },
   historyMenu: {
     justifyContent: 'center',
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemInfo: { flex: 1, gap: 3 },
-  itemTitle: { fontSize: 15, fontWeight: '600' },
-  itemTime: { fontSize: 12 },
+  itemTitle: typographyStyles.subheadBold,
+  itemTime: typographyStyles.caption1,
   historySeparator: { height: Spacing.sm },
 });

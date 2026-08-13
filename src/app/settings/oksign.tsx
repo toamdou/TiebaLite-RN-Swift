@@ -39,7 +39,7 @@ import { useSignStore } from '@/stores/signStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Spacing } from '@/theme';
+import { Spacing, typographyStyles } from '@/theme';
 import type { SignProgressItem } from '@/stores/signStore';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { LiveActivityPreview } from '@/components/ui/LiveActivityPreview';
@@ -108,7 +108,7 @@ export default function OKSignSettingsPage() {
     if (isSigning) return;
 
     try {
-      hapticForScene('action-success');
+      hapticForScene('press');
       await startSign();
     } catch (e: any) {
       Alert.alert('签到失败', e?.message || '签到过程中出现未知错误');
@@ -454,10 +454,7 @@ const styles = StyleSheet.create({
   signStatRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: Spacing.xs,
   },
-  signStatText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  signStatText: typographyStyles.subheadBold,
 });

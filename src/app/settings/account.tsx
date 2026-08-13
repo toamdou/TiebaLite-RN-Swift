@@ -13,9 +13,11 @@ import type { Account } from '@/types';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Spacing } from '@/theme';
+import { useThemeColors } from '@/theme/ThemeContext';
 
 export default function AccountPage() {
   const router = useRouter();
+  const { colors } = useThemeColors();
   const { isLoggedIn, account: currentAccount, switchAccount, logout } = useAuthStore();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -102,7 +104,7 @@ export default function AccountPage() {
             accounts.map((item) => {
               const isCurrent = currentAccount?.uid === item.uid;
               return (
-                <HStack key={item.uid} alignment="center" spacing={8}>
+                <HStack key={item.uid} alignment="center" spacing={Spacing.sm}>
                   {/* 点击整行切换账号（主键统一用 uid） */}
                   <Button
                     onPress={() => handleSwitch(item)}
@@ -111,7 +113,7 @@ export default function AccountPage() {
                     <Text>{item.nameShow || item.name || ''}</Text>
                     <Text>{item.name ? `@${item.name}` : `UID: ${item.uid}`}</Text>
                     {isCurrent
-                      ? <Image systemName="checkmark.circle.fill" size={16} color="#34C759" />
+                      ? <Image systemName="checkmark.circle.fill" size={16} color={colors.success} />
                       : null}
                   </Button>
                   {/* 每行右侧菜单：移除账号，替代「管理」Section 重复的移除行 */}

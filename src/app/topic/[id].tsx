@@ -25,7 +25,7 @@ import { topicDetail, mapProtoThread } from '@/services/api/endpoints';
 import { usePagedList } from '@/hooks/usePagedList';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { formatCount } from '@/utils';
-import { Spacing, Radius, DURATION, EASE_OUT, HERO } from '@/theme';
+import { Spacing, Radius, DURATION, EASE_OUT, HERO, typographyStyles } from '@/theme';
 import type { FeedItem, ThreadInfo } from '@/types';
 
 // ---------- 首屏级联入场（仅首次数据批次，Reduce Motion 跳过） ----------
@@ -284,12 +284,12 @@ export default function TopicDetailPage() {
   const listFooter = useCallback(
     () =>
       loadingMore ? (
-        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+        <View style={{ paddingVertical: Spacing.xl, alignItems: 'center' }}>
           <ActivityIndicator size="small" color={colors.primary} />
         </View>
       ) : !hasMore && threads.length > 0 ? (
-        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-          <Text style={{ fontSize: 13, color: colors.textTertiary }}>— 没有更多了 —</Text>
+        <View style={{ paddingVertical: Spacing.xl, alignItems: 'center' }}>
+          <Text style={[typographyStyles.footnote, { color: colors.textTertiary }]}>— 没有更多了 —</Text>
         </View>
       ) : null,
     [loadingMore, hasMore, threads.length, colors.primary, colors.textTertiary],
@@ -347,7 +347,7 @@ export default function TopicDetailPage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  skeletonWrap: { paddingHorizontal: 16, paddingTop: 12 },
+  skeletonWrap: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   listContent: { paddingBottom: Spacing.hero },
   topicHeader: {
     padding: Spacing.lg,
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
   topicHeroRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: Spacing.md,
     marginBottom: Spacing.sm,
   },
   topicIconBadge: {
@@ -397,12 +397,12 @@ const styles = StyleSheet.create({
   relateTitle: {
     fontSize: 13,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: Spacing.sm,
   },
   relateWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Spacing.sm,
   },
   relateChip: {
     flexDirection: 'row',
@@ -429,8 +429,5 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     alignItems: 'center',
   },
-  simpleHeaderText: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
+  simpleHeaderText: typographyStyles.number,
 });

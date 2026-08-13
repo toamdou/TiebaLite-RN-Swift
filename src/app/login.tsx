@@ -23,7 +23,7 @@ import type { WebViewNavigation } from 'react-native-webview';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { useAppTheme } from '@/theme/ThemeContext';
-import { Radius } from '@/theme';
+import { Radius, Spacing, typographyStyles } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { getNativeCookies } from '@/services/cookies/CookieService';
 import { setAuthCredentials } from '@/services/api/interceptors';
@@ -352,7 +352,7 @@ export default function LoginPage() {
       {loadingState === 'success' && (
         <View style={[styles.overlay, { backgroundColor: colors.scrim }]}>
           <View style={styles.successIconContainer}>
-            <View style={styles.successIcon}>
+            <View style={[styles.successIcon, { backgroundColor: colors.success }]}>
               <SymbolView name="checkmark" size={32} tintColor="#FFF" weight="bold" />
             </View>
           </View>
@@ -363,7 +363,7 @@ export default function LoginPage() {
       {/* Error State */}
       {loadingState === 'error' && (
         <View style={[styles.errorContainer, { backgroundColor: colors.scrim }]}>
-          <SymbolView name="exclamationmark.triangle.fill" size={48} tintColor="#FF3B30" />
+          <SymbolView name="exclamationmark.triangle.fill" size={48} tintColor={colors.danger} />
           <Text style={[styles.errorText, { color: colors.text }]}>
             {error || '登录失败'}
           </Text>
@@ -378,7 +378,7 @@ export default function LoginPage() {
           </Pressable>
           <Pressable
             onPress={handleClose}
-            style={[styles.retryButton, { backgroundColor: colors.surfaceSecondary, marginTop: 12 }]}
+            style={[styles.retryButton, { backgroundColor: colors.surfaceSecondary, marginTop: Spacing.md }]}
           >
             <Text style={[styles.retryText, { color: colors.text }]}>返回</Text>
           </Pressable>
@@ -445,23 +445,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   } as any,
   statusText: {
-    fontSize: 15,
-    marginTop: 4,
+    ...typographyStyles.subhead,
+    marginTop: Spacing.xs,
   },
   successIconContainer: {
-    marginBottom: 8,
+    marginBottom: Spacing.sm,
   },
   successIcon: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#34C759', // iOS systemGreen（登录成功语义色，与 colors.success 一致）
+    // backgroundColor 走 colors.success（组件内动态注入，iOS systemGreen 语义色）
     justifyContent: 'center',
     alignItems: 'center',
   },
   successText: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...typographyStyles.number,
     color: '#FFF',
   },
   errorContainer: {
@@ -473,35 +472,33 @@ const styles = StyleSheet.create({
     padding: 32,
   } as any,
   errorText: {
-    fontSize: 17,
-    fontWeight: '600',
-    marginTop: 16,
+    ...typographyStyles.headline,
+    marginTop: Spacing.lg,
     textAlign: 'center',
   },
   errorHint: {
     fontSize: 14,
-    marginTop: 8,
+    marginTop: Spacing.sm,
     textAlign: 'center',
     lineHeight: 20,
   },
   retryButton: {
     marginTop: 24,
     paddingHorizontal: 32,
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
     borderRadius: Radius.input,
   },
   retryText: {
     color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
+    ...typographyStyles.calloutBold,
   },
   securityNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
-    gap: 8,
+    gap: Spacing.sm,
   },
   securityText: {
     fontSize: 12,

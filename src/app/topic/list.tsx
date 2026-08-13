@@ -15,7 +15,7 @@ import { Link, Stack } from 'expo-router';
 import { Image } from 'expo-image';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius, Shadows } from '@/theme';
+import { Radius, Shadows, Spacing, typographyStyles } from '@/theme';
 import { HOT_RANK_COLORS } from '@/app/(tabs)/explore';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -203,14 +203,14 @@ export default function HotTopicListPage() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  skeletonWrap: { paddingHorizontal: 12, paddingTop: 8 },
-  listContent: { paddingHorizontal: 12, paddingVertical: 8 },
+  skeletonWrap: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm },
+  listContent: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
     borderRadius: Radius.card,
-    gap: 12,
+    gap: Spacing.md,
     ...Shadows.card,
   },
   rankContainer: {
@@ -231,11 +231,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  rankText: {
-    fontSize: 17,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
+  rankText: typographyStyles.headline,
   topicImage: {
     width: 56,
     height: 56,
@@ -269,11 +265,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  topicName: {
-    fontSize: 15,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
+  topicName: typographyStyles.subheadBold,
   tag: {
     paddingHorizontal: 5,
     paddingVertical: 1,
@@ -285,13 +277,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 14,
   },
-  topicDesc: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  discussNum: {
-    fontSize: 12,
-  },
+  topicDesc: typographyStyles.footnote,
+  discussNum: typographyStyles.caption1,
   separator: {
     height: 1,
   },

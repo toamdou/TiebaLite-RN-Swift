@@ -37,7 +37,7 @@ import {
   SearchUserList,
 } from '@/components/search/SearchResultList';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius, DURATION, EASE_OUT } from '@/theme';
+import { Radius, DURATION, EASE_OUT, Spacing, typographyStyles } from '@/theme';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { searchThread, searchForum, searchUser, searchSuggestions } from '@/services/api/endpoints';
 import { relativeTime } from '@/utils';
@@ -416,14 +416,14 @@ export default function SearchPage() {
                     <Pressable
                       onPress={() => setHistoryExpanded((v) => !v)}
                       hitSlop={8}
-                      style={{ padding: 4 }}
+                      style={{ padding: Spacing.xs }}
                     >
                       <Text style={[styles.historyToggleText, { color: colors.textTertiary }]}>
                         {historyExpanded ? '收起' : '全部'}
                       </Text>
                     </Pressable>
                   )}
-                  <Pressable onPress={clearHistory} hitSlop={8} style={{ padding: 4 }}>
+                  <Pressable onPress={clearHistory} hitSlop={8} style={{ padding: Spacing.xs }}>
                     <SymbolView name="trash" size={16} tintColor={colors.textTertiary} />
                   </Pressable>
                 </View>
@@ -511,14 +511,14 @@ const styles = StyleSheet.create({
   },
   // ── Tab 栏（SwiftUI segmented） ──
   tabBar: {
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     paddingTop: 10,
     paddingBottom: 6,
   },
   // ── 贴子排序 ──
   sortHost: {
     alignItems: 'flex-start',
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     paddingBottom: 2,
   },
   // ── 主体 ──
@@ -526,24 +526,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bodyContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
   },
   centerWrap: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 80,
-    gap: 12,
+    gap: Spacing.md,
   },
   skeletonWrap: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
   },
   retryBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
     borderRadius: Radius.chip,
-    marginTop: 4,
+    marginTop: Spacing.xs,
   },
   retryText: {
     fontSize: 14,
@@ -567,11 +567,9 @@ const styles = StyleSheet.create({
   historyHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Spacing.sm,
   },
-  historyToggleText: {
-    fontSize: 13,
-  },
+  historyToggleText: typographyStyles.footnote,
   historyTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -583,7 +581,7 @@ const styles = StyleSheet.create({
   },
   tagPill: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: Spacing.sm,
     borderRadius: Radius.capsule,
     maxWidth: 200,
   },
@@ -592,7 +590,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: Spacing.sm,
     borderRadius: Radius.capsule,
     maxWidth: 220,
   },
@@ -606,9 +604,7 @@ const styles = StyleSheet.create({
   emptyWrap: {
     alignItems: 'center',
     paddingTop: 80,
-    gap: 12,
+    gap: Spacing.md,
   },
-  emptyTitle: {
-    fontSize: 15,
-  },
+  emptyTitle: typographyStyles.subhead,
 });

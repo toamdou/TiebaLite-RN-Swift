@@ -25,6 +25,7 @@ import { labelStyle, buttonStyle } from '@expo/ui/swift-ui/modifiers';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 
 import { useAppTheme } from '@/theme/ThemeContext';
+import { Spacing, typographyStyles } from '@/theme';
 
 /** 内置浏览器只允许内嵌加载贴吧相关可信域名。 */
 const TRUSTED_HOSTS = [
@@ -274,8 +275,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 44,
-    paddingHorizontal: 8,
-    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    gap: Spacing.xs,
   },
   toolBtn: {
     width: 40,
@@ -287,11 +288,11 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: Spacing.sm,
     gap: 6,
   },
   loader: {
-    marginRight: 4,
+    marginRight: Spacing.xs,
   },
   toolbarTitle: {
     fontSize: 16,
@@ -308,20 +309,18 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'transparent',
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
   },
   loadingSkeleton: { flex: 1 },
   loadingHint: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
+    gap: Spacing.sm,
+    paddingVertical: Spacing.lg,
   },
-  loadingHintText: {
-    fontSize: 13,
-  },
+  loadingHintText: typographyStyles.footnote,
   loadingBar: {
     height: 2,
   },

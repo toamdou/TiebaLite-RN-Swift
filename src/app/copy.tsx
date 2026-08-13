@@ -15,7 +15,7 @@ import { SymbolView } from '@/components/ui/SymbolView';
 import * as Clipboard from 'expo-clipboard';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius } from '@/theme';
+import { Radius, Spacing, typographyStyles } from '@/theme';
 
 export default function CopyPage() {
   const { text } = useLocalSearchParams<{ text: string }>();
@@ -123,25 +123,25 @@ export default function CopyPage() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  closeBtn: { padding: 4 },
+  closeBtn: { padding: Spacing.xs },
   tipBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: Radius.input,
   },
-  tipText: { fontSize: 13, lineHeight: 18, flex: 1 },
+  tipText: { ...typographyStyles.footnote, flex: 1 },
   scrollArea: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 8 },
+  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm },
   bodyText: { fontSize: 16, lineHeight: 26 },
   bottomBar: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
     gap: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
@@ -149,11 +149,11 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: Spacing.sm,
     paddingVertical: 14,
     borderRadius: Radius.input,
   },
-  copyAllText: { fontSize: 16, fontWeight: '600' },
+  copyAllText: typographyStyles.calloutBold,
   closeActionBtn: {
     alignItems: 'center',
     paddingVertical: 14,

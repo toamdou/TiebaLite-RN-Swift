@@ -27,7 +27,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius } from '@/theme';
+import { Radius, Spacing, typographyStyles } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { threadStore, removeStore } from '@/services/api/endpoints';
 import { usePagedList } from '@/hooks/usePagedList';
@@ -259,7 +259,7 @@ export default function ThreadStorePage() {
         }
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: insets.bottom + 16 },
+          { paddingBottom: insets.bottom + Spacing.lg },
           items.length === 0 && styles.emptyList,
         ]}
         refreshControl={
@@ -291,18 +291,18 @@ export default function ThreadStorePage() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  skeletonWrap: { paddingHorizontal: 12, paddingTop: 12 },
-  listContent: { paddingHorizontal: 12, paddingTop: 8 },
+  skeletonWrap: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md },
+  listContent: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm },
   emptyList: { flex: 1 },
   // Undo toast（浮动底部，不遮列表头）
   undoBar: {
     position: 'absolute',
-    left: 12,
-    right: 12,
+    left: Spacing.md,
+    right: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: 10,
     borderRadius: Radius.chip,
     shadowColor: '#000',
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    padding: 16,
+    padding: Spacing.lg,
     gap: 10,
   },
   favoriteMenu: {
@@ -339,23 +339,23 @@ const styles = StyleSheet.create({
   favContent: { flex: 1, gap: 6 },
   favTitle: { fontSize: 15, fontWeight: '600', lineHeight: 23, letterSpacing: 0 },
   metaRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  forumName: { fontSize: 12 },
-  authorName: { fontSize: 12 },
+  forumName: typographyStyles.caption1,
+  authorName: typographyStyles.caption1,
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  floor: { fontSize: 12 },
+  floor: typographyStyles.caption1,
   stats: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: Spacing.xs,
   },
-  statText: { fontSize: 11 },
+  statText: typographyStyles.caption2,
   removeBtn: { padding: 6, marginTop: 2 },
   // Footer
-  loadingMore: { paddingVertical: 16 },
-  noMore: { textAlign: 'center', paddingVertical: 16, fontSize: 13 },
-  favSeparator: { height: 8 },
+  loadingMore: { paddingVertical: Spacing.lg },
+  noMore: { textAlign: 'center', paddingVertical: Spacing.lg, ...typographyStyles.footnote },
+  favSeparator: { height: Spacing.sm },
 });

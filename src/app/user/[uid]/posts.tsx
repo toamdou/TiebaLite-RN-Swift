@@ -27,7 +27,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius, Spacing } from '@/theme';
+import { Radius, Spacing, typographyStyles } from '@/theme';
 import { userPost } from '@/services/api/endpoints';
 import { usePagedList } from '@/hooks/usePagedList';
 import { LoadMoreFooter } from '@/components/ui/LoadMoreFooter';
@@ -203,7 +203,7 @@ export default function UserPostsPage() {
         ListEmptyComponent={listEmpty}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: insets.bottom + 16 },
+          { paddingBottom: insets.bottom + Spacing.lg },
           items.length === 0 && styles.emptyList,
         ]}
         refreshControl={
@@ -230,30 +230,30 @@ export default function UserPostsPage() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  skeletonWrap: { paddingHorizontal: 16, paddingTop: 20 },
-  listContent: { paddingHorizontal: 16 },
+  skeletonWrap: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl },
+  listContent: { paddingHorizontal: Spacing.lg },
   // 空数据/加载/错误态撑满容器，保证 ListEmptyComponent 内骨架与空态居中
   emptyList: { flex: 1 },
 
   // Tabs
-  tabsRow: { paddingVertical: 12 },
+  tabsRow: { paddingVertical: Spacing.md },
 
   // Content Items
   contentItem: { padding: 14, borderRadius: Radius.input },
-  forumChipRow: { flexDirection: 'row', marginBottom: 8 },
+  forumChipRow: { flexDirection: 'row', marginBottom: Spacing.sm },
   forumChip: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 8,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: Radius.chip,
   },
   forumChipText: { fontSize: 11, fontWeight: '500' },
   contentTitle: { fontSize: 14, lineHeight: 20, marginBottom: 6 },
   contentMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  contentTime: { fontSize: 11 },
+  contentTime: typographyStyles.caption2,
   replyCountRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  replyCountText: { fontSize: 11 },
+  replyCountText: typographyStyles.caption2,
 
-  loadingMore: { paddingVertical: 16 },
-  noMore: { textAlign: 'center', paddingVertical: 16, fontSize: 13 },
+  loadingMore: { paddingVertical: Spacing.lg },
+  noMore: { textAlign: 'center', paddingVertical: Spacing.lg, ...typographyStyles.footnote },
 });
