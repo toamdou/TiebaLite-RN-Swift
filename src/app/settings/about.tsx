@@ -6,6 +6,7 @@ import { APP_VERSION, APP_NAME } from '@/constants/app';
 import { openLink } from '@/utils/linkOpener';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { ThemedHost } from '@/components/ui/ThemedHost';
+import { Spacing } from '@/theme';
 
 export default function AboutPage() {
   const { colors } = useThemeColors();
@@ -26,8 +27,8 @@ export default function AboutPage() {
           {/* 首区块：图标 + 标题 + 版本 居中排版 */}
           <VStack
             alignment="center"
-            spacing={4}
-            modifiers={[frame({ maxWidth: 9999 }), padding({ vertical: 16 })]}
+            spacing={Spacing.xs}
+            modifiers={[frame({ maxWidth: 9999 }), padding({ vertical: Spacing.lg })]}
           >
             <Image systemName="bubble.left.and.bubble.right.fill" size={56} color={colors.primary} />
             <Text modifiers={[font({ textStyle: 'title', weight: 'bold' })]}>{APP_NAME}</Text>

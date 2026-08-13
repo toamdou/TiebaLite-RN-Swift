@@ -231,7 +231,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  rankText: typographyStyles.headline,
+  rankText: {
+    fontSize: 17,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
   topicImage: {
     width: 56,
     height: 56,
