@@ -38,7 +38,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import ImageViewer from '@/components/ImageViewer';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { DURATION, EASE_OUT, MOMENTUM, PRESS_ENTER, Radius, Shadows } from '@/theme';
+import { DURATION, EASE_OUT, HERO, MOMENTUM, PRESS_ENTER, Radius, Shadows } from '@/theme';
 import { useAppPreference } from '@/hooks/useAppPreference';
 import { useBlockFilter } from '@/hooks/useBlockFilter';
 import { useImageViewer } from '@/hooks/useImageViewer';
@@ -108,8 +108,7 @@ const StaggeredCard = React.memo(function StaggeredCard({
   return <Animated.View style={animatedStyle}>{children}</Animated.View>;
 });
 
-/** Hero entrance spring (≈ RN Animated friction 12 / tension 120) */
-const HERO_SPRING = { damping: 14, stiffness: 140, mass: 1 } as const;
+// Hero entrance spring 直接复用 springs.ts 的 HERO token（damping:14/stiffness:140/mass:1）。
 
 function parseGeneralThread(item: any, forumName: string, userList: any[]): ThreadInfo {
   return mapProtoThread(item, { userList, forumName });
@@ -275,13 +274,14 @@ export default function ForumPage() {
         listEntranceY.value = 0;
         return;
       }
-      // Reanimated 4: springs/timings run on the UI thread; delays via withDelay
-      heroAvatarScale.value = withSpring(1, HERO_SPRING);
-      heroAvatarOpacity.value = withTiming(1, { duration: 250 });
-      heroContentOpacity.value = withDelay(150, withTiming(1, { duration: 300 }));
-      heroContentSlideY.value = withDelay(150, withSpring(0, HERO_SPRING));
-      listEntranceOpacity.value = withDelay(250, withTiming(1, { duration: 300 }));
-      listEntranceY.value = withDelay(250, withSpring(0, HERO_SPRING));
+      // Reanimated 4: springs/timings run on the UI thread; delays via withDelay.
+      // 时长/延迟全部由 DURATION / HERO token 组合，禁止手写 magic number。
+      heroAvatarScale.value = withSpring(1, HERO);
+      heroAvatarOpacity.value = withTiming(1, { duration: DURATION.enter });
+      heroContentOpacity.value = withDelay(DURATION.enter - DURATION.stagger * 2, withTiming(1, { duration: DURATION.enter }));
+      heroContentSlideY.value = withDelay(DURATION.enter - DURATION.stagger * 2, withSpring(0, HERO));
+      listEntranceOpacity.value = withDelay(DURATION.enter + DURATION.stagger, withTiming(1, { duration: DURATION.enter }));
+      listEntranceY.value = withDelay(DURATION.enter + DURATION.stagger, withSpring(0, HERO));
     }
   }, [loaded, currentForum, reduceMotion, heroAvatarScale, heroAvatarOpacity, heroContentOpacity, heroContentSlideY, listEntranceOpacity, listEntranceY]);
 
@@ -350,8 +350,8 @@ export default function ForumPage() {
     // Tab switch fade transition (skip first render)
     if (!firstDataRender && !reduceMotion) {
       listOpacity.value = withSequence(
-        withTiming(0, { duration: 100 }),
-        withTiming(1, { duration: 200 }),
+        withTiming(0, { duration: DURATION.exit }),
+        withTiming(1, { duration: DURATION.enter }),
       );
     }
 
@@ -436,6 +436,11 @@ export default function ForumPage() {
       if (result.isSuccess) {
         markForumSigned(currentForum.forumId, result.exp ?? 0);
         Alert.alert('签到成功', `经验+${result.exp}`);
+      } else if (result.errorCode === 1101) {
+        // 1101 = 今天已签到（可能由后台自动签到/其他端先签）。与
+        // runSignBatch / TiebaBackgroundSync 的语义一致：是成功状态，不是失败。
+        markForumSigned(currentForum.forumId, result.exp ?? 0);
+        Alert.alert('提示', '今天已签到');
       } else {
         Alert.alert('签到失败', result.errorMsg || '未知错误');
       }
@@ -517,9 +522,10 @@ export default function ForumPage() {
 
   // ── FAB ──
   const animateFab = useCallback(() => {
+    // FAB press 反馈与卡片按压一致：PRESS_ENTER 弹簧（对齐 FeedCard/card press）
     fabScale.value = withSequence(
-      withTiming(0.85, { duration: 80 }),
-      withTiming(1, { duration: 120 }),
+      withSpring(0.85, PRESS_ENTER),
+      withSpring(1, PRESS_ENTER),
     );
   }, [fabScale]);
 
@@ -584,6 +590,7 @@ export default function ForumPage() {
         <ForumThreadCard
           item={item}
           colors={colors}
+          grid={numColumns === 2}
           onImagePress={imageViewer.handleImagePress}
           onLike={handleCardLike}
         />
@@ -672,7 +679,7 @@ export default function ForumPage() {
                 <Text style={[styles.followBtnText, {
                   color: followBtnActive && currentForum?.signInInfo?.isSignIn
                     ? colors.text
-                    : '#FFFFFF',
+                    : colors.textOnPrimary,
                 }]}>
                   {followBtnLabel}
                 </Text>
@@ -789,7 +796,7 @@ export default function ForumPage() {
     return (
       <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
         <Stack.Screen options={{ title: `${name}吧`, headerRight }} />
-        <SkeletonList count={6} variant={numColumns === 2 ? 'card' : 'thread'} />
+        <SkeletonList count={6} variant={numColumns === 2 ? 'card' : 'row'} />
       </View>
     );
   }
@@ -841,7 +848,7 @@ export default function ForumPage() {
 
       {/* ── FAB ── */}
       {fabVisible && (
-      <Animated.View style={[styles.fabContainer, fabAnimatedStyle]}>
+      <Animated.View style={[styles.fabContainer, { bottom: insets.bottom + 12 }, fabAnimatedStyle]}>
         <Pressable
           onPress={handleFabPress}
           style={({ pressed }) => [
@@ -925,9 +932,9 @@ export default function ForumPage() {
 // ────────────────────────────────────────────────────────────
 
 const ForumThreadCard = React.memo(function ForumThreadCard({
-  item, colors, onLike,
+  item, colors, grid = false, onLike,
 }: {
-  item: ThreadInfo; colors: any;
+  item: ThreadInfo; colors: any; grid?: boolean;
   onImagePress: (images: string[], index: number) => void;
   onLike?: (item: ThreadInfo) => void;
 }) {
@@ -968,8 +975,8 @@ const ForumThreadCard = React.memo(function ForumThreadCard({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
       >
-        <Animated.View style={[styles.cardWrapper, pressStyle]}>
-        <View style={[styles.cardInner, { backgroundColor: colors.card }]}>
+        <Animated.View style={[styles.cardWrapper, grid && styles.cardWrapperGrid, pressStyle]}>
+        <View style={[styles.cardInner, grid && styles.cardInnerGrid, { backgroundColor: colors.card }]}>
           {showHero ? (
             /* == 有图：全幅图片 + 底部渐变遮罩 + 白色文字叠加 == */
             <View style={styles.heroContent}>
@@ -1084,7 +1091,7 @@ const ForumThreadCard = React.memo(function ForumThreadCard({
               )}
 
               {/* -- Action bar: share | like -- */}
-              <View style={styles.actionBar}>
+              <View style={[styles.actionBar, { borderTopColor: colors.divider }]}>
                 <Pressable style={styles.actionBtn} onPress={() => onLike?.(item)}>
                   <SymbolView
                     name={item.hasAgree ? 'heart.fill' : 'heart'}
@@ -1113,6 +1120,15 @@ const ForumThreadCard = React.memo(function ForumThreadCard({
 
 // ────────────────────────────────────────────────────────────
 // ClassifyPickerSheet — native bottom sheet (audit #15)
+// ────────────────────────────────────────────────────────────
+// 评估（P2）：曾考虑换成原生 Picker pickerStyle('menu')（项目 settings/search
+// 已有用法），但保留 bottom sheet。原因：
+//   1. goodClassifyId 是 `string | null`（"全部"=null），SwiftUI Picker 的
+//      selection 需要非空字符串，需哨兵值映射，破坏 setGoodClassifyId(null) 契约。
+//   2. 分类过滤是页面内过滤控件，贴吧分类列表可能较长，bottom sheet 可滚动，
+//      比 menu 弹层更适合该场景。
+//   3. 项目内 pickerStyle('menu') 均用于 Form/Section 设置表单，非工具栏过滤。
+//   4. 改造需重写 visible/onClose 状态机，回归风险大于收益。
 // ────────────────────────────────────────────────────────────
 
 function ClassifyPickerSheet({
@@ -1185,7 +1201,7 @@ function ClassifyPickerSheet({
           </Pressable>
         ))}
         <Pressable
-          style={[styles.menuItem, styles.menuCancelItem]}
+          style={[styles.menuItem, styles.menuCancelItem, { borderTopColor: colors.divider }]}
           onPress={onClose}
         >
           <Text style={[styles.menuCancelText, { color: colors.textSecondary }]}>取消</Text>
@@ -1279,9 +1295,18 @@ const styles = StyleSheet.create({
     borderRadius: Radius.card,
     ...Shadows.card,
   },
+  // 双列网格每行等高：FlashList 行内默认 alignItems:stretch，StaggeredCard →
+  // cardOuter(flex:1) 已随行高拉伸；这里补上 cardWrapper/cardInner 的 flex:1，
+  // 让可见卡片背景填满行高，避免行内底部不齐（P2 评估结论）。
+  cardWrapperGrid: {
+    flex: 1,
+  },
   cardInner: {
     borderRadius: Radius.card,
     overflow: 'hidden',
+  },
+  cardInnerGrid: {
+    flex: 1,
   },
   heroContent: {
     height: 240,
@@ -1366,12 +1391,12 @@ const styles = StyleSheet.create({
   originForumChipText: { fontSize: 11, fontWeight: '500' },
 
   // ── Action bar ──
+  // borderTopColor 使用 colors.divider（静态 StyleSheet 无法取主题色，见调用处内联）。
   actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.12)',
   },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   actionText: { fontSize: 13, fontWeight: '500' },
@@ -1386,7 +1411,9 @@ const styles = StyleSheet.create({
   cardTime: { fontSize: 12, marginTop: 2 },
 
   // ── FAB ──
-  fabContainer: { position: 'absolute', right: 20, bottom: 24, zIndex: 100 },
+  // bottom 由调用处传入 insets.bottom + 12（对齐 thread/[id].tsx 浮动栏），
+  // 避免全面屏 Home Indicator 遮挡。静态样式只保留 right。
+  fabContainer: { position: 'absolute', right: 20, zIndex: 100 },
   fab: {
     width: 52, height: 52, borderRadius: Radius.capsule,
     justifyContent: 'center', alignItems: 'center',
@@ -1411,7 +1438,6 @@ const styles = StyleSheet.create({
   menuCancelItem: {
     justifyContent: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.15)',
     marginTop: 4,
   },
   menuCancelText: { fontSize: 16, fontWeight: '600' },

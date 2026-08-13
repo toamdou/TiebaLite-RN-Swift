@@ -26,7 +26,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius } from '@/theme';
+import { Radius, Spacing } from '@/theme';
 import { userPost } from '@/services/api/endpoints';
 import { usePagedList } from '@/hooks/usePagedList';
 import { LoadMoreFooter } from '@/components/ui/LoadMoreFooter';
@@ -39,7 +39,7 @@ const POST_TABS = [
   { label: '回复', value: 'replies' },
 ];
 
-const UserPostsItemSeparator = () => <View style={{ height: 8 }} />;
+const UserPostsItemSeparator = () => <View style={{ height: Spacing.sm }} />;
 
 // ---------- Component ----------
 
@@ -67,12 +67,16 @@ export default function UserPostsPage() {
     refresh: handleRefresh,
     loadMore: handleLoadMore,
     load,
+    setItems,
   } = paged;
 
   // Initial load + reload when tab changes
   useEffect(() => {
+    // 切换 tab 后旧 tab 数据若残留，loading && items.length===0 不成立 → 新 tab 下会闪现旧数据。
+    // 先清空再请求，配合 listEmpty 骨架立即展示加载态。
+    setItems([]);
     load(1, { isThread: activeTab === 'threads' });
-  }, [uid, activeTab, load]);
+  }, [uid, activeTab, load, setItems]);
 
   const handleTabChange = useCallback((value: string) => {
     hapticSelection();
@@ -129,16 +133,27 @@ export default function UserPostsPage() {
     (item: any, idx: number) => item.id || item.threadId || String(idx),
     [],
   );
-  const listEmpty = useMemo(
-    () => (
+  // 单份 ListEmptyComponent：loading / error / 空数据 三态合一，
+  // 取代原先"提前 return 骨架屏"+"ListEmptyComponent 空态"的双份骨架逻辑。
+  const listEmpty = useMemo(() => {
+    if (loading) {
+      return (
+        <View style={styles.skeletonWrap}>
+          <SkeletonList variant="thread" count={8} />
+        </View>
+      );
+    }
+    if (error) {
+      return <ErrorState message={error} onRetry={handleRefresh} />;
+    }
+    return (
       <EmptyState
         title="暂无内容"
         description={activeTab === 'threads' ? '还没有发过帖子' : '还没有回复'}
         icon="tray.fill"
       />
-    ),
-    [activeTab],
-  );
+    );
+  }, [loading, error, activeTab, handleRefresh]);
   const listFooter = useMemo(
     () =>
       (
@@ -153,30 +168,6 @@ export default function UserPostsPage() {
   );
 
   const headerTitle = name || '用户帖子';
-
-  // ---------- Loading state ----------
-
-  if (loading && items.length === 0) {
-    return (
-      <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
-        <Stack.Screen options={{ title: headerTitle }} />
-        <View style={styles.skeletonWrap}>
-          <SkeletonList variant="thread" count={8} />
-        </View>
-      </View>
-    );
-  }
-
-  // ---------- Error state ----------
-
-  if (error && items.length === 0) {
-    return (
-      <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
-        <Stack.Screen options={{ title: headerTitle }} />
-        <ErrorState message={error} onRetry={handleRefresh} />
-      </View>
-    );
-  }
 
   // ---------- Main render ----------
 
@@ -211,6 +202,7 @@ export default function UserPostsPage() {
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: insets.bottom + 16 },
+          items.length === 0 && styles.emptyList,
         ]}
         refreshControl={
           <RefreshControl
@@ -237,6 +229,8 @@ const styles = StyleSheet.create({
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   skeletonWrap: { paddingHorizontal: 16, paddingTop: 20 },
   listContent: { paddingHorizontal: 16 },
+  // 空数据/加载/错误态撑满容器，保证 ListEmptyComponent 内骨架与空态居中
+  emptyList: { flex: 1 },
 
   // Tabs
   tabsRow: { paddingVertical: 12 },

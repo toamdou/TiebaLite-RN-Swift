@@ -21,7 +21,7 @@ import { GlassView } from '@/components/ui/GlassView';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius, Shadows, Spacing, typographyStyles } from '@/theme';
+import { Radius, Shadows, Spacing, typographyStyles, PRESS_ENTER } from '@/theme';
 import type { SemanticColors } from '@/theme/colors';
 
 // ---------- Toast Types ----------
@@ -110,7 +110,7 @@ export const Toast = forwardRef<ToastRef>(function Toast(_props, ref) {
       translateY.value = 0;
       opacity.value = withTiming(1, { duration: 200 });
     } else {
-      translateY.value = withSpring(0, { damping: 20, stiffness: 300 });
+      translateY.value = withSpring(0, PRESS_ENTER);
       opacity.value = withTiming(1, { duration: 200 });
     }
 

@@ -5,6 +5,7 @@ import { hapticSelection } from '@/utils/haptics';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { usePreferenceForm } from '@/hooks/usePreferenceForm';
+import { PreferenceToggleRow } from '@/components/settings/PreferenceToggleRow';
 import { DEFAULT_SORT_OPTIONS, FORUM_FAB_OPTIONS } from '@/constants/settings';
 
 export default function ExperimentalFeaturesPage() {
@@ -69,6 +70,25 @@ export default function ExperimentalFeaturesPage() {
             systemImage="arrow.up.arrow.down"
             isOn={preferences.collectDescSort}
             onIsOnChange={makeToggle('collectDescSort')}
+          />
+        </Section>
+
+        {/* 从习惯页移入的「暂不生效」偏好：保留偏好但明确标注未生效 */}
+        <Section
+          title="内容（暂不生效）"
+          footer="以下开关仅保存偏好，当前版本尚未生效"
+        >
+          <PreferenceToggleRow
+            preferenceKey="showFollowedOnly"
+            label="只显示关注"
+            systemImage="star.fill"
+            description="当前暂不生效，仅保存偏好"
+          />
+          <PreferenceToggleRow
+            preferenceKey="forumSingleColumn"
+            label="贴吧单列布局"
+            systemImage="rectangle.fill"
+            description="当前暂不生效，仅保存偏好"
           />
         </Section>
       </Form>

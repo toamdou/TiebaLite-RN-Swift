@@ -44,7 +44,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import ImageViewer from '@/components/ImageViewer';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius, DURATION, EASE_OUT } from '@/theme';
+import { Radius, DURATION, EASE_OUT, Spacing, typographyStyles } from '@/theme';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useAuthStore } from '@/stores/authStore';
 import {
@@ -68,16 +68,17 @@ import type { UserInfo } from '@/types';
 
 // ---------- Constants ----------
 
+// 外层 segmented 只保留 3 段；粉丝/关注列表改为从头部统计区进入的独立视图，
+// 避免「外层分段 + 内嵌分段」的双层分段控件（风险最小的方案）。
 const PROFILE_TABS = [
   { label: '贴子', value: 'threads' },
   { label: '回复', value: 'replies' },
   { label: '关注的吧', value: 'forums' },
-  { label: '粉丝/关注', value: 'social' },
 ];
 
 const DEFAULT_INTRO = '这个人很懒，什么都没留下';
 
-const ProfileItemSeparator = () => <View style={{ height: 8 }} />;
+const ProfileItemSeparator = () => <View style={{ height: Spacing.sm }} />;
 
 // ---------- 首屏级联入场（仅项目挂载时执行一次，Reduce Motion 跳过） ----------
 
@@ -133,6 +134,10 @@ export default function UserProfilePage() {
   // Tab state
   const [activeTab, setActiveTab] = useState('threads');
   const displayedTab = !isOwnProfile && activeTab === 'replies' ? 'threads' : activeTab;
+
+  // 粉丝/关注独立视图（从头部统计区进入，外层 segmented 不再嵌套）
+  const [socialVisible, setSocialVisible] = useState(false);
+  const [socialInitialMode, setSocialInitialMode] = useState<SocialMode>('fans');
 
   // Profile loading
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -284,22 +289,40 @@ export default function UserProfilePage() {
 
         {/* ---- Stats Row (3 items) ---- */}
         <View style={[styles.statsRow, { borderColor: colors.separator }]}>
-          {/* 关注 */}
-          <View style={styles.statItem}>
+          {/* 关注 — 点击进入关注列表 */}
+          <Pressable
+            onPress={() => {
+              hapticImpact(ImpactFeedbackStyle.Light);
+              setSocialInitialMode('follows');
+              setSocialVisible(true);
+            }}
+            style={styles.statItem}
+            accessibilityRole="button"
+            accessibilityLabel={`关注 ${formatCount(user.concernNum || 0)}，点击查看`}
+          >
             <Text style={[styles.statValue, { color: colors.text }]}>
               {formatCount(user.concernNum || 0)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textTertiary }]}>关注</Text>
-          </View>
+          </Pressable>
           {/* Divider */}
           <View style={[styles.statDivider, { backgroundColor: colors.separator }]} />
-          {/* 粉丝 */}
-          <View style={styles.statItem}>
+          {/* 粉丝 — 点击进入粉丝列表 */}
+          <Pressable
+            onPress={() => {
+              hapticImpact(ImpactFeedbackStyle.Light);
+              setSocialInitialMode('fans');
+              setSocialVisible(true);
+            }}
+            style={styles.statItem}
+            accessibilityRole="button"
+            accessibilityLabel={`粉丝 ${formatCount(user.fansNum || 0)}，点击查看`}
+          >
             <Text style={[styles.statValue, { color: colors.text }]}>
               {formatCount(user.fansNum || 0)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textTertiary }]}>粉丝</Text>
-          </View>
+          </Pressable>
           {/* Divider */}
           <View style={[styles.statDivider, { backgroundColor: colors.separator }]} />
           {/* 获赞 */}
@@ -472,51 +495,50 @@ export default function UserProfilePage() {
     <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
       <Stack.Screen options={{ title: user?.nameShow || user?.name || '用户' }} />
 
-      {/* SegmentedControl tabs rendered outside FlatList */}
-      <View style={styles.tabsRow}>
-        <Host matchContents>
-          <Picker
-          selection={displayedTab}
-            onSelectionChange={handleTabChange}
-            modifiers={[pickerStyle('segmented')]}
-          >
-            {visibleTabs.map((tab) => (
-              <SWText key={tab.value} modifiers={[tag(tab.value)]}>{tab.label}</SWText>
-            ))}
-          </Picker>
-        </Host>
-      </View>
-
-      <View style={styles.tabLists}>
-        {visibleTabs.map((tab) => (
-          <View
-            key={tab.value}
-            style={[
-              styles.tabListWrap,
-              displayedTab !== tab.value && styles.tabListHidden,
-            ]}
-          >
-            {tab.value === 'social' ? (
-              <SocialTabList
-                uid={uid}
-                colors={colors}
-                insets={insets}
-                header={renderHeader}
-                onHeaderRefresh={loadProfile}
-              />
-            ) : (
-              <UserTabList
-                tab={tab.value}
-                uid={uid}
-                colors={colors}
-                insets={insets}
-                header={renderHeader}
-                onHeaderRefresh={loadProfile}
-              />
-            )}
+      {socialVisible ? (
+        <SocialTabList
+          uid={uid}
+          colors={colors}
+          insets={insets}
+          initialMode={socialInitialMode}
+          onClose={() => setSocialVisible(false)}
+        />
+      ) : (
+        <>
+          {/* SegmentedControl tabs rendered outside FlatList */}
+          <View style={styles.tabsRow}>
+            <Host matchContents>
+              <Picker
+              selection={displayedTab}
+                onSelectionChange={handleTabChange}
+                modifiers={[pickerStyle('segmented')]}
+              >
+                {visibleTabs.map((tab) => (
+                  <SWText key={tab.value} modifiers={[tag(tab.value)]}>{tab.label}</SWText>
+                ))}
+              </Picker>
+            </Host>
           </View>
-        ))}
-      </View>
+
+          {/* 懒挂载：仅挂载当前激活的 tab，切换时才 mount/加载，避免预渲染多份 FlashList */}
+          <View style={styles.tabLists}>
+            {visibleTabs
+              .filter((tab) => tab.value === displayedTab)
+              .map((tab) => (
+                <View key={tab.value} style={styles.tabListWrap}>
+                  <UserTabList
+                    tab={tab.value}
+                    uid={uid}
+                    colors={colors}
+                    insets={insets}
+                    header={renderHeader}
+                    onHeaderRefresh={loadProfile}
+                  />
+                </View>
+              ))}
+          </View>
+        </>
+      )}
 
       <ImageViewer
         images={user?.portrait ? [getAvatarUrl(user.portrait)] : []}
@@ -710,7 +732,7 @@ function UserTabList({
   );
 }
 
-// ---------- 粉丝/关注列表（tab: social） ----------
+// ---------- 粉丝/关注独立视图 ----------
 // 复用 social.ts 的 getFans/getFollows（20/页，pn 从 1 开始），
 // SocialUser 无 level/时间字段，行内展示昵称 + 用户名副行。
 
@@ -720,17 +742,17 @@ function SocialTabList({
   uid,
   colors,
   insets,
-  header,
-  onHeaderRefresh,
+  initialMode,
+  onClose,
 }: {
   uid: string;
   colors: any;
   insets: any;
-  header: React.ReactElement | null;
-  onHeaderRefresh: () => Promise<void>;
+  initialMode: SocialMode;
+  onClose: () => void;
 }) {
   const listRef = useRef<FlashList<SocialUser>>(null);
-  const [mode, setMode] = useState<SocialMode>('fans');
+  const [mode, setMode] = useState<SocialMode>(initialMode);
 
   const paged = usePagedList<SocialUser, { uid: string; mode: SocialMode }>({
     fetcher: async (p, params, signal) => {
@@ -766,8 +788,8 @@ function SocialTabList({
   }, []);
 
   const handleRefresh = useCallback(async () => {
-    await Promise.all([onHeaderRefresh(), refresh()]);
-  }, [onHeaderRefresh, refresh]);
+    await refresh();
+  }, [refresh]);
 
   const handleLoadMore = useCallback(async () => {
     if (!hasMore || loadingMore || loading) return;
@@ -777,8 +799,16 @@ function SocialTabList({
   const listHeader = useCallback(
     () => (
       <View>
-        {header}
-        <View style={styles.socialToggleWrap}>
+        <View style={styles.socialTopBar}>
+          <Pressable
+            onPress={onClose}
+            hitSlop={8}
+            style={styles.socialCloseBtn}
+            accessibilityRole="button"
+            accessibilityLabel="关闭粉丝/关注列表"
+          >
+            <SymbolView name="xmark" size={16} weight="semibold" tintColor={colors.textSecondary} />
+          </Pressable>
           <Host matchContents>
             <Picker
               selection={mode}
@@ -789,10 +819,12 @@ function SocialTabList({
               <SWText modifiers={[tag('follows')]}>关注</SWText>
             </Picker>
           </Host>
+          {/* 平衡左侧关闭按钮占位，让分段居中 */}
+          <View style={styles.socialCloseBtn} />
         </View>
       </View>
     ),
-    [header, mode, handleModeChange],
+    [onClose, mode, handleModeChange, colors],
   );
 
   const renderItem = useCallback(
@@ -933,7 +965,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   nameSection: { gap: 3 },
-  userName: { fontSize: 22, fontWeight: '700' },
+  userName: typographyStyles.title2,
   levelName: { fontSize: 13, fontWeight: '500' },
 
   // Stats Row (3 items with vertical dividers)
@@ -946,8 +978,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     marginBottom: 12,
   },
-  statItem: { alignItems: 'center', gap: 2 },
-  statValue: { fontSize: 17, fontWeight: '700' },
+  statItem: { alignItems: 'center', gap: 2, flex: 1 },
+  statValue: typographyStyles.headline,
   statLabel: { fontSize: 12, fontWeight: '500' },
   statDivider: {
     width: StyleSheet.hairlineWidth,
@@ -1008,7 +1040,21 @@ const styles = StyleSheet.create({
   tabsRow: { paddingVertical: 12 },
   tabLists: { flex: 1 },
   tabListWrap: { flex: 1 },
-  tabListHidden: { display: 'none' },
+
+  // 粉丝/关注独立视图顶部栏
+  socialTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+  },
+  socialCloseBtn: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   // Content Items
   contentItem: { padding: 14, borderRadius: Radius.input },
@@ -1030,10 +1076,6 @@ const styles = StyleSheet.create({
   forumLevel: { fontSize: 11 },
 
   // Social Items (粉丝/关注)
-  socialToggleWrap: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
   socialItem: {
     flexDirection: 'row',
     alignItems: 'center',

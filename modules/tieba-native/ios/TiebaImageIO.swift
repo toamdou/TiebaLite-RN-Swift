@@ -38,6 +38,11 @@ final class TiebaImageIO {
   // Disk budget cap (~200MB). Exceeding it evicts least-recently-used files.
   private let diskLimitBytes: Int64 = 200 * 1024 * 1024
   private let evictionLock = NSLock()
+  // Bump when the on-disk key encoding changes: files written under the old
+  // scheme can never be found again, so purge them once on launch instead of
+  // letting up to ~200MB of orphans wait for LRU eviction.
+  private let cacheVersion = 2
+  private let cacheVersionKey = "TiebaImageIO.cacheVersion"
 
   private init() {
     let base = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first
@@ -46,6 +51,7 @@ final class TiebaImageIO {
     try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
     memoryCache.countLimit = 200
     memoryCache.totalCostLimit = 50 * 1024 * 1024
+    purgeIfKeyEncodingChanged()
   }
 
   func makeThumbnail(
@@ -58,7 +64,7 @@ final class TiebaImageIO {
   ) async throws -> String {
     let baseKey = cacheKey.isEmpty
       ? UUID().uuidString
-      : cacheKey.components(separatedBy: CharacterSet.alphanumerics.inverted).joined(separator: "-")
+      : makeSafeCacheKey(cacheKey)
     // Different target widths produce different files; suffix the key so a
     // list thumbnail and a full image never collide. nil keeps legacy names.
     let suffix = targetWidth.map { $0 > 0 ? "-w\(Int($0))" : "" } ?? ""
@@ -132,6 +138,48 @@ final class TiebaImageIO {
     for url in contents {
       try? fileManager.removeItem(at: url)
     }
+  }
+
+  /// Filesystem-safe, collision-free cache key derived from the raw cacheKey.
+  ///
+  /// The previous scheme collapsed every non-alphanumeric character into "-",
+  /// which is NOT injective: "https://x.com/a-b" and "https://x.com/a/b" both
+  /// sanitize to "https---x-com-a-b" (the split segments are identical, so a
+  /// per-segment length prefix alone would not help either), and the two
+  /// thumbnails overwrote each other in memory and on disk. We keep the
+  /// readable sanitized prefix for debuggability and append a stable 64-bit
+  /// digest of the ORIGINAL key so two distinct keys can no longer collide.
+  /// The digest is only used for namespace disambiguation, not security.
+  private func makeSafeCacheKey(_ cacheKey: String) -> String {
+    let readable = cacheKey.components(separatedBy: CharacterSet.alphanumerics.inverted)
+      .joined(separator: "-")
+    return "\(readable)-\(stableDigest64(cacheKey))"
+  }
+
+  /// djb2 variant (64-bit) over the Unicode scalars of the input. Pure
+  /// integer arithmetic, so the value is deterministic across launches and
+  /// platforms; URLs that differ only in separator characters always produce
+  /// different digests.
+  private func stableDigest64(_ input: String) -> String {
+    var hash: UInt64 = 5381
+    for scalar in input.unicodeScalars {
+      hash = (hash &* 33) &+ UInt64(scalar.value)
+    }
+    return String(hash, radix: 16)
+  }
+
+  /// One-shot migration: when the cache-key encoding version changes, drop
+  /// every file written by the previous encoding. Old keys can never be
+  /// resolved again, so leaving them would only waste the disk budget.
+  private func purgeIfKeyEncodingChanged() {
+    let defaults = UserDefaults.standard
+    guard defaults.integer(forKey: cacheVersionKey) != cacheVersion else { return }
+    if let contents = try? fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil) {
+      for url in contents {
+        try? fileManager.removeItem(at: url)
+      }
+    }
+    defaults.set(cacheVersion, forKey: cacheVersionKey)
   }
 
   // Bump the file mtime on every hit so eviction naturally picks the oldest.

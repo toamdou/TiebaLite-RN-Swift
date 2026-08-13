@@ -3,6 +3,7 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text as RNText, View }
 import { Stack, useRouter } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
 import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { hapticNotify, NotificationFeedbackType } from '@/utils/haptics';
 import {
   Button,
@@ -28,6 +29,7 @@ import { Radius, Spacing, typographyStyles } from '@/theme';
 
 export default function EditProfilePage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { colors } = useThemeColors();
   const account = useAuthStore((s) => s.account);
   const [sex, setSex] = useState(0);
@@ -107,15 +109,24 @@ export default function EditProfilePage() {
         sortBy: [MediaLibrary.SortBy.creationTime],
         first: 48,
       });
+      // 48 张逐张串行解析会导致首屏卡顿，改为并行分批解析
+      const CHUNK_SIZE = 12;
       const resolved: { id: string; uri: string }[] = [];
-      for (const a of assets) {
-        try {
-          const info = await MediaLibrary.getAssetInfoAsync(a);
-          if (info?.localUri) {
-            resolved.push({ id: info.id ?? a.id, uri: info.localUri });
-          }
-        } catch {
-          // Skip assets that cannot be resolved to a local file.
+      for (let i = 0; i < assets.length; i += CHUNK_SIZE) {
+        const chunk = assets.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(
+          chunk.map(async (a) => {
+            try {
+              const info = await MediaLibrary.getAssetInfoAsync(a);
+              return info?.localUri ? { id: info.id ?? a.id, uri: info.localUri } : null;
+            } catch {
+              // Skip assets that cannot be resolved to a local file.
+              return null;
+            }
+          }),
+        );
+        for (const r of chunkResults) {
+          if (r) resolved.push(r);
         }
       }
       setPhotos(resolved);
@@ -136,6 +147,12 @@ export default function EditProfilePage() {
     try {
       const tbs = await requireTbs();
       await uploadPortrait(uri, tbs);
+      // 上传成功后回写 authStore 的 portrait，使页面头像与「我的」页立即更新
+      if (account) {
+        useAuthStore.setState({
+          account: { ...account, portrait: uri },
+        });
+      }
       hapticNotify(NotificationFeedbackType.Success);
       toastRef.current?.show({
         title: '头像已更新',
@@ -152,7 +169,7 @@ export default function EditProfilePage() {
     } finally {
       setUploading(false);
     }
-  }, []);
+  }, [account]);
 
   return (
     <>
@@ -248,7 +265,7 @@ export default function EditProfilePage() {
         transparent={false}
         onRequestClose={() => setPickerVisible(false)}
       >
-        <View style={[styles.modal, { backgroundColor: colors.windowBackground }]}>
+        <View style={[styles.modal, { backgroundColor: colors.windowBackground, paddingTop: insets.top + Spacing.lg }]}>
           <View style={styles.modalHeader}>
             <RNText style={[typographyStyles.headline, { color: colors.text }]}>选择头像</RNText>
             <Pressable
@@ -310,7 +327,6 @@ const styles = StyleSheet.create({
   },
   modal: {
     flex: 1,
-    paddingTop: 64,
     paddingHorizontal: Spacing.lg,
   },
   modalHeader: {

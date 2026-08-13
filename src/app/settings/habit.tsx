@@ -57,24 +57,9 @@ export default function HabitSettingsPage() {
             systemImage="nosign"
           />
           <PreferenceToggleRow
-            preferenceKey="showFollowedOnly"
-            label="只显示关注"
-            systemImage="star.fill"
-            description="当前暂不生效，仅保存偏好"
-          />
-          <PreferenceToggleRow
             preferenceKey="blockVideo"
             label="屏蔽视频"
             systemImage="video.slash.fill"
-          />
-        </Section>
-
-        <Section title="贴吧">
-          <PreferenceToggleRow
-            preferenceKey="forumSingleColumn"
-            label="单列布局"
-            systemImage="rectangle.fill"
-            description="当前暂不生效，仅保存偏好"
           />
         </Section>
       </Form>

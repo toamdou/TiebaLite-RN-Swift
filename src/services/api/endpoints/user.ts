@@ -83,13 +83,54 @@ export async function userPost(uid: string, page: number = 1, isThread: boolean 
       undefined,
       signal,
     ));
-    return { items: raw?.data?.content ?? raw?.content ?? [], hasMore: (raw?.data?.has_more ?? raw?.has_more ?? 0) === 1 };
+    const content = raw?.data?.content ?? raw?.content ?? [];
+    return {
+      // JSON 回退路径：服务端下发 snake_case（tid / create_time / time），UI 读 item.createTime 恒空。
+      // 此处映射为 UI 读取的 camelCase：id ← tid ?? id、createTime ← create_time ?? time。
+      // 注意：与 proto 路径一致，createTime 保持秒级（UI 侧按秒 *1000 消费，userPost 不走毫秒契约）。
+      // 其余字段（title / content / forum_name 等）原样透传；映射字段放在展开后，保证始终生效。
+      items: (Array.isArray(content) ? content : []).map((i: any) => ({
+        ...i,
+        id: String(i.tid ?? i.id ?? ''),
+        threadId: String(i.tid ?? i.thread_id ?? i.id ?? ''),
+        createTime: Number(i.create_time ?? i.time ?? 0),
+      })),
+      hasMore: (raw?.data?.has_more ?? raw?.has_more ?? 0) === 1,
+    };
   }
+}
+
+/**
+ * 映射 /c/f/forum/like 的 forum_list 单条（snake_case）为 ForumInfo（camelCase）。
+ * 与 forumFollowed.ts 的 mapForumInfo 同构，兼容服务端两种下发形态。
+ */
+function mapForumLikeItem(item: any): ForumInfo {
+  return {
+    forumId: String(item.forum_id ?? item.forumId ?? item.fid ?? ''),
+    forumName: item.forum_name ?? item.forumName ?? '',
+    name: item.forum_name ?? item.forumName ?? '',
+    avatar: item.avatar ?? '',
+    slogan: item.slogan ?? '',
+    memberCount: Number(item.member_count ?? item.memberCount ?? 0),
+    threadCount: Number(item.thread_count ?? item.threadCount ?? 0),
+    levelName: item.level_name ?? item.levelName ?? '',
+    levelId: Number(item.level_id ?? item.levelId ?? 0),
+    isLike: item.is_like === '1' || item.is_like === 1 || item.isLike === true,
+    isSign: item.is_sign === '1' || item.is_sign === 1 || item.isSign === true,
+    signCount: item.sign_count != null || item.signCount != null
+      ? Number(item.sign_count ?? item.signCount)
+      : undefined,
+  };
 }
 
 export async function userLikeForum(uid: string, page: number = 1, signal?: AbortSignal): Promise<{ items: ForumInfo[]; hasMore: boolean }> {
   const raw = await postFormAction<any>('/c/f/forum/like', { page_no: String(page), page_size: '50', uid }, signal);
-  return { items: raw?.data?.forum_list ?? raw?.forum_list ?? [], hasMore: (raw?.data?.has_more ?? raw?.has_more ?? 0) === 1 };
+  const forumList = raw?.data?.forum_list ?? raw?.forum_list ?? [];
+  return {
+    // 新字段形状：forum_list 映射为 camelCase ForumInfo（旧实现透传 snake_case，UI 读 item.forumName / item.levelName 恒空）
+    items: Array.isArray(forumList) ? forumList.map(mapForumLikeItem) : [],
+    hasMore: (raw?.data?.has_more ?? raw?.has_more ?? 0) === 1,
+  };
 }
 
 

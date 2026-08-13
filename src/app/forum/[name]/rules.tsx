@@ -235,6 +235,7 @@ function RuleContentRenderer({
           source={{ uri: src }}
           style={[
             styles.ruleImage,
+            { backgroundColor: colors.surfaceSecondary },
             width > 0 && height > 0 ? { aspectRatio: width / height } : null,
           ]}
           contentFit="cover"
@@ -503,7 +504,7 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: 10,
     borderRadius: Radius.input,
-    backgroundColor: '#F0F0F0',
+    // backgroundColor 走 colors.surfaceSecondary（组件内动态注入，暗色不亮块）
   },
   quoteBlock: {
     width: '100%',

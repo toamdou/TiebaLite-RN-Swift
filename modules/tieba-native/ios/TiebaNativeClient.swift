@@ -7,6 +7,7 @@ enum TiebaClientError: LocalizedError {
   case httpStatus(Int)
   case cancelled
   case invalidResponse
+  case disallowedHost
 
   var errorDescription: String? {
     switch self {
@@ -20,6 +21,8 @@ enum TiebaClientError: LocalizedError {
       return "Request cancelled"
     case .invalidResponse:
       return "Invalid response data"
+    case .disallowedHost:
+      return "Request host is not allowed"
     }
   }
 }
@@ -146,6 +149,9 @@ final class TiebaNativeClient {
     guard let data = encoded.data(using: .utf8), let url = URL(string: urlString) else {
       throw TiebaClientError.invalidUrl
     }
+    guard isAllowedHost(url) else {
+      throw TiebaClientError.disallowedHost
+    }
 
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -175,6 +181,9 @@ final class TiebaNativeClient {
     guard let url = URL(string: urlString) else {
       throw TiebaClientError.invalidUrl
     }
+    guard isAllowedHost(url) else {
+      throw TiebaClientError.disallowedHost
+    }
     let body = try TiebaSigner.buildMultipartBody(
       formFields: formFields,
       protoData: protoData,
@@ -190,6 +199,23 @@ final class TiebaNativeClient {
     request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
     apply(headers, to: &request)
     return try await perform(request, requestId: requestId)
+  }
+
+  /// Defense-in-depth: `postProto` builds the request from a URL/headers
+  /// supplied by JS, so an injected JS payload could otherwise steer the
+  /// native client at any host (e.g. exfiltrate a signed request to a
+  /// third-party endpoint). Only Baidu hosts (anything under *.baidu.com) and
+  /// loopback addresses for local debugging are allowed; anything else fails
+  /// closed. `postForm` passes through the same gate even though its callers
+  /// are native-only. This is a host allow-list only — TLS cert pinning is
+  /// intentionally out of scope for this round.
+  private func isAllowedHost(_ url: URL) -> Bool {
+    guard let host = url.host else { return false }
+    let lower = host.lowercased()
+    if lower == "localhost" || lower == "127.0.0.1" || lower == "::1" {
+      return true
+    }
+    return lower == "baidu.com" || lower.hasSuffix(".baidu.com")
   }
 
   private func apply(_ headers: [String: String], to request: inout URLRequest) {

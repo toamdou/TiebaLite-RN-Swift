@@ -26,6 +26,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { GlassView } from 'expo-glass-effect';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { useAuthStore } from '@/stores/authStore';
@@ -38,6 +39,7 @@ import { SymbolView } from '@/components/ui/SymbolView';
 import { Avatar } from '@/components/ui/Avatar';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -45,7 +47,8 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { DURATION, EASE_OUT, PRESS_ENTER } from '@/theme';
+import { DURATION, EASE_OUT, PRESS_ENTER, Radius } from '@/theme';
+import { typographyStyles } from '@/theme/typography';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { ForumInfo } from '@/types';
 
@@ -182,6 +185,7 @@ export default function HomeScreen() {
 function LoggedInHome() {
   const { colors } = useThemeColors();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const followedForums = useForumStore((s) => s.followedForums);
   const isLoadingForums = useForumStore((s) => s.isLoadingForums);
   const loadFollowedForums = useForumStore((s) => s.loadFollowedForums);
@@ -193,6 +197,8 @@ function LoggedInHome() {
   const [searchQuery] = useState('');
   const [recentForums, setRecentForums] = useState<ForumHistoryItem[]>([]);
   const [historyExpanded, setHistoryExpanded] = useState(true);
+  // 关注吧加载失败态：用于替代静默 catch，展示重试入口
+  const [forumsError, setForumsError] = useState('');
 
   // 首屏入场标记：仅数据首次到达批次做 stagger 入场（关注吧来自 store，首次到达后置位）。
   const entranceDoneRef = useRef(false);
@@ -206,25 +212,34 @@ function LoggedInHome() {
     return followedForums.filter((f) => f.forumName.toLowerCase().includes(q));
   }, [followedForums, searchQuery]);
 
+  const handleLoadFollowedForums = useCallback(async () => {
+    try {
+      setForumsError('');
+      await loadFollowedForums();
+    } catch (e: any) {
+      setForumsError(e?.message || '加载关注的贴吧失败');
+    }
+  }, [loadFollowedForums]);
+
   useFocusEffect(
     useCallback(() => {
-      loadFollowedForums().catch(() => {});
+      handleLoadFollowedForums();
       if (showHistoryForum) {
         getVisitHistory('forum')
           .then((items) => setRecentForums(items.map(toForumHistoryItem).filter((f): f is ForumHistoryItem => f !== null)))
           .catch(() => {});
       }
-    }, [loadFollowedForums, showHistoryForum]),
+    }, [handleLoadFollowedForums, showHistoryForum]),
   );
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener(TAB_RESELECT_EVENT, (tabName: string) => {
       if (tabName === 'index') {
-        loadFollowedForums().catch(() => {});
+        handleLoadFollowedForums();
       }
     });
     return () => sub.remove();
-  }, [loadFollowedForums]);
+  }, [handleLoadFollowedForums]);
 
   const handleSign = useCallback(() => {
     hapticNotify(NotificationFeedbackType.Success);
@@ -237,8 +252,8 @@ function LoggedInHome() {
   }, [router]);
 
   const handleRefresh = useCallback(async () => {
-    await loadFollowedForums();
-  }, [loadFollowedForums]);
+    await handleLoadFollowedForums();
+  }, [handleLoadFollowedForums]);
 
   const handleUnfollowConfirm = useCallback((forum: ForumInfo) => {
     Alert.alert(
@@ -314,9 +329,10 @@ function LoggedInHome() {
 
   return (
     <ThemedHost style={{ flex: 1 }}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
       <VStack spacing={0}>
         {/* §5.7: 搜索栏 (flex-1) + 一键签到 同一行，签到按钮在右上 */}
-        <HStack spacing={10} modifiers={[padding({ horizontal: 16 })]}>
+        <HStack spacing={10} modifiers={[padding({ horizontal: 16, top: 8 })]}>
           <RNHostView>
             <SearchBarPill onPress={() => router.push('/search' as any)} />
           </RNHostView>
@@ -373,6 +389,14 @@ function LoggedInHome() {
         {/* 吧列表 */}
         {isLoadingForums && followedForums.length === 0 ? (
           <SkeletonList variant="row" count={8} style={styles.forumSkeleton} />
+        ) : forumsError && followedForums.length === 0 ? (
+          <ErrorState
+            title="加载失败"
+            message={forumsError}
+            icon="wifi.exclamationmark"
+            onRetry={handleLoadFollowedForums}
+            retryLabel="重试"
+          />
         ) : filteredForums.length === 0 ? (
           <ContentUnavailableView
             systemImage={searchQuery ? 'magnifyingglass' : 'tray'}
@@ -398,6 +422,7 @@ function LoggedInHome() {
           />
         )}
       </VStack>
+      </View>
     </ThemedHost>
   );
 }
@@ -439,17 +464,11 @@ function SearchBarPill({ onPress }: { onPress: () => void }) {
 
         {/* Center: Glass Search Pill */}
         <Pressable onPress={onPress} style={({ pressed }) => [searchStyles.pill, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
+          {/* 默认 glassEffectStyle（regular 磨砂）与全局 GlassView 质感统一，
+              不再叠加 clear 液态玻璃 + 手写 rgba 底 */}
           <GlassView
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                backgroundColor: isDark
-                  ? 'rgba(255,255,255,0.08)'
-                  : 'rgba(120,120,128,0.12)',
-              },
-            ]}
-            glassEffectStyle="clear"
-            colorScheme={isDark ? 'dark' : 'light'}
+            style={StyleSheet.absoluteFill}
+            theme={isDark ? 'dark' : 'light'}
           />
           <View style={searchStyles.pillInner}>
             <SymbolView name="magnifyingglass" size={15} tintColor={colors.textTertiary} style={{ marginRight: 8 }} />
@@ -464,6 +483,9 @@ function SearchBarPill({ onPress }: { onPress: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   forumMenu: {
     flex: 1,
   },
@@ -481,16 +503,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    borderRadius: 14,
+    borderRadius: Radius.card,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 8,
   },
   forumRowText: { flex: 1, gap: 2 },
-  forumRowName: { fontSize: 15, fontWeight: '600' },
-  forumRowMeta: { fontSize: 12 },
+  forumRowName: { ...typographyStyles.subheadBold },
+  forumRowMeta: { ...typographyStyles.caption1 },
   forumRowBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  forumRowLevel: { fontSize: 12, fontWeight: '700' },
+  forumRowLevel: { ...typographyStyles.caption1Bold },
 });
 
 const searchStyles = StyleSheet.create({
@@ -522,7 +544,6 @@ const searchStyles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   text: {
-    fontSize: 15,
-    fontWeight: '400',
+    ...typographyStyles.subhead,
   },
 });

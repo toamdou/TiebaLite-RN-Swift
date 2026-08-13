@@ -53,12 +53,24 @@ const plist_1 = require("./plist");
  * Everything here is idempotent: copying overwrites with identical bytes and
  * `mkdir` is recursive, so re-running `expo prebuild` is a no-op in effect.
  */
-const withWidgetFiles = (config, { widgetName, appGroup }) => (0, config_plugins_1.withDangerousMod)(config, [
+const withWidgetFiles = (config, { widgetName, appGroup }) => {
+    // 防御（CWE-22）：widgetName 会拼进 `ios/<widgetName>/` 目标目录
+    // （path.join(platformRoot, widgetName)），`../` 可越出 ios/ 目录写文件。
+    // Xcode target 命名本身也限制为字母数字下划线，此处拒绝其余字符。
+    if (!/^[A-Za-z0-9_]+$/.test(widgetName ?? "")) {
+        throw new Error(`[tieba-live-activity] Invalid widgetName: ${JSON.stringify(widgetName)}. ` +
+            "Only alphanumeric characters and underscores are allowed.");
+    }
+    return (0, config_plugins_1.withDangerousMod)(config, [
     "ios",
     (cfg) => {
         const projectRoot = cfg.modRequest.projectRoot;
         const platformRoot = cfg.modRequest.platformProjectRoot; // <root>/ios
-        const targetDir = path.join(platformRoot, widgetName);
+        // CWE-22 边界校验：path.resolve 生成目标后，必须仍在 <root>/ios/ 之内。
+        const targetDir = path.resolve(platformRoot, widgetName);
+        if (targetDir !== platformRoot && !targetDir.startsWith(platformRoot + path.sep)) {
+            throw new Error(`[tieba-live-activity] widgetName escapes the ios/ directory: ${widgetName}`);
+        }
         fs.mkdirSync(targetDir, { recursive: true });
         // 1. Copy the three first-party Swift sources into the extension.
         const packageRoot = (0, paths_1.getPackageRoot)();
@@ -102,4 +114,5 @@ const withWidgetFiles = (config, { widgetName, appGroup }) => (0, config_plugins
         return cfg;
     },
 ]);
+};
 exports.withWidgetFiles = withWidgetFiles;

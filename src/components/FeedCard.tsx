@@ -10,7 +10,7 @@
  * - 按压：reanimated scale 0.97 spring
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -80,6 +80,47 @@ function CardMenuButton({
     </MenuView>
   );
 }
+
+/**
+ * 吧卡片头像：forum.avatar 空串 / 加载失败时兜底为首字占位，
+ * 避免暗色下出现空白方块。
+ */
+const ForumCardAvatar = React.memo(function ForumCardAvatar({
+  avatar,
+  name,
+}: {
+  avatar: string;
+  name: string;
+}) {
+  const { colors } = useThemeColors();
+  const [failed, setFailed] = useState(false);
+  const showImage = !!avatar && !failed;
+  if (showImage) {
+    return (
+      <Image
+        cachePolicy="memory-disk"
+        source={{ uri: avatar }}
+        style={styles.forumCardAvatar}
+        contentFit="cover"
+        recyclingKey={avatar}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <View
+      style={[
+        styles.forumCardAvatar,
+        styles.forumAvatarPlaceholder,
+        { backgroundColor: colors.surfaceSecondary },
+      ]}
+    >
+      <Text style={[styles.forumAvatarText, { color: colors.textSecondary }]}>
+        {(name || '?').slice(0, 1)}
+      </Text>
+    </View>
+  );
+});
 
 /**
  * Hero 信息区容器。
@@ -576,13 +617,7 @@ const FeedCard = React.memo(function FeedCard({ item, onDislike, onBlockAuthor, 
           onPressOut={onPressOut}
           style={[styles.forumCard, { backgroundColor: colors.card }, Shadows.card]}
         >
-          <Image
-            cachePolicy="memory-disk"
-            source={{ uri: forum.avatar }}
-            style={styles.forumCardAvatar}
-            contentFit="cover"
-            recyclingKey={forum.avatar}
-          />
+          <ForumCardAvatar avatar={forum.avatar} name={forum.forumName} />
           <View style={styles.forumCardInfo}>
             <Text style={[styles.forumCardName, { color: colors.text }]}>
               {forum.forumName}吧
@@ -674,6 +709,8 @@ const styles = StyleSheet.create({
     // 无 borderRadius — 由父卡片统一裁剪
   },
   heroImage: {
+    // 高度 200pt 为信息流首图的设计定值（Hero 图 16:9 横向版面），
+    // 无对应 spacing token，保留常量；宽度由组件内动态按屏宽注入。
     height: 200,
   },
   heroVideoBadge: {
@@ -781,6 +818,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    // 4 条未收录为 token（spacing 刻度为 4/8/12/16），保持 2pt 更紧凑
     marginBottom: Spacing.sm + 2,
   },
   headerLeft: {
@@ -839,6 +877,7 @@ const styles = StyleSheet.create({
   },
   preview: {
     ...typographyStyles.subhead,
+    // 2pt 微调（spacing 刻度无 10pt），保持与 header 一致
     marginBottom: Spacing.sm + 2,
   },
   // ── 底部操作栏 ──
@@ -893,6 +932,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    // 2pt 微调（spacing 刻度无 10pt）
     marginBottom: Spacing.xs + 2,
   },
   topicIcon: {
@@ -918,6 +958,7 @@ const styles = StyleSheet.create({
   },
   topicDesc: {
     ...typographyStyles.subhead,
+    // 2pt 微调（spacing 刻度无 10pt）
     marginBottom: Spacing.xs + 2,
   },
   topicFooter: {

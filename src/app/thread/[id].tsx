@@ -50,6 +50,7 @@ import { LoadMoreFooter } from '@/components/ui/LoadMoreFooter';
 import { SkeletonList } from '../../components/ui/Skeleton';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { EASE_OUT, DURATION } from '@/theme/springs';
+import { Radius } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { useBlockFilter } from '@/hooks/useBlockFilter';
 import { useAppPreference } from '@/hooks/useAppPreference';
@@ -119,7 +120,7 @@ const ThreadHeader = memo(function ThreadHeader({
   return (
     <View>
       {/* ── Main Post (OP) — visually distinct card section ── */}
-      <View style={[styles.mainPostSection, { backgroundColor: colors.card, borderRadius: 16, marginHorizontal: 12, padding: 16, marginBottom: 8, borderWidth: 0.5, borderColor: 'rgba(128,128,128,0.12)' }]}>
+      <View style={[styles.mainPostSection, { backgroundColor: colors.card, borderRadius: Radius.card, marginHorizontal: 12, padding: 16, marginBottom: 8, borderWidth: 0.5, borderColor: colors.divider }]}>
         {/* Author row */}
         <Link href={{ pathname: '/user/[uid]', params: { uid: thread.authorId } }} push asChild>
           <Pressable style={styles.authorRow}>
@@ -135,7 +136,7 @@ const ThreadHeader = memo(function ThreadHeader({
                   {thread.authorNameShow || thread.authorName}
                 </Text>
                 <View style={[styles.lzBadge, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.lzBadgeText}>楼主</Text>
+                  <Text style={[styles.lzBadgeText, { color: colors.textOnPrimary }]}>楼主</Text>
                 </View>
               </View>
               <Text style={[styles.authorMeta, { color: colors.textTertiary }]}>
@@ -175,7 +176,7 @@ const ThreadHeader = memo(function ThreadHeader({
               },
             ]}
           >
-            <Text style={[styles.seeLzPillText, { color: seeLz ? '#FFFFFF' : colors.textSecondary }]}>
+            <Text style={[styles.seeLzPillText, { color: seeLz ? colors.textOnPrimary : colors.textSecondary }]}>
               只看楼主
             </Text>
           </Pressable>
@@ -190,7 +191,7 @@ const ThreadHeader = memo(function ThreadHeader({
               },
             ]}
           >
-            <Text style={[styles.sortPillText, { color: reverse ? '#FFFFFF' : colors.textSecondary }]}>
+            <Text style={[styles.sortPillText, { color: reverse ? colors.textOnPrimary : colors.textSecondary }]}>
               {reverse ? '倒序' : '正序'}
             </Text>
           </Pressable>
@@ -370,7 +371,7 @@ export default function ThreadPage() {
         barVisible.value = visible ? 1 : 0;
         barTranslateY.value = reduceMotionSV.value
           ? (visible ? 0 : 120)
-          : withTiming(visible ? 0 : 120, { duration: 200 });
+          : withTiming(visible ? 0 : 120, { duration: visible ? DURATION.enter : DURATION.exit });
       };
 
       // Near the top: reveal immediately, never throttle.
@@ -701,9 +702,9 @@ export default function ThreadPage() {
   // Main render
   // ──────────────────────────────────────────────
 
-  const threadTitle = thread?.title
-    ? (thread.title.length > 14 ? thread.title.slice(0, 14) + '...' : thread.title)
-    : '帖子';
+  // 完整标题交给原生 Stack header，由 header 原生省略号（numberOfLines=1）处理，
+  // 避免手动 slice(0,14)+'...' 与导航栏截断双重缩略。
+  const threadTitle = thread?.title || '帖子';
 
   return (
     <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
@@ -743,8 +744,6 @@ export default function ThreadPage() {
         keyExtractor={replyKeyExtractor}
         renderItem={renderPost}
         estimatedItemSize={220}
-        windowSize={15}
-        maxToRenderPerBatch={12}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={
           <EmptyState title="暂无回复" description="还没有人回复这个帖子" icon="bubble.left" />
@@ -989,7 +988,7 @@ const styles = StyleSheet.create({
   lzBadge: {
     paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
   },
-  lzBadgeText: { color: '#FFF', fontSize: 11, fontWeight: '700', lineHeight: 15 },
+  lzBadgeText: { fontSize: 11, fontWeight: '700', lineHeight: 15 },
   authorMeta: { fontSize: 13, fontWeight: '400' },
 
   // ── Reply toolbar ──

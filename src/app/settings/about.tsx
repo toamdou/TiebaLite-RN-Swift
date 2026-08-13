@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { Form, Section, Button, Text, Image } from '@expo/ui/swift-ui';
-import { font, foregroundStyle } from '@expo/ui/swift-ui/modifiers';
+import { Form, Section, Button, Text, Image, Label, VStack } from '@expo/ui/swift-ui';
+import { font, foregroundStyle, frame, padding } from '@expo/ui/swift-ui/modifiers';
 import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
 import { APP_VERSION, APP_NAME } from '@/constants/app';
 import { openLink } from '@/utils/linkOpener';
@@ -23,14 +23,21 @@ export default function AboutPage() {
     <ThemedHost style={{ flex: 1 }}>
       <Form>
         <Section>
-          <Image systemName="bubble.left.and.bubble.right.fill" size={56} color={colors.primary} />
-          <Text modifiers={[font({ textStyle: 'title', weight: 'bold' })]}>{APP_NAME}</Text>
-          <Text modifiers={[font({ textStyle: 'subheadline' }), foregroundStyle({ type: 'hierarchical', style: 'secondary' })]}>
-            Version {APP_VERSION}
-          </Text>
-          <Text modifiers={[font({ textStyle: 'caption' }), foregroundStyle({ type: 'hierarchical', style: 'tertiary' })]}>
-            基于 HuanChengFly/TiebaLite 迁移至 React Native
-          </Text>
+          {/* 首区块：图标 + 标题 + 版本 居中排版 */}
+          <VStack
+            alignment="center"
+            spacing={4}
+            modifiers={[frame({ maxWidth: 9999 }), padding({ vertical: 16 })]}
+          >
+            <Image systemName="bubble.left.and.bubble.right.fill" size={56} color={colors.primary} />
+            <Text modifiers={[font({ textStyle: 'title', weight: 'bold' })]}>{APP_NAME}</Text>
+            <Text modifiers={[font({ textStyle: 'subheadline' }), foregroundStyle({ type: 'hierarchical', style: 'secondary' })]}>
+              Version {APP_VERSION}
+            </Text>
+            <Text modifiers={[font({ textStyle: 'caption' }), foregroundStyle({ type: 'hierarchical', style: 'tertiary' })]}>
+              基于 HuanChengFly/TiebaLite 迁移至 React Native
+            </Text>
+          </VStack>
         </Section>
 
         <Section title="信息">
@@ -39,10 +46,11 @@ export default function AboutPage() {
           <Button label="作者: HuanChengFly" systemImage="person.fill" />
         </Section>
 
+        {/* 技术栈：无交互的静态信息行，不渲染为可点击 Button */}
         <Section title="技术栈">
-          <Button label="React Native" systemImage="atom" />
-          <Button label="Expo SDK 57" systemImage="cube.box.fill" />
-          <Button label="iOS 液态玻璃 & SwiftUI" systemImage="circle.lefthalf.filled" />
+          <Label title="React Native" systemImage="atom" />
+          <Label title="Expo SDK 57" systemImage="cube.box.fill" />
+          <Label title="iOS 液态玻璃 & SwiftUI" systemImage="circle.lefthalf.filled" />
         </Section>
 
         <Section footer="感谢原项目 HuanChengFly/TiebaLite 的开源贡献。本应用为非官方贴吧客户端，仅供学习交流使用。">

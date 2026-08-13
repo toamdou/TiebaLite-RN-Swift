@@ -25,7 +25,7 @@ import { topicDetail, mapProtoThread } from '@/services/api/endpoints';
 import { usePagedList } from '@/hooks/usePagedList';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { formatCount } from '@/utils';
-import { Spacing, Radius, DURATION, EASE_OUT } from '@/theme';
+import { Spacing, Radius, DURATION, EASE_OUT, HERO } from '@/theme';
 import type { FeedItem, ThreadInfo } from '@/types';
 
 // ---------- 首屏级联入场（仅首次数据批次，Reduce Motion 跳过） ----------
@@ -47,7 +47,7 @@ function FirstBatchStagger({
     }
     progress.value = 0;
     progress.value = withDelay(
-      index * DURATION.stagger,
+      Math.min(index, 10) * DURATION.stagger,
       withTiming(1, { duration: DURATION.enter, easing: EASE_OUT }),
     );
     return () => {
@@ -124,11 +124,7 @@ export default function TopicDetailPage() {
       if (reduceMotion) {
         heroAnim.value = 1;
       } else {
-        heroAnim.value = withSpring(1, {
-          damping: 16,
-          stiffness: 150,
-          mass: 1,
-        });
+        heroAnim.value = withSpring(1, HERO);
       }
     }
   }, [topicInfo, heroAnim, reduceMotion]);
@@ -168,7 +164,7 @@ export default function TopicDetailPage() {
   const listHeader = useCallback(
     () =>
       topicInfo ? (
-        <Animated.View style={[styles.topicHeader, heroStyle]}>
+        <Animated.View style={[styles.topicHeader, { borderBottomColor: colors.divider }, heroStyle]}>
           <View style={styles.topicHeroRow}>
             <View
               style={[
@@ -356,7 +352,7 @@ const styles = StyleSheet.create({
   topicHeader: {
     padding: Spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(128,128,128,0.2)',
+    // borderBottomColor 走 colors.divider（组件内动态注入，见 listHeader）
   },
   topicHeroRow: {
     flexDirection: 'row',

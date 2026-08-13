@@ -1,5 +1,5 @@
 /**
- * Built-in Browser Page (内置浏览�?
+ * Built-in Browser Page (内置浏览器)
  * WebView-based browser for opening tieba.baidu.com links in-app.
  */
 
@@ -20,6 +20,9 @@ import * as Clipboard from 'expo-clipboard';
 import * as WebBrowser from 'expo-web-browser';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { Menu, Button as SWButton } from '@expo/ui/swift-ui';
+import { labelStyle, buttonStyle } from '@expo/ui/swift-ui/modifiers';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 
 import { useAppTheme } from '@/theme/ThemeContext';
 
@@ -193,22 +196,34 @@ export default function WebViewPage() {
           <View style={styles.titleContainer}>
             {loading && <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />}
             <Text style={[styles.toolbarTitle, { color: colors.text }]} numberOfLines={1}>
-              {pageTitle || '加载�?..'}
+              {pageTitle || '加载中…'}
             </Text>
           </View>
 
-          {/* Share */}
-          <Pressable onPress={handleShare} style={styles.toolBtn}>
-            <SymbolView name="square.and.arrow.up" size={22} tintColor={colors.text} />
-          </Pressable>
-
-          <Pressable onPress={handleCopy} style={styles.toolBtn}>
-            <SymbolView name="doc.on.doc" size={20} tintColor={colors.text} />
-          </Pressable>
-
-          <Pressable onPress={handleOpenBrowser} style={styles.toolBtn}>
-            <SymbolView name="safari" size={20} tintColor={colors.text} />
-          </Pressable>
+          {/* Share / Copy / Open in Safari — 收进一个菜单，给标题留空间 */}
+          <ThemedHost matchContents>
+            <Menu
+              label=""
+              systemImage="ellipsis"
+              modifiers={[labelStyle('iconOnly'), buttonStyle('plain')]}
+            >
+              <SWButton
+                label="分享链接"
+                systemImage="square.and.arrow.up"
+                onPress={handleShare}
+              />
+              <SWButton
+                label="复制链接"
+                systemImage="doc.on.doc"
+                onPress={handleCopy}
+              />
+              <SWButton
+                label="在 Safari 中打开"
+                systemImage="safari"
+                onPress={handleOpenBrowser}
+              />
+            </Menu>
+          </ThemedHost>
         </View>
       </View>
 

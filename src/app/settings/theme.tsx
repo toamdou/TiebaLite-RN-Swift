@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { ActivityIndicator } from 'react-native';
 import { Form, Section, Toggle, Button, Text, Picker, Slider } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
@@ -15,8 +16,19 @@ const FONT_SCALE_STEP = 0.05;
 
 export default function ThemeSelectionPage() {
   const hydrated = usePreferencesStore((s) => s.hasHydrated);
-  if (!hydrated) return null;
+  // 未水合时返回轻量占位，避免整页白屏闪烁
+  if (!hydrated) return <ThemeHydratedPlaceholder />;
   return <ThemeSelectionForm />;
+}
+
+/** 偏好水合完成前的轻量加载占位 */
+function ThemeHydratedPlaceholder() {
+  const { colors } = useThemeColors();
+  return (
+    <ThemedHost style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </ThemedHost>
+  );
 }
 
 function ThemeSelectionForm() {

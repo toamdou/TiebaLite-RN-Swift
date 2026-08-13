@@ -15,7 +15,8 @@ import { Link, Stack } from 'expo-router';
 import { Image } from 'expo-image';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius } from '@/theme';
+import { Radius, Shadows } from '@/theme';
+import { HOT_RANK_COLORS } from '@/app/(tabs)/explore';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
@@ -50,13 +51,9 @@ export default function HotTopicListPage() {
 
   const renderTopic = useCallback(
     ({ item }: { item: HotTopicListItem }) => {
-      const isTop3 = (item.rank ?? 0) <= 3;
-      const rankColors: Record<number, string> = {
-        1: '#FF3B30',
-        2: '#FF9500',
-        3: '#FFCC00',
-      };
-      const rankColor = rankColors[item.rank ?? 0] || colors.textDisabled;
+      const rank = item.rank ?? 0;
+      const isTop3 = rank <= 3;
+      const rankColor = isTop3 ? HOT_RANK_COLORS[rank - 1] : colors.textDisabled;
       return (
         <Link href={{ pathname: '/topic/[id]', params: { id: item.topicId, name: item.topicName } }} push asChild>
           <Pressable
@@ -64,7 +61,6 @@ export default function HotTopicListPage() {
               styles.card,
               {
                 backgroundColor: colors.card,
-                shadowColor: colors.shadow,
                 opacity: pressed ? 0.9 : 1,
                 transform: [{ scale: pressed ? 0.98 : 1 }],
               },
@@ -86,7 +82,7 @@ export default function HotTopicListPage() {
             {item.imageUrl ? (
               <Image
                 source={{ uri: item.imageUrl }}
-                style={[styles.topicImage, isTop3 && styles.topicImageTop3]}
+                style={[styles.topicImage, isTop3 && styles.topicImageTop3, { backgroundColor: colors.surfaceSecondary }]}
                 contentFit="cover"
                 transition={150}
                 cachePolicy="memory-disk"
@@ -96,7 +92,7 @@ export default function HotTopicListPage() {
                 style={[
                   styles.topicImagePlaceholder,
                   isTop3 && styles.topicImageTop3,
-                  { backgroundColor: colors.chip },
+                  { backgroundColor: colors.surfaceSecondary },
                 ]}
               >
                 <SymbolView
@@ -114,12 +110,12 @@ export default function HotTopicListPage() {
                 </Text>
                 {item.isHot && (
                   <View style={[styles.tag, { backgroundColor: '#FF3B30' }]}>
-                    <Text style={styles.tagText}>热</Text>
+                    <Text style={[styles.tagText, { color: colors.textOnPrimary }]}>热</Text>
                   </View>
                 )}
                 {item.isNew && (
                   <View style={[styles.tag, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.tagText}>新</Text>
+                    <Text style={[styles.tagText, { color: colors.textOnPrimary }]}>新</Text>
                   </View>
                 )}
               </View>
@@ -160,7 +156,7 @@ export default function HotTopicListPage() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.windowBackground }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: "热门话题" }} />
         <View style={styles.skeletonWrap}>
           <SkeletonList variant="card" count={8} />
@@ -171,7 +167,7 @@ export default function HotTopicListPage() {
 
   if (isError && topics.length === 0) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.windowBackground }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: "热门话题" }} />
         <ErrorState message={errorMessage} onRetry={handleRefresh} />
       </View>
@@ -179,7 +175,7 @@ export default function HotTopicListPage() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.windowBackground }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ title: "热门话题" }} />
       <FlashList
         data={topics}
@@ -213,12 +209,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
-    borderRadius: Radius.input,
+    borderRadius: Radius.card,
     gap: 12,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    ...Shadows.card,
   },
   rankContainer: {
     width: 32,
@@ -247,7 +240,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: Radius.chip,
-    backgroundColor: '#F0F0F0',
+    // backgroundColor 走 colors.surfaceSecondary（组件内动态注入，暗色不亮块）
   },
   topicImageTop3: {
     width: 84,
@@ -260,7 +253,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.chip,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F0F0F0',
+    // backgroundColor 走 colors.surfaceSecondary（组件内动态注入，暗色不亮块）
   },
   rankBadgeTop3: {
     width: 34,
@@ -287,7 +280,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   tagText: {
-    color: '#FFF',
+    // color 走 colors.textOnPrimary（组件内动态注入：红/主色底都适配）
     fontSize: 10,
     fontWeight: '700',
     lineHeight: 14,

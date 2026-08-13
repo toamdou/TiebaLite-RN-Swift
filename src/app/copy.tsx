@@ -23,7 +23,14 @@ export default function CopyPage() {
   const insets = useSafeAreaInsets();
   const { colors } = useThemeColors();
 
-  const decodedText = decodeURIComponent(text || '');
+  // decodeURIComponent 对非法 % 序列会抛 URIError，非法参数导致整页白屏；
+  // try/catch 兜底，失败时保留原文。
+  let decodedText = text || '';
+  try {
+    decodedText = decodeURIComponent(decodedText);
+  } catch {
+    // 保留原文
+  }
 
   const handleCopyAll = useCallback(async () => {
     hapticImpact(ImpactFeedbackStyle.Light);
@@ -94,8 +101,8 @@ export default function CopyPage() {
             pressed && { opacity: 0.8 },
           ]}
         >
-          <SymbolView name="doc.on.doc" size={16} tintColor="#FFF" />
-          <Text style={s.copyAllText}>复制全部</Text>
+          <SymbolView name="doc.on.doc" size={16} tintColor={colors.textOnPrimary} />
+          <Text style={[s.copyAllText, { color: colors.textOnPrimary }]}>复制全部</Text>
         </Pressable>
         <Pressable
           onPress={handleClose}
@@ -146,7 +153,7 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: Radius.input,
   },
-  copyAllText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+  copyAllText: { fontSize: 16, fontWeight: '600' },
   closeActionBtn: {
     alignItems: 'center',
     paddingVertical: 14,

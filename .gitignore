@@ -41,3 +41,6 @@ yarn-debug.*
 yarn-error.*
 *.tsbuildinfo
 .metro-health-check*
+
+# mimosa scan/hook state
+.mimosa/

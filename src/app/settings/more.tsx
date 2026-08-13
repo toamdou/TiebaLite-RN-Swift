@@ -21,7 +21,6 @@ import { ThemedHost } from '@/components/ui/ThemedHost';
 import {
   IMAGE_LOAD_TYPE_LABELS,
   IMAGE_WATERMARK_LABELS,
-  DEFAULT_START_TAB_LABELS,
 } from '@/constants/settings';
 import { TiebaNative } from '../../../modules/tieba-native/src/TiebaNative';
 
@@ -30,7 +29,6 @@ export default function MoreSettingsPage() {
   const preferences = usePreferencesStore((s) => s.preferences);
   const setPreference = usePreferencesStore((s) => s.setPreference);
   const resetPreferences = usePreferencesStore((s) => s.resetPreferences);
-  const [, setCacheSize] = useState('');
   const [showClearCache, setShowClearCache] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [showClearAll, setShowClearAll] = useState(false);
@@ -68,7 +66,6 @@ export default function MoreSettingsPage() {
       } catch {
         // Native cache is under Paths.cache too; this is a secondary cleanup.
       }
-      setCacheSize('0 B');
       hapticNotify(NotificationFeedbackType.Success);
     } catch {
       hapticNotify(NotificationFeedbackType.Error);
@@ -157,22 +154,8 @@ export default function MoreSettingsPage() {
           />
         </Section>
 
-        <Section
-          title="启动"
-          footer="当前暂不生效：启动标签页由原生标签栏记忆上次位置。"
-        >
-          <Picker
-            label="默认启动页"
-            selection={preferences.defaultStartTab}
-            onSelectionChange={(v: string) => setPreference('defaultStartTab', v as never)}
-            modifiers={[pickerStyle('menu')]}
-          >
-            {Object.entries(DEFAULT_START_TAB_LABELS).map(([value, label]) => (
-              <Text key={value} modifiers={[tag(value)]}>{label}</Text>
-            ))}
-          </Picker>
-        </Section>
-
+        {/* 「默认启动页」偏好暂不生效（启动标签页由原生标签栏记忆上次位置），
+            整个 Section 隐藏，避免误导用户。 */}
         <Section title="数据">
           <ConfirmationDialog
             title="清除图片缓存"
@@ -258,6 +241,9 @@ export default function MoreSettingsPage() {
           title="更多"
           footer="系统应用设置可管理通知、权限与后台任务。"
         >
+          <Button onPress={() => navigateTo('/settings/experimental')}>
+            <Label title="实验功能" systemImage="flask" modifiers={[foregroundStyle('#FF9500')]} />
+          </Button>
           <Button onPress={() => navigateTo('/settings/about')}>
             <Label title="关于" systemImage="info.circle" modifiers={[foregroundStyle('#8E8E93')]} />
           </Button>

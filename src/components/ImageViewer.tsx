@@ -310,7 +310,7 @@ export default function ImageViewer({
     [images, currentIndex, lowPowerMode],
   );
   const { pages, start: pageWindowStart, anchor: pageWindowAnchor } = pageWindow;
-  const thumbnails = pages;
+  // 缩略条展示全部图片（仅大图 PagerView 走窗口化），实现长图集可直接跳到远端图。
 
   const getWatermarkText = useCallback(
     (forumName?: string) => {
@@ -438,7 +438,7 @@ export default function ImageViewer({
       if (e.translationY > 140 || e.velocityY > 900) {
         dragTranslateY.value = withTiming(
           SCREEN_HEIGHT,
-          { duration: 240 },
+          { duration: DURATION.exit },
           (finished) => {
             if (finished) runOnJS(onClose)();
           },
@@ -469,7 +469,12 @@ export default function ImageViewer({
     (idx: number) => {
       const localIndex = idx - pageWindowStart;
       if (localIndex >= 0 && localIndex < pages.length) {
+        // 目标页在当前窗口内：直接翻页（窗口随滑动重建）
         pagerRef.current?.setPage(localIndex);
+      } else {
+        // 目标页在当前窗口外（缩略条可跳远图）：直接更新 currentIndex，
+        // 窗口围绕新页重建，再交给 setPageWithoutAnimation 对齐到新 anchor。
+        setCurrentIndex(idx);
       }
     },
     [pageWindowStart, pages.length],
@@ -630,7 +635,7 @@ export default function ImageViewer({
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.thumbnailStrip}
             >
-              {thumbnails.map(({ uri, index }) => (
+              {images.map((uri, index) => (
                 <ThumbnailCell
                   key={index}
                   uri={uri}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text as RNText, View } from 'react-native';
-import { Form, Section, Button, Text, TextField, Toggle, Picker, ConfirmationDialog, RNHostView } from '@expo/ui/swift-ui';
+import { Form, Section, Button, Text, TextField, Toggle, Picker, ConfirmationDialog, RNHostView, useNativeState } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import { hapticNotify, hapticSelection, NotificationFeedbackType } from '@/utils/haptics';
 import { BlockManager } from '@/utils/BlockManager';
@@ -40,7 +40,8 @@ export default function BlockPage() {
   const [activeTab, setActiveTab] = useState('keyword');
   const [keywords, setKeywords] = useState<BlockedWord[]>([]);
   const [users, setUsers] = useState<BlockedUser[]>([]);
-  const [addText, setAddText] = useState('');
+  // 受控输入：绑定原生 state，切换 tab 清空时输入框同步清空（参照 edit-profile.tsx 模式）
+  const addTextState = useNativeState('');
   const [isRegex, setIsRegex] = useState(false);
   const [isWhitelist, setIsWhitelist] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -98,11 +99,12 @@ export default function BlockPage() {
   }, [loadBlacklist, loadDislikeForums]);
 
   const handleAdd = useCallback(async () => {
-    if (!addText.trim()) return;
+    const raw = addTextState.get().trim();
+    if (!raw) return;
     if (activeTab === 'keyword') {
       if (isRegex) {
         try {
-          new RegExp(addText.trim());
+          new RegExp(raw);
         } catch (e: any) {
           Alert.alert('正则表达式无效', e?.message || '请输入有效的正则表达式');
           return;
@@ -110,7 +112,7 @@ export default function BlockPage() {
       }
       const newWord: BlockedWord = {
         id: Date.now().toString(),
-        keyword: addText.trim(),
+        keyword: raw,
         isRegex,
         category: isWhitelist ? 'whitelist' : 'blacklist',
       };
@@ -119,16 +121,16 @@ export default function BlockPage() {
     } else {
       const newUser: BlockedUser = {
         id: Date.now().toString(),
-        uid: addText.trim(),
+        uid: raw,
       };
       await BlockManager.addBlockedUser(newUser);
       setUsers((prev) => [...prev, newUser]);
     }
-    setAddText('');
+    addTextState.set('');
     setIsRegex(false);
     setIsWhitelist(false);
     hapticNotify(NotificationFeedbackType.Success);
-  }, [addText, activeTab, isRegex, isWhitelist]);
+  }, [addTextState, activeTab, isRegex, isWhitelist]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
@@ -271,12 +273,21 @@ export default function BlockPage() {
                 {formatCount(f.memberNum)} 成员 · {formatCount(f.postNum)} 帖子
               </RNText>
             </View>
-            <RNText style={[typographyStyles.caption1, { color: colors.textTertiary }]}>客户端解除</RNText>
+            <RNText style={[typographyStyles.caption1, { color: colors.textTertiary }]}>需在贴吧客户端解除</RNText>
           </View>
         ))}
       </View>
     );
   };
+
+  // tab 切换时清空输入与辅助开关（受控 state 同步清空输入框）
+  const handleTabChange = useCallback((v: string) => {
+    hapticSelection();
+    setActiveTab(v);
+    addTextState.set('');
+    setIsRegex(false);
+    setIsWhitelist(false);
+  }, [addTextState]);
 
   return (
     <ThemedHost style={{ flex: 1 }}>
@@ -284,101 +295,107 @@ export default function BlockPage() {
         <Section>
           <Picker
             selection={activeTab}
-            onSelectionChange={(v: string) => { hapticSelection(); setActiveTab(v); setAddText(''); setIsRegex(false); setIsWhitelist(false); }}
+            onSelectionChange={handleTabChange}
             modifiers={[pickerStyle('segmented')]}
           >
             <Text modifiers={[tag('keyword')]}>屏蔽词</Text>
             <Text modifiers={[tag('user')]}>屏蔽用户</Text>
+            <Text modifiers={[tag('blacklist')]}>黑名单</Text>
+            <Text modifiers={[tag('forums')]}>屏蔽吧</Text>
           </Picker>
         </Section>
 
-        <Section title={activeTab === 'keyword' ? '添加屏蔽词' : '添加屏蔽用户'}>
-          <TextField
-            placeholder={activeTab === 'keyword' ? '输入屏蔽关键词' : '输入用户ID'}
-            onTextChange={setAddText}
-          />
-          {activeTab === 'keyword' && (
-            <>
-              <Toggle
-                label="使用正则表达式"
-                isOn={isRegex}
-                onIsOnChange={(v) => { hapticSelection(); setIsRegex(v); }}
+        {activeTab === 'keyword' || activeTab === 'user' ? (
+          <>
+            <Section title={activeTab === 'keyword' ? '添加屏蔽词' : '添加屏蔽用户'}>
+              <TextField
+                text={addTextState}
+                placeholder={activeTab === 'keyword' ? '输入屏蔽关键词' : '输入用户ID'}
               />
-              <Toggle
-                label="设为白名单"
-                isOn={isWhitelist}
-                onIsOnChange={(v) => { hapticSelection(); setIsWhitelist(v); }}
+              {activeTab === 'keyword' && (
+                <>
+                  <Toggle
+                    label="使用正则表达式"
+                    isOn={isRegex}
+                    onIsOnChange={(v) => { hapticSelection(); setIsRegex(v); }}
+                  />
+                  <Toggle
+                    label="设为白名单"
+                    isOn={isWhitelist}
+                    onIsOnChange={(v) => { hapticSelection(); setIsWhitelist(v); }}
+                  />
+                </>
+              )}
+              <Button
+                label="添加"
+                systemImage="plus.circle.fill"
+                onPress={handleAdd}
               />
-            </>
-          )}
-          <Button
-            label="添加"
-            systemImage="plus.circle.fill"
-            onPress={handleAdd}
-          />
-        </Section>
+            </Section>
 
-        <Section title={activeTab === 'keyword' ? `屏蔽词列表 (${keywords.length})` : `屏蔽用户 (${users.length})`}>
-          {(keywords.length > 0 || users.length > 0) && (
-            <ConfirmationDialog
-              title="移除屏蔽项"
-              isPresented={!!deleteTarget}
-              onIsPresentedChange={(v) => { if (!v) setDeleteTarget(null); }}
-              titleVisibility="visible"
-            >
-              <ConfirmationDialog.Trigger>
-                {activeTab === 'keyword'
-                  ? keywords.map((word) => (
-                      <Button
-                        key={word.id}
-                        role="destructive"
-                        onPress={() => setDeleteTarget(word.id)}
-                      >
-                        <Text>{word.keyword}</Text>
-                        <Text>{word.isRegex ? '正则' : ''}{word.category === 'whitelist' ? '白名单' : ''}</Text>
-                      </Button>
-                    ))
-                  : users.map((user) => (
-                      <Button
-                        key={user.uid}
-                        role="destructive"
-                        onPress={() => setDeleteTarget(user.uid)}
-                      >
-                        <Text>{user.username || user.uid}</Text>
-                      </Button>
-                    ))}
-              </ConfirmationDialog.Trigger>
-              <ConfirmationDialog.Actions>
-                <Button label="删除" role="destructive" onPress={handleDeleteConfirm} />
-                <Button label="取消" role="cancel" />
-              </ConfirmationDialog.Actions>
-              <ConfirmationDialog.Message>
-                <Text>确定要移除此屏蔽项吗？</Text>
-              </ConfirmationDialog.Message>
-            </ConfirmationDialog>
-          )}
-          {keywords.length === 0 && users.length === 0 && (
-            <Text>暂无屏蔽项</Text>
-          )}
-        </Section>
-
-        <Section
-          title="云端黑名单"
-          footer="由贴吧服务端维护的社交黑名单，与上方的本地屏蔽相互独立。"
-        >
-          <RNHostView matchContents>
-            {renderBlacklist()}
-          </RNHostView>
-        </Section>
-
-        <Section
-          title="屏蔽吧（云端）"
-          footer="由贴吧服务端记录，解除请在贴吧客户端中操作。"
-        >
-          <RNHostView matchContents>
-            {renderDislikeForums()}
-          </RNHostView>
-        </Section>
+            <Section title={activeTab === 'keyword' ? `屏蔽词列表 (${keywords.length})` : `屏蔽用户 (${users.length})`}>
+              {(keywords.length > 0 || users.length > 0) && (
+                <ConfirmationDialog
+                  title="移除屏蔽项"
+                  isPresented={!!deleteTarget}
+                  onIsPresentedChange={(v) => { if (!v) setDeleteTarget(null); }}
+                  titleVisibility="visible"
+                >
+                  <ConfirmationDialog.Trigger>
+                    {activeTab === 'keyword'
+                      ? keywords.map((word) => (
+                          <Button
+                            key={word.id}
+                            role="destructive"
+                            onPress={() => setDeleteTarget(word.id)}
+                          >
+                            <Text>{word.keyword}</Text>
+                            <Text>{word.isRegex ? '正则' : ''}{word.category === 'whitelist' ? '白名单' : ''}</Text>
+                          </Button>
+                        ))
+                      : users.map((user) => (
+                          <Button
+                            key={user.uid}
+                            role="destructive"
+                            onPress={() => setDeleteTarget(user.uid)}
+                          >
+                            <Text>{user.username || user.uid}</Text>
+                          </Button>
+                        ))}
+                  </ConfirmationDialog.Trigger>
+                  <ConfirmationDialog.Actions>
+                    <Button label="删除" role="destructive" onPress={handleDeleteConfirm} />
+                    <Button label="取消" role="cancel" />
+                  </ConfirmationDialog.Actions>
+                  <ConfirmationDialog.Message>
+                    <Text>确定要移除此屏蔽项吗？</Text>
+                  </ConfirmationDialog.Message>
+                </ConfirmationDialog>
+              )}
+              {keywords.length === 0 && users.length === 0 && (
+                <Text>暂无屏蔽项</Text>
+              )}
+            </Section>
+          </>
+        ) : activeTab === 'blacklist' ? (
+          <Section
+            title="云端黑名单"
+            footer="由贴吧服务端维护的社交黑名单，与本地屏蔽相互独立。"
+          >
+            <RNHostView matchContents>
+              {renderBlacklist()}
+            </RNHostView>
+          </Section>
+        ) : (
+          <Section
+            title="屏蔽吧（云端）"
+            footer="由贴吧服务端记录，解除请在贴吧客户端中操作。"
+          >
+            <RNHostView matchContents>
+              {renderDislikeForums()}
+            </RNHostView>
+          </Section>
+        )}
       </Form>
     </ThemedHost>
   );

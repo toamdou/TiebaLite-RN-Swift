@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View, Text as RNText } from 'react-native';
 import {
   Button,
   DatePicker,
@@ -39,7 +39,9 @@ import { useSignStore } from '@/stores/signStore';
 import { useAuthStore } from '@/stores/authStore';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useThemeColors } from '@/theme/ThemeContext';
+import { Spacing } from '@/theme';
 import type { SignProgressItem } from '@/stores/signStore';
+import { SymbolView } from '@/components/ui/SymbolView';
 import { LiveActivityPreview } from '@/components/ui/LiveActivityPreview';
 import { recoverStaleSignLiveActivities } from '@/services/liveActivity';
 import { ThemedHost } from '@/components/ui/ThemedHost';
@@ -186,7 +188,14 @@ export default function OKSignSettingsPage() {
     [autoSign, scheduleAutoSign, setPreference],
   );
 
-  if (!hasHydrated) return null;
+  // 未水合时返回轻量占位，避免整页白屏闪烁
+  if (!hasHydrated) {
+    return (
+      <ThemedHost style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </ThemedHost>
+    );
+  }
 
   const signProgress =
     totalCount > 0 ? Math.min((currentIndex + 1) / totalCount, 1) : 0;
@@ -235,13 +244,15 @@ export default function OKSignSettingsPage() {
               value={signProgress}
               modifiers={[progressViewStyle('linear'), tint(colors.primary)]}
             />
-            <HStack spacing={14}>
-              <Text modifiers={[foregroundStyle(colors.success), font({ weight: 'semibold' })]}>
-                ✓ {successCount}
-              </Text>
-              <Text modifiers={[foregroundStyle(colors.danger), font({ weight: 'semibold' })]}>
-                ✗ {failCount}
-              </Text>
+            <HStack spacing={Spacing.md} alignment="center">
+              <RNHostView matchContents>
+                <View style={styles.signStatRow}>
+                  <SymbolView name="checkmark.circle.fill" size={16} tintColor={colors.success} />
+                  <RNText style={[styles.signStatText, { color: colors.success }]}>{successCount}</RNText>
+                  <SymbolView name="xmark.circle" size={16} tintColor={colors.danger} />
+                  <RNText style={[styles.signStatText, { color: colors.danger }]}>{failCount}</RNText>
+                </View>
+              </RNHostView>
               {totalExp > 0 && (
                 <Text
                   modifiers={[
@@ -357,38 +368,70 @@ export default function OKSignSettingsPage() {
 
         {progressList.length > 0 && (
           <Section title="进度列表">
-            {progressList.map((item: SignProgressItem, index: number) => (
-              <HStack
-                key={item.forumId || `progress-${index}`}
-                spacing={8}
-                alignment="center"
-              >
-                <Text modifiers={[font({ weight: 'medium' })]}>{item.forumName}</Text>
-                <Spacer />
-                {item.status === 'success' && (
-                  <Text modifiers={[foregroundStyle(colors.success), font({ weight: 'semibold' })]}>
-                    ✓{item.exp ? ` +${item.exp}` : ''}
-                  </Text>
-                )}
-                {item.status === 'failed' && (
-                  <Text modifiers={[foregroundStyle(colors.danger), font({ weight: 'semibold' })]}>
-                    ✗
-                  </Text>
-                )}
-                {item.status === 'signing' && (
-                  <ProgressView modifiers={[progressViewStyle('circular')]} />
-                )}
-                {item.status === 'pending' && (
+            {status === 'completed' ? (
+              // 完成态折叠为摘要，不再保留逐吧明细
+              <HStack spacing={Spacing.md} alignment="center">
+                <RNHostView matchContents>
+                  <View style={styles.signStatRow}>
+                    <SymbolView name="checkmark.circle.fill" size={16} tintColor={colors.success} />
+                    <RNText style={[styles.signStatText, { color: colors.success }]}>{successCount}</RNText>
+                    {failCount > 0 && (
+                      <>
+                        <SymbolView name="xmark.circle" size={16} tintColor={colors.danger} />
+                        <RNText style={[styles.signStatText, { color: colors.danger }]}>{failCount}</RNText>
+                      </>
+                    )}
+                  </View>
+                </RNHostView>
+                {totalExp > 0 && (
                   <Text
                     modifiers={[
                       foregroundStyle({ type: 'hierarchical', style: 'secondary' }),
                     ]}
                   >
-                    等待中
+                    共 {progressList.length} 个吧 · +{totalExp} 经验
                   </Text>
                 )}
               </HStack>
-            ))}
+            ) : (
+              progressList.map((item: SignProgressItem, index: number) => (
+                <HStack
+                  key={item.forumId || `progress-${index}`}
+                  spacing={Spacing.sm}
+                  alignment="center"
+                >
+                  <Text modifiers={[font({ weight: 'medium' })]}>{item.forumName}</Text>
+                  <Spacer />
+                  {item.status === 'success' && (
+                    <RNHostView matchContents>
+                      <View style={styles.signStatRow}>
+                        <SymbolView name="checkmark.circle.fill" size={16} tintColor={colors.success} />
+                        {item.exp ? (
+                          <RNText style={[styles.signStatText, { color: colors.success }]}>+{item.exp}</RNText>
+                        ) : null}
+                      </View>
+                    </RNHostView>
+                  )}
+                  {item.status === 'failed' && (
+                    <RNHostView matchContents>
+                      <SymbolView name="xmark.circle" size={16} tintColor={colors.danger} />
+                    </RNHostView>
+                  )}
+                  {item.status === 'signing' && (
+                    <ProgressView modifiers={[progressViewStyle('circular')]} />
+                  )}
+                  {item.status === 'pending' && (
+                    <Text
+                      modifiers={[
+                        foregroundStyle({ type: 'hierarchical', style: 'secondary' }),
+                      ]}
+                    >
+                      等待中
+                    </Text>
+                  )}
+                </HStack>
+              ))
+            )}
           </Section>
         )}
 
@@ -406,3 +449,15 @@ export default function OKSignSettingsPage() {
     </ThemedHost>
   );
 }
+
+const styles = StyleSheet.create({
+  signStatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  signStatText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+});

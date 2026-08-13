@@ -179,10 +179,26 @@ public final class TiebaRichTextView: ExpoView, UITextViewDelegate {
     var attrs = attributes
     attrs[.foregroundColor] = linkColor
     attrs[.underlineStyle] = NSUnderlineStyle.single.rawValue
-    if let url = URL(string: urlString) {
+    if let url = makeLinkURL(from: urlString) {
       attrs[.link] = url
     }
     attributed.append(NSAttributedString(string: text, attributes: attrs))
+  }
+
+  /// URL(string:) rejects raw non-ASCII characters (e.g. Chinese text in a
+  /// post's external link), so those runs never got a `.link` attribute and
+  /// taps did nothing. Percent-encode the string as a fallback so the run
+  /// becomes tappable; the host-dispatch logic in `handle` is unchanged.
+  private func makeLinkURL(from urlString: String) -> URL? {
+    if let url = URL(string: urlString) {
+      return url
+    }
+    guard
+      let encoded = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+    else {
+      return nil
+    }
+    return URL(string: encoded)
   }
 
   private func appendEmoticon(

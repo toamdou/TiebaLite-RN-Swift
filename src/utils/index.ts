@@ -127,29 +127,38 @@ export function getLevelColor(level: number): string {
 /**
  * Convert tieba portrait ID to full avatar URL.
  * Mirrors Kotlin: StringUtil.getAvatarUrl()
- * Portrait IDs like "tb.1.xxx" need prefix "http://tb.himg.baidu.com/sys/portrait/item/"
+ * Portrait IDs like "tb.1.xxx" need prefix "https://tb.himg.baidu.com/sys/portrait/item/"
  */
 export function getAvatarUrl(portrait?: string | null): string {
   if (!portrait) return '';
   if (portrait.startsWith('http://') || portrait.startsWith('https://')) return portrait;
-  // Kotlin uses http:// — Baidu portrait CDN may not support HTTPS
-  return `http://tb.himg.baidu.com/sys/portrait/item/${portrait}`;
+  // 本地 URI（头像上传后即时预览等）：直接透传，避免被拼成图床坏 URL。
+  if (portrait.startsWith('file://') || portrait.startsWith('ph://')) return portrait;
+  // Baidu portrait CDN serves HTTPS; always use it so the app stays on the
+  // TLS surface (the old plaintext ATS exception for tb.himg.baidu.com was
+  // removed). Plain http:// inputs are left untouched here and handled by the
+  // consumer / link-opener layer.
+  return `https://tb.himg.baidu.com/sys/portrait/item/${portrait}`;
 }
 
 /**
  * Format large numbers (e.g., 12345 -> "1.2万")
+ * 防御：字段缺失/非数字（undefined/null/NaN）时返回空串，避免
+ * undefined.toString() 抛 TypeError 被 ErrorBoundary 兜成整页"出错了"。
  */
 export function formatCount(count: number): string {
-  if (count >= 100000000) {
-    return `${(count / 100000000).toFixed(1)}亿`;
+  const c = Number(count);
+  if (!Number.isFinite(c)) return '';
+  if (c >= 100000000) {
+    return `${(c / 100000000).toFixed(1)}亿`;
   }
-  if (count >= 10000) {
-    return `${(count / 10000).toFixed(1)}万`;
+  if (c >= 10000) {
+    return `${(c / 10000).toFixed(1)}万`;
   }
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}k`;
+  if (c >= 1000) {
+    return `${(c / 1000).toFixed(1)}k`;
   }
-  return count.toString();
+  return c.toString();
 }
 
 // ---------- Validation ----------

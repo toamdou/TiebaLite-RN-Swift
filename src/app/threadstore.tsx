@@ -32,11 +32,22 @@ import { usePagedList } from '@/hooks/usePagedList';
 import { relativeTime, formatCount } from '@/utils';
 import type { FavoriteThread } from '@/types';
 
-const favoriteKeyExtractor = (item: FavoriteThread) => item.id;
+// threadStore 映射前原始项以 tid 承载收藏 ID（item.id 全为 undefined），
+// 映射后为 camelCase id；两者都缺失时回退索引保证 FlashList key 稳定唯一。
+const favoriteKeyExtractor = (item: any, index: number) =>
+  String(item.id ?? item.tid ?? item.threadId ?? index);
 
 const FAVORITE_MENU_ACTIONS: MenuAction[] = [
   { id: 'remove', title: '取消收藏', image: 'star.slash', attributes: { destructive: true } },
 ];
+
+/** threadStore 时间戳容错：映射后 camelCase 毫秒，未映射 snake_case 秒 → 统一毫秒 */
+function storeTimestamp(item: any): number {
+  const raw = item.updateTime ?? item.update_time ?? item.collectTime ?? item.collect_time;
+  const t = Number(raw);
+  if (!Number.isFinite(t) || t <= 0) return 0;
+  return t >= 1e11 ? t : t * 1000;
+}
 
 const FavoriteRowSeparator = () => <View style={styles.favSeparator} />;
 
@@ -142,11 +153,11 @@ export default function ThreadStorePage() {
               </Text>
               <View style={styles.metaRow}>
                 <Text style={[styles.forumName, { color: colors.textLink }]} numberOfLines={1}>
-                  {item.forumName}
+                  {item.forumName ?? item.forum_name}
                 </Text>
-                {item.authorName ? (
+                {(item.authorName ?? item.author_name) ? (
                   <Text style={[styles.authorName, { color: colors.textTertiary }]} numberOfLines={1}>
-                    {item.authorName}
+                    {item.authorName ?? item.author_name}
                   </Text>
                 ) : null}
               </View>
@@ -162,11 +173,11 @@ export default function ThreadStorePage() {
                     tintColor={colors.textTertiary}
                   />
                   <Text style={[styles.statText, { color: colors.textTertiary }]}>
-                    {formatCount(item.latestReplyNum)}
+                    {formatCount(item.latestReplyNum ?? item.latest_reply_num)}
                   </Text>
                 </View>
                 <Text style={[styles.statText, { color: colors.textTertiary }]}>
-                  {relativeTime(item.updateTime || item.collectTime)}
+                  {relativeTime(storeTimestamp(item))}
                 </Text>
               </View>
             </View>
@@ -222,15 +233,6 @@ export default function ThreadStorePage() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Undo Snackbar */}
-      {undoRemoved && (
-        <View style={[styles.undoBar, { backgroundColor: colors.surfaceSecondary }]}>
-          <Text style={[styles.undoText, { color: colors.text }]}>已取消收藏</Text>
-          <View style={{ height: 32 }}>
-            <Button title="撤销" variant="plain" onPress={handleUndo} />
-          </View>
-        </View>
-      )}
       <FlashList
         data={items}
         keyExtractor={favoriteKeyExtractor}
@@ -265,6 +267,15 @@ export default function ThreadStorePage() {
         ListFooterComponent={renderFooter}
         ItemSeparatorComponent={FavoriteRowSeparator}
       />
+      {/* Undo Toast：浮动在列表底部，不再遮挡列表头数据（P2 最小修复） */}
+      {undoRemoved && (
+        <View style={[styles.undoBar, { backgroundColor: colors.surfaceSecondary, bottom: insets.bottom + 16 }]}>
+          <Text style={[styles.undoText, { color: colors.text }]}>已取消收藏</Text>
+          <View style={{ height: 32 }}>
+            <Button title="撤销" variant="plain" onPress={handleUndo} />
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -275,16 +286,22 @@ const styles = StyleSheet.create({
   skeletonWrap: { paddingHorizontal: 12, paddingTop: 12 },
   listContent: { paddingHorizontal: 12, paddingTop: 8 },
   emptyList: { flex: 1 },
-  // Undo bar
+  // Undo toast（浮动底部，不遮列表头）
   undoBar: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    marginHorizontal: 12,
-    marginTop: 8,
     borderRadius: Radius.chip,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   undoText: { fontSize: 14 },
   // Item

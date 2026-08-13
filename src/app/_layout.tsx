@@ -160,7 +160,14 @@ function RootLayoutInner() {
   const router = useRouter();
   const toolbarPrimaryColor = useAppPreference('toolbarPrimaryColor', false);
   const statusBarFontDark = useAppPreference('statusBarFontDark', false);
-  const headerTint = toolbarPrimaryColor ? (statusBarFontDark ? '#000' : '#FFF') : colors.text;
+  // headerTint 需随主题明暗自适应：深色模式下导航栏是深色液态玻璃，
+  // 勾选"工具栏使用主色调"时若再按 statusBarFontDark 取黑色字会黑字贴深底
+  // 不可见，故深色一律用浅色（onNavBarSurface），浅色才尊重 statusBarFontDark。
+  const headerTint = toolbarPrimaryColor
+    ? (isDark
+        ? colors.onNavBarSurface
+        : (statusBarFontDark ? '#000' : '#FFF'))
+    : colors.text;
 
   // 主题变化时同步原生根视图背景色（expo-system-ui runtime API）
   useEffect(() => {
@@ -313,10 +320,9 @@ function RootLayoutInner() {
           }}
           dangerouslySingular={(segment) => segment}
         />
-        {SCREENS.filter((s) => !['forum/[name]', 'thread/[id]', 'thread/[id]/subposts', 'search/index'].includes(s.name)).map((s) => (
+        {SCREENS.filter((s) => !['forum/[name]', 'thread/[id]', 'thread/[id]/subposts'].includes(s.name)).map((s) => (
           <Stack.Screen key={s.name} name={s.name} options={{ title: s.title }} />
         ))}
-        <Stack.Screen name="search/index" options={{ headerShown: false }} />
       </Stack>
     </View>
   );

@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
+import { ActivityIndicator } from 'react-native';
 import { Form, Section, Toggle, Button, Text, TextField, Picker } from '@expo/ui/swift-ui';
 import { pickerStyle, tag, font, foregroundStyle } from '@expo/ui/swift-ui/modifiers';
 import { hapticImpact, hapticNotify, hapticSelection, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
-import { useThemeActions } from '@/theme/ThemeContext';
+import { useThemeActions, useThemeColors } from '@/theme/ThemeContext';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 
@@ -15,8 +16,19 @@ const PRESET_COLORS = [
 
 export default function CustomSettingsPage() {
   const hydrated = usePreferencesStore((s) => s.hasHydrated);
-  if (!hydrated) return null;
+  // 未水合时返回轻量占位，避免整页白屏闪烁
+  if (!hydrated) return <HydratedPlaceholder />;
   return <CustomSettingsForm />;
+}
+
+/** 偏好水合完成前的轻量加载占位 */
+function HydratedPlaceholder() {
+  const { colors } = useThemeColors();
+  return (
+    <ThemedHost style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </ThemedHost>
+  );
 }
 
 function CustomSettingsForm() {
@@ -72,12 +84,16 @@ function CustomSettingsForm() {
         </Section>
 
         <Section title="工具栏选项">
+          {/* 该开关实际只影响导航栏前景（标题/返回箭头）与状态栏样式，
+              不改变工具栏背景色，故文案按实际作用命名以避免误导 */}
           <Toggle
-            label="工具栏使用主色调"
+            label="导航栏使用主色调"
             systemImage="paintpalette.fill"
             isOn={preferences.toolbarPrimaryColor}
             onIsOnChange={(v) => { hapticSelection(); setPreference('toolbarPrimaryColor', v); }}
-          />
+          >
+            <Text>将导航栏标题与图标着色为主色调，并联动状态栏样式</Text>
+          </Toggle>
           {preferences.toolbarPrimaryColor && (
             <Toggle
               label="状态栏深色字体"

@@ -6,7 +6,7 @@
  * search history, and paginated results.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -14,7 +14,6 @@ import {
   Text,
   Alert,
   ScrollView,
-  TextInput,
 } from 'react-native';
 import { Picker, Text as SWText } from '@expo/ui/swift-ui';
 import {
@@ -23,7 +22,8 @@ import {
   pickerStyle,
   tag,
 } from '@expo/ui/swift-ui/modifiers';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import type { SearchBarCommands } from 'react-native-screens';
 import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
@@ -67,6 +67,15 @@ export default function ForumSearchPage() {
   const [filterType, setFilterType] = useState('0'); // 0=all, 1=only threads
   const [searchedKeyword, setSearchedKeyword] = useState('');
   const [searched, setSearched] = useState(false);
+
+  // 原生 header 搜索栏（UISearchController）引用与当前文字镜像。
+  // iOS 不支持 autoFocus / onClose 事件，改用命令式 focus() 实现自动聚焦；
+  // 切换 tab 返回时重新聚焦，方便连续搜索。
+  const searchBarRef = useRef<SearchBarCommands | null>(null);
+  const searchQueryRef = useRef('');
+  useEffect(() => {
+    searchQueryRef.current = searchQuery;
+  }, [searchQuery]);
   const paged = usePagedList<SearchPostResult, { kw: string }>({
     fetcher: async (p, params, signal) => {
       const data = await searchPost(
@@ -194,12 +203,15 @@ export default function ForumSearchPage() {
     await loadMore();
   }, [hasMore, loadingMore, loading, loadMore]);
 
-  const handleSubmitSearch = useCallback(() => {
-    if (searchQuery.trim()) {
-      hapticImpact(ImpactFeedbackStyle.Light);
-      doSearch(searchQuery, 1, true);
-    }
-  }, [searchQuery, doSearch]);
+  const handleSubmitSearch = useCallback(
+    (text: string) => {
+      if (text.trim()) {
+        hapticImpact(ImpactFeedbackStyle.Light);
+        doSearch(text, 1, true);
+      }
+    },
+    [doSearch],
+  );
 
   const handleHistoryTap = useCallback((kw: string) => {
     hapticSelection();
@@ -220,26 +232,24 @@ export default function ForumSearchPage() {
   // Show loading indicator
   const showLoading = loading && results.length === 0;
 
+  const searchBarOptions = useMemo(
+    () => ({
+      ref: searchBarRef,
+      placeholder: '搜索吧内帖子...',
+      hideWhenScrolling: false,
+      placement: 'stacked' as const,
+      autoCapitalize: 'none' as const,
+      text: searchQuery,
+      onChangeText: (e: { nativeEvent: { text: string } }) => setSearchQuery(e.nativeEvent.text),
+      onSearchButtonPress: (e: { nativeEvent: { text: string } }) => handleSubmitSearch(e.nativeEvent.text),
+      onCancelButtonPress: () => setSearchQuery(''),
+    }),
+    [searchQuery, handleSubmitSearch],
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Search Bar */}
-      <View style={styles.searchBar}>
-        <View style={[styles.searchInputRow, { backgroundColor: colors.surfaceSecondary }]}>
-          <SymbolView name="magnifyingglass" size={16} tintColor={colors.textTertiary} style={{ marginRight: 8 }} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={handleSubmitSearch}
-            placeholder="搜索吧内帖子..."
-            placeholderTextColor={colors.textTertiary}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-            accessibilityLabel="搜索关键词"
-          />
-        </View>
-      </View>
+      <Stack.Screen options={{ headerSearchBarOptions: searchBarOptions }} />
       {/* Sort & Filter native menus */}
       <View style={styles.controlsRow}>
         <Picker<string>
@@ -304,8 +314,8 @@ export default function ForumSearchPage() {
                 style={[styles.historyChip, { backgroundColor: colors.surfaceSecondary }]}
                 onPress={() => handleHistoryTap(item.keyword)}
                 onLongPress={() => handleHistoryLongPress(item.keyword)}
-                accessibilityLabel={`删除搜索历史：${item.keyword}`}
-                accessibilityHint="长按删除该条搜索历史"
+                accessibilityLabel={`搜索历史：${item.keyword}，点击搜索，长按删除`}
+                accessibilityHint="轻点搜索该关键词，长按弹出删除确认"
               >
                 <Text style={[styles.historyChipText, { color: colors.textSecondary }]}>
                   {item.keyword}
@@ -358,22 +368,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  searchBar: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  searchInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 36,
-    paddingHorizontal: 14,
-    borderRadius: Radius.input,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    paddingVertical: 0,
   },
   controlsRow: {
     flexDirection: 'row',

@@ -159,14 +159,57 @@ export async function unfollowUser(portrait: string, tbs: string): Promise<{ suc
 // Kotlin: POST /c/c/post/addstore (data=json, tbs, stoken)
 // Kotlin: POST /c/c/post/rmstore (tid, tbs, fid=null)
 
-export async function threadStore(page: number = 0, signal?: AbortSignal): Promise<{ items: FavoriteThread[]; hasMore: boolean }> {
+/**
+ * 收藏列表项（新字段形状，NOTIFICATIONS-ADAPTER / 收藏 UI 侧按此消费）。
+ * 服务端 store_list 为 snake_case，此处统一映射为 camelCase：
+ * - id / tid / threadId 三别名等价（tid 为服务端主键，跳转统一用 id）
+ * - collectTime / updateTime 经 toMillis 统一转毫秒（兼容秒/毫秒下发，不乘 1000）
+ * - 向后兼容：仍满足旧 FavoriteThread 形状，UI 旧的 item.id / title / floor 读取保持有效
+ */
+export interface FavoriteStoreItem extends FavoriteThread {
+  /** 服务端原始帖子 id（与 id / threadId 等价） */
+  tid: string;
+  /** 帖子 id 别名（跳转用） */
+  threadId: string;
+  /** 所属吧 id（forum_id） */
+  forumId: string;
+  /** 服务端 is_read（1 / '1' / true 已读） */
+  isRead: boolean;
+}
+
+/** 映射服务端 store_list 单条（snake_case）为 UI camelCase 形状。 */
+export function mapStoreItem(item: any): FavoriteStoreItem {
+  const tid = String(item.tid ?? item.id ?? item.thread_id ?? '');
+  return {
+    id: tid,
+    tid,
+    threadId: String(item.thread_id ?? item.tid ?? item.id ?? tid),
+    title: item.title ?? item.thread_title ?? '',
+    forumName: item.forum_name ?? item.forumName ?? item.fname ?? '',
+    forumId: String(item.forum_id ?? item.forumId ?? item.fid ?? ''),
+    authorName: item.author_name ?? item.authorName ?? '',
+    postId: String(item.post_id ?? item.postId ?? item.pid ?? ''),
+    floor: Number(item.floor ?? 0),
+    collectTime: toMillis(Number(item.collect_time ?? item.collectTime ?? 0)),
+    updateTime: toMillis(Number(item.update_time ?? item.updateTime ?? 0)),
+    latestReplyNum: Number(item.latest_reply_num ?? item.latestReplyNum ?? 0),
+    isRead: item.is_read === 1 || item.is_read === '1' || item.is_read === true || item.isRead === 1 || item.isRead === true,
+  };
+}
+
+export async function threadStore(page: number = 0, signal?: AbortSignal): Promise<{ items: FavoriteStoreItem[]; hasMore: boolean }> {
   // page 从 0 开始（与调用方 initialPage=0 对齐），offset=(page-1)*50，保证第 0 页被请求。
   const offset = Math.max(0, (page - 1)) * 50;
   // Kotlin OfficialTiebaApi: threadStoreFlow(rn, offset, stoken, user_id)
   const raw = await postFormAction<any>('/c/f/post/threadstore', {
     rn: '50', offset: String(offset), stoken: getStoken(), user_id: getUidSync() || '',
   }, signal);
-  return { items: raw?.data?.store_list ?? raw?.store_list ?? [], hasMore: (raw?.data?.has_more ?? raw?.has_more ?? 0) === 1 };
+  const storeList = raw?.data?.store_list ?? raw?.store_list ?? [];
+  return {
+    // 新字段形状：store_list 映射为 camelCase（旧实现直接透传 snake_case，UI 读 item.title 等恒空、formatCount(undefined) 崩溃、keyExtractor 全 undefined）
+    items: Array.isArray(storeList) ? storeList.map(mapStoreItem) : [],
+    hasMore: (raw?.data?.has_more ?? raw?.has_more ?? 0) === 1,
+  };
 }
 
 export async function addStore(threadId: string, postId?: string): Promise<{ success: boolean }> {

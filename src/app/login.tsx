@@ -23,8 +23,8 @@ import type { WebViewNavigation } from 'react-native-webview';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
 import { useAppTheme } from '@/theme/ThemeContext';
+import { Radius } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
-import { GlassView, GlassCard } from '@/components/ui/GlassView';
 import { getNativeCookies } from '@/services/cookies/CookieService';
 import { setAuthCredentials } from '@/services/api/interceptors';
 import { apiGet, apiPost } from '@/services/api/client';
@@ -304,28 +304,8 @@ export default function LoginPage() {
           headerBlurEffect: 'systemMaterial' as const,
           headerShadowVisible: false,
           headerTintColor: colors.text,
-          headerLeft: () => (
-            <Pressable
-              onPress={handleClose}
-              style={({ pressed }) => [
-                styles.headerIconBtn,
-                {
-                  opacity: pressed ? 0.6 : 1,
-                  backgroundColor: 'rgba(120, 120, 128, 0.16)',
-                  borderRadius: 18,
-                },
-              ]}
-              accessibilityLabel="关闭登录"
-              accessibilityRole="button"
-            >
-              <SymbolView
-                name="xmark"
-                size={16}
-                weight="semibold"
-                tintColor={colors.text}
-              />
-            </Pressable>
-          ),
+          // 关闭通道只保留 formSheet 抓条（_layout.tsx 已设 sheetGrabberVisible: true
+          // + headerBackVisible: false），不再自绘 xmark，避免双关闭入口。
           headerRight: () => (
             <Pressable
               onPress={handleHelp}
@@ -347,45 +327,42 @@ export default function LoginPage() {
         }}
       />
 
-      {/* Loading Overlay */}
+      {/* Loading Overlay — 普通 scrim 半透明遮罩 + 原生加载指示器，
+          不再用全屏玻璃盖住正在加载的 WebView 内容 */}
       {loadingState === 'loading' && (
-        <GlassView theme="dark" style={styles.overlay}>
-          <GlassCard theme="dark" padding="none" style={styles.card}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-              正在加载登录页面...
-            </Text>
-          </GlassCard>
-        </GlassView>
+        <View style={[styles.overlay, { backgroundColor: colors.scrim }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.statusText, { color: colors.textOnPrimary }]}>
+            正在加载登录页面...
+          </Text>
+        </View>
       )}
 
       {/* Extracting Overlay */}
       {loadingState === 'extracting' && (
-        <GlassView theme="dark" style={styles.overlay}>
-          <GlassCard theme="dark" padding="none" style={styles.card}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-              正在获取用户信息...
-            </Text>
-          </GlassCard>
-        </GlassView>
+        <View style={[styles.overlay, { backgroundColor: colors.scrim }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.statusText, { color: colors.textOnPrimary }]}>
+            正在获取用户信息...
+          </Text>
+        </View>
       )}
 
       {/* Success Overlay */}
       {loadingState === 'success' && (
-        <GlassView theme="dark" style={[styles.overlay, styles.successOverlay]}>
+        <View style={[styles.overlay, { backgroundColor: colors.scrim }]}>
           <View style={styles.successIconContainer}>
             <View style={styles.successIcon}>
               <SymbolView name="checkmark" size={32} tintColor="#FFF" weight="bold" />
             </View>
           </View>
           <Text style={styles.successText}>登录成功</Text>
-        </GlassView>
+        </View>
       )}
 
       {/* Error State */}
       {loadingState === 'error' && (
-        <View style={styles.errorContainer}>
+        <View style={[styles.errorContainer, { backgroundColor: colors.scrim }]}>
           <SymbolView name="exclamationmark.triangle.fill" size={48} tintColor="#FF3B30" />
           <Text style={[styles.errorText, { color: colors.text }]}>
             {error || '登录失败'}
@@ -397,13 +374,13 @@ export default function LoginPage() {
             onPress={handleRetry}
             style={[styles.retryButton, { backgroundColor: colors.primary }]}
           >
-            <Text style={styles.retryText}>重新加载</Text>
+            <Text style={[styles.retryText, { color: colors.textOnPrimary }]}>重新加载</Text>
           </Pressable>
           <Pressable
             onPress={handleClose}
-            style={[styles.retryButton, { backgroundColor: colors.textSecondary, marginTop: 12 }]}
+            style={[styles.retryButton, { backgroundColor: colors.surfaceSecondary, marginTop: 12 }]}
           >
-            <Text style={styles.retryText}>返回</Text>
+            <Text style={[styles.retryText, { color: colors.text }]}>返回</Text>
           </Pressable>
         </View>
       )}
@@ -463,23 +440,14 @@ const styles = StyleSheet.create({
   overlay: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.35)',
     zIndex: 10,
     justifyContent: 'center',
     alignItems: 'center',
   } as any,
-  card: {
-    paddingHorizontal: 32,
-    paddingVertical: 24,
-    borderRadius: 16,
-    alignItems: 'center',
-    gap: 12,
-  },
   statusText: {
     fontSize: 15,
     marginTop: 4,
   },
-  successOverlay: {},
   successIconContainer: {
     marginBottom: 8,
   },
@@ -503,7 +471,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-    backgroundColor: 'rgba(0,0,0,0.05)',
   } as any,
   errorText: {
     fontSize: 17,
@@ -521,7 +488,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingHorizontal: 32,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: Radius.input,
   },
   retryText: {
     color: '#FFF',

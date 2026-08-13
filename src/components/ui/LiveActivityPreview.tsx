@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import type { SignStatus } from '@/stores/signStore';
+import { SymbolView } from '@/components/ui/SymbolView';
 
 interface LiveActivityPreviewProps {
   active: boolean;
@@ -68,7 +69,7 @@ export function LiveActivityPreview({
       <View style={styles.lockCard}>
         <View style={styles.lockRow}>
           <View style={[styles.iconBadge, { borderColor: accent, backgroundColor: `${accent}22` }]}>
-            <Text style={[styles.iconText, { color: accent }]}>✓</Text>
+            <SymbolView name="checkmark" size={14} weight="bold" tintColor={accent} />
           </View>
           <View style={styles.lockText}>
             <Text style={styles.lockTitle} numberOfLines={1}>{title}</Text>
@@ -94,7 +95,7 @@ export function LiveActivityPreview({
       <View style={styles.islandColumn}>
         <View style={styles.islandCompact}>
           <View style={[styles.islandCompactIcon, { borderColor: accent }]}>
-            <Text style={[styles.islandCompactIconText, { color: accent }]}>✓</Text>
+            <SymbolView name="checkmark" size={8} weight="bold" tintColor={accent} />
           </View>
           <View style={styles.islandCompactText}>
             <Text style={styles.islandCompactTitle}>签到</Text>
@@ -166,10 +167,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconText: {
-    fontSize: 17,
-    fontWeight: '700',
   },
   lockText: {
     flex: 1,
@@ -243,10 +240,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  islandCompactIconText: {
-    fontSize: 11,
-    fontWeight: '700',
   },
   islandCompactText: {
     flex: 1,

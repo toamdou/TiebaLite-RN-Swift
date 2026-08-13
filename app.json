@@ -49,10 +49,6 @@
             "tb1.bdstatic.com": {
               "NSExceptionAllowsInsecureHTTPLoads": false,
               "NSIncludesSubdomains": true
-            },
-            "tb.himg.baidu.com": {
-              "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
-              "NSIncludesSubdomains": true
             }
           }
         },

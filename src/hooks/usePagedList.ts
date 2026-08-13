@@ -78,6 +78,11 @@ export function usePagedList<T, P = undefined, E = any>({
   const [extra, setExtra] = useState<E | null>(null);
   const seqRef = useRef(0);
   const controllerRef = useRef<AbortController | null>(null);
+  // 同步镜像 state 的 ref，供 loadMore 入口做同步守卫：
+  // loadingMore 经 setState 异步生效，FlashList 同帧二次 onEndReached 时
+  // 闭包里的 loadingMore 仍是旧值，导致同页重复发起 run(page, 'more')。
+  const loadingMoreRef = useRef(false);
+  const pageRef = useRef(initialPage);
   const paramsRef = useRef(params);
   useEffect(() => {
     paramsRef.current = params;
@@ -95,7 +100,10 @@ export function usePagedList<T, P = undefined, E = any>({
       // 页面 fetcher 均显式接收 signal，全局回退机制对本集群已无用途。
       if (mode === 'refresh') setRefreshing(true);
       else if (mode === 'initial') setLoading(true);
-      else setLoadingMore(true);
+      else {
+        setLoadingMore(true);
+        loadingMoreRef.current = true;
+      }
       setError(null);
       try {
         const result = await fetcher(
@@ -110,6 +118,7 @@ export function usePagedList<T, P = undefined, E = any>({
           setItems(result.items.slice(0, maxItems));
         }
         setPage(result.nextPage ?? targetPage);
+        pageRef.current = result.nextPage ?? targetPage;
         setHasMore(result.hasMore);
         setExtra(result.extra ?? null);
       } catch (e: any) {
@@ -121,6 +130,7 @@ export function usePagedList<T, P = undefined, E = any>({
         setLoading(false);
         setRefreshing(false);
         setLoadingMore(false);
+        loadingMoreRef.current = false;
       }
     },
     [fetcher, maxItems],
@@ -135,17 +145,26 @@ export function usePagedList<T, P = undefined, E = any>({
   // loadMore 直接请求当前 `page`：setPage 已把 page 推进到 nextPage
   // （fetcher 的 nextPage 语义是"下一次应请求的页号"，均为 p+1）。
   // 若这里用 page + 1 会双重递增，每次翻页都跳过一页。
-  const loadMore = useCallback(() => run(page, 'more'), [run, page]);
+  // 同步守卫：loadingMore 经 setState 异步生效，FlashList 快速滚动时同帧
+  // 二次 onEndReached 会拿旧闭包再跑一次；用 loadingMoreRef 同步拦截。
+  // 同理 page 也走 pageRef，保证两次调用读取同一真实页号。
+  const loadMore = useCallback(() => {
+    if (loadingMoreRef.current) return Promise.resolve();
+    loadingMoreRef.current = true;
+    return run(pageRef.current, 'more');
+  }, [run]);
   const reset = useCallback(() => {
     seqRef.current += 1;
     controllerRef.current?.abort();
     controllerRef.current = null;
     setItems([]);
     setPage(initialPage);
+    pageRef.current = initialPage;
     setHasMore(true);
     setLoading(true);
     setRefreshing(false);
     setLoadingMore(false);
+    loadingMoreRef.current = false;
     setError(null);
     setExtra(null);
   }, [initialPage]);

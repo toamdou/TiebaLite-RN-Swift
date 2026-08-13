@@ -168,11 +168,16 @@ function getSegmentLabel(tab: MessageTab): string {
 }
 
 /** 类型图标（SF Symbol）与颜色：回复 / @ / 点赞 可一眼区分 */
-function getTypeIcon(type: CategorizedMessage['category']): { name: string; color: string } {
+function getTypeIcon(
+  type: CategorizedMessage['category'],
+  colors: ReturnType<typeof useThemeColors>['colors'],
+): { name: string; color: string } {
   switch (type) {
-    case 'reply': return { name: 'arrowshape.turn.up.left.fill', color: '#4477E0' };
-    case 'at': return { name: 'at', color: '#FF9500' };
-    case 'agree': return { name: 'hand.thumbsup.fill', color: '#FF3B30' };
+    // 主题无"回复/提到/点赞"独立语义色，取语义色系变体：
+    // reply=主题 tint（primary/info 同源）、at=warning 橙、agree=success 绿
+    case 'reply': return { name: 'arrowshape.turn.up.left.fill', color: colors.tint };
+    case 'at': return { name: 'at', color: colors.warning };
+    case 'agree': return { name: 'hand.thumbsup.fill', color: colors.success };
   }
 }
 
@@ -224,11 +229,9 @@ export default function NotificationsScreen() {
   const paged = usePagedList<CategorizedMessage, { type: MessageTab; isLoggedIn: boolean }>({
     fetcher: async (p, params, signal) => {
       if (!params.isLoggedIn) return { items: [], hasMore: false };
-      // getMoreMsg：并行拉取 reply/at/agree 三来源并按 category 打标合并。
-      // 分段仅作前端过滤（合并流已含全部三类消息）。
-      const data = await getMoreMsg(p - 1, signal);
-      const items = data.items.filter((i) => i.category === params.type);
-      return { items, hasMore: data.hasMore, nextPage: p + 1 };
+      // getMoreMsg：按当前分类只拉对应接口（hasMore 只反映当前分类，避免已耗尽分类空翻页）。
+      const data = await getMoreMsg(params.type, p - 1, signal);
+      return { items: data.items, hasMore: data.hasMore, nextPage: p + 1 };
     },
     params: { type: activeTab, isLoggedIn },
   });
@@ -333,7 +336,7 @@ export default function NotificationsScreen() {
 
   const renderMessageItem = useCallback(
     ({ item, index }: { item: CategorizedMessage; index: number }) => {
-      const icon = getTypeIcon(item.category);
+      const icon = getTypeIcon(item.category, colors);
       return (
         <EntranceRow index={index} animateEntry={!entranceDoneRef.current}>
           <PressScale onPress={() => handleMessagePress(item)}>
@@ -385,7 +388,7 @@ export default function NotificationsScreen() {
                   </RNText>
                 ) : null}
                 <RNText style={[styles.messageTime, { color: colors.textDisabled }]}>
-                  {relativeTime(item.createTime * 1000)}
+                  {relativeTime(item.createTime)}
                 </RNText>
               </View>
             </View>
@@ -535,10 +538,12 @@ const styles = StyleSheet.create({
   messageNamePressable: {
     flexShrink: 1,
   },
+  // 未读红点：定位到头像右上角（行内边距 12 + 头像 40 → 头像右缘 x=52，
+  // 圆点 8x8 骑在右上角：left=48/top=8）
   unreadDot: {
     position: 'absolute',
-    top: 14,
-    left: 4,
+    top: 8,
+    left: 48,
     width: 8,
     height: 8,
     borderRadius: 4,

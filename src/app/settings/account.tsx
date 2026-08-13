@@ -1,18 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Form, Section, Button, Text, Image, ConfirmationDialog } from '@expo/ui/swift-ui';
+import { Alert, StyleSheet } from 'react-native';
+import {
+  Form, Section, Button, Text, Image, HStack, Menu, RNHostView, ConfirmationDialog,
+  Button as SWButton,
+} from '@expo/ui/swift-ui';
+import { labelStyle, buttonStyle, frame } from '@expo/ui/swift-ui/modifiers';
 import { useRouter } from 'expo-router';
 import { hapticImpact, hapticNotify, ImpactFeedbackStyle, NotificationFeedbackType } from '@/utils/haptics';
 import { useAuthStore } from '@/stores/authStore';
 import { getAccountListSync, deleteAccountSync } from '@/services/storage/AuthSQLiteStorage';
 import type { Account } from '@/types';
 import { ThemedHost } from '@/components/ui/ThemedHost';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Spacing } from '@/theme';
 
 export default function AccountPage() {
   const router = useRouter();
   const { isLoggedIn, account: currentAccount, switchAccount, logout } = useAuthStore();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [removeTarget, setRemoveTarget] = useState<Account | null>(null);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const loadAccounts = useCallback(async () => {
@@ -37,21 +43,38 @@ export default function AccountPage() {
     [currentAccount, switchAccount],
   );
 
-  const handleRemoveConfirm = useCallback(async () => {
-    if (!removeTarget) return;
-    hapticImpact(ImpactFeedbackStyle.Medium);
-    const isCurrent = currentAccount?.uid === removeTarget.uid;
-    try {
-      if (isCurrent) {
-        await logout();
-      } else {
-        deleteAccountSync(removeTarget.uid);
-      }
-      setAccounts(getAccountListSync());
-      hapticNotify(NotificationFeedbackType.Success);
-    } catch {}
-    setRemoveTarget(null);
-  }, [removeTarget, currentAccount, logout]);
+  // 每行右侧菜单触发移除；统一用 uid 作主键判断当前账号（与 switch/delete 一致）
+  const handleRemoveAccount = useCallback(
+    (account: Account) => {
+      const isCurrent = currentAccount?.uid === account.uid;
+      Alert.alert(
+        '移除账号',
+        isCurrent
+          ? '这是当前登录的账号，移除后将退出登录。'
+          : `确定要移除账号「${account.nameShow || account.name || ''}」吗？`,
+        [
+          { text: '取消', style: 'cancel' },
+          {
+            text: '移除',
+            style: 'destructive',
+            onPress: async () => {
+              hapticImpact(ImpactFeedbackStyle.Medium);
+              try {
+                if (isCurrent) {
+                  await logout();
+                } else {
+                  deleteAccountSync(account.uid);
+                }
+                setAccounts(getAccountListSync());
+                hapticNotify(NotificationFeedbackType.Success);
+              } catch {}
+            },
+          },
+        ],
+      );
+    },
+    [currentAccount, logout],
+  );
 
   const handleLogout = useCallback(async () => {
     try {
@@ -66,25 +89,47 @@ export default function AccountPage() {
     <ThemedHost style={{ flex: 1 }}>
       <Form>
         <Section title="已登录账号">
-          {accounts.map((item) => {
-            const isCurrent = currentAccount?.uid === item.uid;
-            return (
-              <Button
-                key={item.uid}
-                onPress={() => handleSwitch(item)}
-              >
-                {[
-                  <Text key="name">{item.nameShow || item.name || ''}</Text>,
-                  <Text key="uid">{item.name ? `@${item.name}` : `UID: ${item.uid}`}</Text>,
-                  ...(isCurrent
-                    ? [<Image key="check" systemName="checkmark.circle.fill" size={16} color="#34C759" />]
-                    : []),
-                ]}
-              </Button>
-            );
-          })}
-          {accounts.length === 0 && (
-            <Text>暂无账号，登录后将显示在这里</Text>
+          {accounts.length === 0 ? (
+            <RNHostView matchContents>
+              <EmptyState
+                title="暂无账号"
+                description="登录后将显示在这里"
+                icon="person.crop.circle.badge.questionmark"
+                style={styles.emptyAccounts}
+              />
+            </RNHostView>
+          ) : (
+            accounts.map((item) => {
+              const isCurrent = currentAccount?.uid === item.uid;
+              return (
+                <HStack key={item.uid} alignment="center" spacing={8}>
+                  {/* 点击整行切换账号（主键统一用 uid） */}
+                  <Button
+                    onPress={() => handleSwitch(item)}
+                    modifiers={[frame({ maxWidth: 9999, alignment: 'leading' })]}
+                  >
+                    <Text>{item.nameShow || item.name || ''}</Text>
+                    <Text>{item.name ? `@${item.name}` : `UID: ${item.uid}`}</Text>
+                    {isCurrent
+                      ? <Image systemName="checkmark.circle.fill" size={16} color="#34C759" />
+                      : null}
+                  </Button>
+                  {/* 每行右侧菜单：移除账号，替代「管理」Section 重复的移除行 */}
+                  <Menu
+                    label=""
+                    systemImage="ellipsis"
+                    modifiers={[labelStyle('iconOnly'), buttonStyle('plain')]}
+                  >
+                    <SWButton
+                      label="移除账号"
+                      systemImage="trash"
+                      role="destructive"
+                      onPress={() => handleRemoveAccount(item)}
+                    />
+                  </Menu>
+                </HStack>
+              );
+            })
           )}
         </Section>
 
@@ -111,40 +156,6 @@ export default function AccountPage() {
             }}
           />
         </Section>
-
-        {accounts.length > 0 && (
-          <Section title="管理">
-            <ConfirmationDialog
-              title="移除账号"
-              isPresented={!!removeTarget}
-              onIsPresentedChange={(v) => { if (!v) setRemoveTarget(null); }}
-              titleVisibility="visible"
-            >
-              <ConfirmationDialog.Trigger>
-                {accounts.map((item) => (
-                  <Button
-                    key={`remove-${item.uid}`}
-                    role="destructive"
-                    onPress={() => setRemoveTarget(item)}
-                  >
-                    <Text>移除 {item.nameShow || item.name}</Text>
-                  </Button>
-                ))}
-              </ConfirmationDialog.Trigger>
-              <ConfirmationDialog.Actions>
-                <Button label="移除" role="destructive" onPress={handleRemoveConfirm} />
-                <Button label="取消" role="cancel" />
-              </ConfirmationDialog.Actions>
-              <ConfirmationDialog.Message>
-                <Text>
-                  {removeTarget && currentAccount?.id === removeTarget.id
-                    ? '这是当前登录的账号，移除后将退出登录。'
-                    : `确定要移除账号「${removeTarget?.nameShow || removeTarget?.name}」吗？`}
-                </Text>
-              </ConfirmationDialog.Message>
-            </ConfirmationDialog>
-          </Section>
-        )}
 
         {isLoggedIn && (
           <Section>
@@ -176,3 +187,9 @@ export default function AccountPage() {
     </ThemedHost>
   );
 }
+
+const styles = StyleSheet.create({
+  emptyAccounts: {
+    paddingVertical: Spacing.xl,
+  },
+});

@@ -30,16 +30,19 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { EASE_OUT, DURATION } from '@/theme/springs';
+import { Radius } from '@/theme';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useAuthStore } from '@/stores/authStore';
 import { flattenStyle, contentToText, relativeTime, formatCount, getLevelColor } from '@/utils';
 import { openLink } from '@/utils/linkOpener';
 import { pbFloor, agree, checkReportPost, delPost } from '@/services/api/endpoints';
 import { usePagedList } from '@/hooks/usePagedList';
+import { useImageViewer } from '@/hooks/useImageViewer';
 import { LoadMoreFooter } from '@/components/ui/LoadMoreFooter';
 import { SkeletonList } from '../../../../components/ui/Skeleton';
 import { TiebaRichText } from '../../../../modules/tieba-native/src/TiebaRichText';
 import { contentToRichTextRuns } from '@/utils/richTextRuns';
+import ImageViewer from '@/components/ImageViewer';
 import type { SubPostInfo } from '@/types';
 
 const subPostKeyExtractor = (item: SubPostInfo) => item.id;
@@ -97,6 +100,7 @@ const ReplyItem = React.memo(function ReplyItem({
   isOwn,
   onReport,
   onDelete,
+  onImagePress,
 }: {
   item: SubPostInfo;
   index: number;
@@ -107,6 +111,7 @@ const ReplyItem = React.memo(function ReplyItem({
   isOwn: boolean;
   onReport: (item: SubPostInfo) => void;
   onDelete: (item: SubPostInfo) => void;
+  onImagePress: (images: string[], index: number) => void;
 }) {
   const router = useRouter();
   const { reduceMotion } = useReducedMotion();
@@ -235,24 +240,45 @@ const ReplyItem = React.memo(function ReplyItem({
             <InlinePostContent content={item.content} colors={colors} />
           </View>
 
-          {/* Row 3.5: Images */}
+          {/* Row 3.5: Images — P0: 楼中楼图片接入 ImageViewer 大图查看器。
+              收集该楼全部图片 URL，点击任一张（含 +N 徽标）打开大图，
+              初始定位到对应下标；分页/回收复用的行也能正常打开。 */}
           {images.length > 0 && (
             <View style={s.imageRow}>
               {/* C8: subpost media caps at 3 thumbnails with a +N chip. */}
               {images.slice(0, 3).map((uri, i) => (
-                <Image
+                <Pressable
                   key={i}
-                  source={{ uri }}
-                  style={s.thumbImage}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  recyclingKey={uri}
-                />
+                  onPress={() => onImagePress(images, i)}
+                  style={({ pressed }) => [
+                    s.thumbImage,
+                    { opacity: pressed ? 0.75 : 1 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`查看第${i + 1}张图片`}
+                >
+                  <Image
+                    source={{ uri }}
+                    style={s.thumbImage}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    recyclingKey={uri}
+                  />
+                </Pressable>
               ))}
               {images.length > 3 && (
-                <View style={[s.thumbImage, s.moreImagesBadge]}>
+                <Pressable
+                  onPress={() => onImagePress(images, 3)}
+                  style={({ pressed }) => [
+                    s.thumbImage,
+                    s.moreImagesBadge,
+                    { opacity: pressed ? 0.75 : 1 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="查看全部图片"
+                >
                   <Text style={s.moreImagesText}>+{images.length - 3}</Text>
-                </View>
+                </Pressable>
               )}
             </View>
           )}
@@ -296,6 +322,7 @@ export default function SubPostsPage() {
   const insets = useSafeAreaInsets();
   const { colors } = useThemeColors();
   const accountUid = useAuthStore((s) => s.account?.uid);
+  const imageViewer = useImageViewer();
   const paged = usePagedList<SubPostInfo>({
     fetcher: async (page, _params, signal) => {
       const data = await pbFloor(threadId, postId, forumId, page, undefined, signal);
@@ -405,9 +432,10 @@ export default function SubPostsPage() {
         isOwn={!!accountUid && accountUid === item.authorId}
         onReport={handleReport}
         onDelete={handleDelete}
+        onImagePress={imageViewer.handleImagePress}
       />
     ),
-    [colors, threadAuthorId, handleAgree, accountUid, handleReport, handleDelete],
+    [colors, threadAuthorId, handleAgree, accountUid, handleReport, handleDelete, imageViewer.handleImagePress],
   );
 
   const mainPostCard = useMemo(
@@ -430,7 +458,7 @@ export default function SubPostsPage() {
         ) : null}
         <Link href={{ pathname: '/thread/[id]', params: { id: threadId } }} push asChild>
           <Pressable style={({ pressed }) => [s.openThreadBtn, { backgroundColor: colors.primary }, pressed && { opacity: 0.85 }]}>
-            <Text style={s.openThreadText}>打开原帖</Text>
+            <Text style={[s.openThreadText, { color: colors.textOnPrimary }]}>打开原帖</Text>
           </Pressable>
         </Link>
       </View>
@@ -493,6 +521,15 @@ export default function SubPostsPage() {
       {/* C4: pbFloor only returns current/total/hasMore (no hasPrev), so
           "上一页/最新回复" controls are intentionally omitted until the
           service exposes a previous-page flag. */}
+      {/* 楼中楼大图查看器（窗口化 + 低功耗 windowSize 2 + 关闭清缓存，
+          由 ImageViewer 内部实现，接入模式与 thread/[id].tsx 一致） */}
+      <ImageViewer
+        images={imageViewer.imageViewerImages}
+        initialIndex={imageViewer.imageViewerIndex}
+        visible={imageViewer.imageViewerVisible}
+        onClose={imageViewer.closeImageViewer}
+        forumName={decodedForumName}
+      />
     </View>
   );
 }
@@ -505,7 +542,7 @@ const s = StyleSheet.create({
 
   // Main-post card at the top of the sub-post page
   mainPostCard: {
-    borderRadius: 14,
+    borderRadius: Radius.card,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 14,
     marginBottom: 10,
@@ -531,7 +568,7 @@ const s = StyleSheet.create({
     marginTop: 6,
   },
   openThreadText: {
-    color: '#FFF',
+    // color 走 colors.textOnPrimary（组件内动态注入）
     fontSize: 13,
     fontWeight: '700',
   },

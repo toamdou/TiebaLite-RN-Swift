@@ -2,23 +2,22 @@
  * Search Page (搜索页) — 贴吧原版样式 + 综合/贴/吧/人 tab
  *
  * 设计：
- * - 顶部搜索栏：圆角药丸灰底 + 放大镜 + placeholder + 取消按钮
+ * - 顶部搜索：原生 header 的 headerSearchBarOptions（UISearchController，placeholder "搜吧、搜贴、搜人"）
  * - 搜索前：搜索历史（标题行 + 药丸标签）
- * - 搜索后：tab 栏（贴/吧/人）+ 对应结果列表
+ * - 搜索后：分段 tab（贴/吧/人，SwiftUI segmented）+ 排序（原生 menu）+ 对应结果列表
  */
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   View,
   Text,
-  TextInput,
   Pressable,
   StyleSheet,
   ScrollView,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Stack, useRouter } from 'expo-router';
+import type { SearchBarCommands } from 'react-native-screens';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -30,7 +29,6 @@ import { hapticImpact, hapticSelection, ImpactFeedbackStyle } from '@/utils/hapt
 import { Picker, Text as SWText } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import { SymbolView } from '@/components/ui/SymbolView';
-import { GlassView } from '@/components/ui/GlassView';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import {
@@ -98,8 +96,7 @@ function FirstBatchStagger({
 // ── 主页面 ──
 export default function SearchPage() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { colors, isDark } = useThemeColors();
+  const { colors } = useThemeColors();
   const [inputText, setInputText] = useState('');
   const [history, setHistory] = useState<SearchHistoryItem[]>([]);
   const [historyExpanded, setHistoryExpanded] = useState(false);
@@ -108,6 +105,21 @@ export default function SearchPage() {
   const [searchedKeyword, setSearchedKeyword] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  // 原生 header 搜索栏（UISearchController）引用与当前文字镜像。
+  // iOS 不支持 autoFocus / onClose 事件，改用命令式 focus() 实现自动聚焦。
+  const searchBarRef = useRef<SearchBarCommands | null>(null);
+  const inputTextRef = useRef('');
+  useEffect(() => {
+    inputTextRef.current = inputText;
+  }, [inputText]);
+  useEffect(() => {
+    // 待原生 header 搜索栏挂载后再聚焦，避免过早调用被吞。
+    const timer = setTimeout(() => {
+      searchBarRef.current?.focus();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, []);
 
   // 搜索结果
   const [threads, setThreads] = useState<SearchThreadResult[]>([]);
@@ -297,90 +309,67 @@ export default function SearchPage() {
     doSearch(kw, activeTab);
   }, [resetSuggestions, doSearch, activeTab, saveToHistory]);
 
-  const handleCancel = useCallback(() => {
-    router.back();
-  }, [router]);
+  // 原生搜索栏取消语义：有输入时清空并收起键盘（恢复搜索前状态），无输入时返回。
+  const handleCancelPress = useCallback(() => {
+    const hasText = inputTextRef.current.trim().length > 0;
+    if (hasText) {
+      inputTextRef.current = '';
+      resetSuggestions();
+      setInputText('');
+      setHasSearched(false);
+      setSearchedKeyword('');
+    } else {
+      router.back();
+    }
+  }, [resetSuggestions, router]);
 
-  const handleClear = useCallback(() => {
-    resetSuggestions();
-    setInputText('');
-    setHasSearched(false);
-    setSearchedKeyword('');
-  }, [resetSuggestions]);
+  const searchBarOptions = useMemo(
+    () => ({
+      ref: searchBarRef,
+      placeholder: '搜吧、搜贴、搜人',
+      hideWhenScrolling: false,
+      placement: 'stacked' as const,
+      autoCapitalize: 'none' as const,
+      text: inputText,
+      onChangeText: (e: { nativeEvent: { text: string } }) => handleInputChange(e.nativeEvent.text),
+      onSearchButtonPress: (e: { nativeEvent: { text: string } }) => handleSearch(e.nativeEvent.text),
+      onCancelButtonPress: handleCancelPress,
+    }),
+    [inputText, handleInputChange, handleSearch, handleCancelPress],
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-      {/* ── 搜索栏 ── */}
-      <View style={styles.searchBarRow}>
-        <GlassView
-          theme={isDark ? 'dark' : 'light'}
-          glassEffectStyle="clear"
-          borderRadius={20}
-          style={[styles.searchInputWrap, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(120,120,128,0.12)' }]}
-        >
-          <SymbolView name="magnifyingglass" size={16} tintColor={colors.textTertiary} style={{ marginRight: 8 }} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            value={inputText}
-            onChangeText={handleInputChange}
-            onSubmitEditing={() => handleSearch(inputText)}
-            placeholder="搜吧、搜贴、搜人"
-            placeholderTextColor={colors.textTertiary}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-            autoFocus
-          />
-          {inputText.length > 0 && (
-            <Pressable onPress={handleClear} hitSlop={6} style={{ padding: 2 }}>
-              <SymbolView name="xmark.circle.fill" size={16} tintColor={colors.textTertiary} />
-            </Pressable>
-          )}
-        </GlassView>
-        <Pressable onPress={handleCancel} hitSlop={8} style={styles.cancelBtn}>
-          <Text style={[styles.cancelText, { color: colors.text }]}>取消</Text>
-        </Pressable>
-      </View>
-
-      {/* ── Tab 栏（搜索后显示） ── */}
-      {hasSearched && (
-        <View style={[styles.tabBar, { borderBottomColor: colors.separator }]}>
-          {TABS.map((tab) => (
-            <Pressable
-              key={tab.key}
-              onPress={() => handleTabChange(tab.key)}
-              style={styles.tabItem}
+    <ThemedHost style={{ flex: 1 }}>
+      <Stack.Screen options={{ title: '搜索', headerSearchBarOptions: searchBarOptions }} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* ── Tab 栏（搜索后显示，SwiftUI segmented） ── */}
+        {hasSearched && (
+          <View style={styles.tabBar}>
+            <Picker
+              selection={activeTab}
+              onSelectionChange={handleTabChange as any}
+              modifiers={[pickerStyle('segmented')]}
             >
-              <Text
-                style={[
-                  styles.tabText,
-                  { color: activeTab === tab.key ? colors.primary : colors.textTertiary },
-                  activeTab === tab.key && styles.tabTextActive,
-                ]}
-              >
-                {tab.label}
-              </Text>
-              {activeTab === tab.key && (
-                <View style={[styles.tabIndicator, { backgroundColor: colors.primary }]} />
-              )}
-            </Pressable>
-          ))}
-        </View>
-      )}
+              {TABS.map((tab) => (
+                <SWText key={tab.key} modifiers={[tag(tab.key)]}>{tab.label}</SWText>
+              ))}
+            </Picker>
+          </View>
+        )}
 
-      {/* ── 贴子排序（搜索后显示） ── */}
-      {hasSearched && activeTab === 'thread' && (
-        <ThemedHost style={styles.sortHost}>
-          <Picker
-            selection={sortOrder}
-            onSelectionChange={handleSortChange as any}
-            modifiers={[pickerStyle('menu')]}
-          >
-            <SWText modifiers={[tag(String(SearchThreadOrder.NEW_FIRST))]}>按时间</SWText>
-            <SWText modifiers={[tag(String(SearchThreadOrder.RELEVANT))]}>按相关性</SWText>
-          </Picker>
-        </ThemedHost>
-      )}
+        {/* ── 贴子排序（搜索后显示，原生 menu Picker） ── */}
+        {hasSearched && activeTab === 'thread' && (
+          <View style={styles.sortHost}>
+            <Picker
+              selection={sortOrder}
+              onSelectionChange={handleSortChange as any}
+              modifiers={[pickerStyle('menu')]}
+            >
+              <SWText modifiers={[tag(String(SearchThreadOrder.NEW_FIRST))]}>按时间</SWText>
+              <SWText modifiers={[tag(String(SearchThreadOrder.RELEVANT))]}>按相关性</SWText>
+            </Picker>
+          </View>
+        )}
 
       {/* ── 内容区 ── */}
       {!hasSearched ? (
@@ -396,7 +385,7 @@ export default function SearchPage() {
                   <Pressable
                     key={`sug-${item}-${idx}`}
                     onPress={() => handleKeywordTap(item)}
-                    style={[styles.tagPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(120,120,128,0.1)' }]}
+                    style={[styles.tagPill, { backgroundColor: colors.chip }]}
                   >
                     <Text style={[styles.tagText, { color: colors.text }]} numberOfLines={1}>
                       {item}
@@ -445,7 +434,7 @@ export default function SearchPage() {
                     key={`${item.keyword}-${item.timestamp}-${idx}`}
                     onPress={() => handleKeywordTap(item.keyword)}
                     onLongPress={() => handleHistoryLongPress(item.keyword)}
-                    style={[styles.historyPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(120,120,128,0.1)' }]}
+                    style={[styles.historyPill, { backgroundColor: colors.chip }]}
                   >
                     <Text style={[styles.tagText, { color: colors.text }]} numberOfLines={1}>
                       {item.keyword}
@@ -460,7 +449,7 @@ export default function SearchPage() {
           )}
           {history.length === 0 && (
             <View style={styles.emptyWrap}>
-              <SymbolView name="magnifyingglass" size={40} tintColor={colors.textDisabled} />
+              <SymbolView name="tray" size={40} tintColor={colors.textDisabled} />
               <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>搜索贴吧、帖子和用户</Text>
             </View>
           )}
@@ -477,7 +466,7 @@ export default function SearchPage() {
               <SymbolView name="wifi.exclamationmark" size={36} tintColor={colors.textDisabled} />
               <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>{error}</Text>
               <Pressable onPress={() => doSearch(searchedKeyword, activeTab)} style={[styles.retryBtn, { backgroundColor: colors.primary }]}>
-                <Text style={styles.retryText}>重试</Text>
+                <Text style={[styles.retryText, { color: colors.textOnPrimary }]}>重试</Text>
               </Pressable>
             </View>
           ) : activeTab === 'thread' ? (
@@ -510,7 +499,7 @@ export default function SearchPage() {
           )}
         </View>
       )}
-    </View>
+    </ThemedHost>
   );
 }
 
@@ -519,62 +508,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  searchBarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 12,
-  },
-  searchInputWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: Radius.capsule,
-    paddingHorizontal: 14,
-    height: 36,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    paddingVertical: 0,
-  },
-  cancelBtn: {
-    paddingVertical: 4,
-  },
-  cancelText: {
-    fontSize: 16,
-    fontWeight: '400',
-  },
-  // ── Tab 栏 ──
+  // ── Tab 栏（SwiftUI segmented） ──
   tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 6,
   },
-  tabItem: {
-    paddingVertical: 10,
-    marginRight: 24,
-    alignItems: 'center',
-  },
-  tabText: {
-    fontSize: 15,
-    fontWeight: '400',
-  },
-  tabTextActive: {
-    fontWeight: '600',
-  },
-  tabIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    width: 20,
-    height: 3,
-    borderRadius: 1.5,
-  },
+  // ── 贴子排序 ──
   sortHost: {
     alignItems: 'flex-start',
     paddingHorizontal: 16,
-    paddingTop: 8,
     paddingBottom: 2,
   },
   // ── 主体 ──
@@ -602,7 +545,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   retryText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },

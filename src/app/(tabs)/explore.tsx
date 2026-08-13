@@ -28,6 +28,7 @@ import { hapticImpact, hapticNotify, hapticSelection, ImpactFeedbackStyle, Notif
 import { useThemeColors } from '@/theme/ThemeContext';
 import { typographyStyles } from '@/theme/typography';
 import { useAuthStore } from '@/stores/authStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBlockFilter } from '@/hooks/useBlockFilter';
 import { useAppPreference } from '@/hooks/useAppPreference';
 import { useImageViewer } from '@/hooks/useImageViewer';
@@ -56,7 +57,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import { DURATION, EASE_OUT } from '@/theme';
+import { DURATION, EASE_OUT, Shadows, Spacing } from '@/theme';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 const TAB_RESELECT_EVENT = 'tieba:tab-reselect';
@@ -134,6 +135,9 @@ const SEGMENTS: { label: string; value: ExploreSegment }[] = [
   { label: '热榜', value: 'hot' },
 ];
 
+// ── 热榜前三名排名色（与 topic/list.tsx 共用） ──
+export const HOT_RANK_COLORS = ['#FF3B30', '#FF9500', '#FFCC00'] as const;
+
 // 信息流驻留上限：对齐 usePagedList 默认上限（约 200 条），控制 JS 数据驻留。
 const MAX_FEED_ITEMS = 200;
 
@@ -205,33 +209,43 @@ function SegmentFade({ segment, children }: { segment: string; children: React.R
 
 // ── 主页面 ──
 export default function ExploreScreen() {
+  const insets = useSafeAreaInsets();
   const [activeSegment, setActiveSegment] = useState<ExploreSegment>('personalized');
+  // 记录最后一次选中的信息流分段（推荐/关注）。切到热榜时 FeedContent 保持
+  // 挂载（display 隐藏），用此值兜底 segment，避免切回时因 prop 变化重拉数据。
+  const [lastFeedSegment, setLastFeedSegment] = useState<'personalized' | 'concern'>('personalized');
 
   const handleSegmentChange = useCallback((value: string) => {
     hapticSelection();
-    setActiveSegment(value as ExploreSegment);
+    const seg = value as ExploreSegment;
+    setActiveSegment(seg);
+    if (seg !== 'hot') setLastFeedSegment(seg);
   }, []);
 
   return (
     <ThemedHost style={{ flex: 1 }}>
       <VStack spacing={0}>
-        {/* 分段选择器 */}
-        <Picker
-          selection={activeSegment}
-          onSelectionChange={handleSegmentChange as any}
-          modifiers={[pickerStyle('segmented'), padding({ horizontal: 16, top: 8 })]}
-        >
-          {SEGMENTS.map((s) => (
-            <Text key={s.value} modifiers={[tag(s.value)]}>{s.label}</Text>
-          ))}
-        </Picker>
+        {/* 分段选择器：顶部安全区（对齐 notifications.tsx）+ token 间距 */}
+        <View style={[styles.pickerWrap, { paddingTop: insets.top }]}>
+          <Picker
+            selection={activeSegment}
+            onSelectionChange={handleSegmentChange as any}
+            modifiers={[pickerStyle('segmented'), padding({ horizontal: Spacing.lg, top: Spacing.sm })]}
+          >
+            {SEGMENTS.map((s) => (
+              <Text key={s.value} modifiers={[tag(s.value)]}>{s.label}</Text>
+            ))}
+          </Picker>
+        </View>
 
-        {/* 内容区 */}
-        {activeSegment === 'hot' ? (
+        {/* 内容区：Feed 与热榜常驻挂载，display 隐藏切换 —— 热榜切回推荐
+            不再卸载 FeedContent，数据与滚动位置得以保留；热榜数据同样驻留。 */}
+        <View style={[styles.segmentContent, activeSegment === 'hot' && styles.segmentHidden]}>
+          <FeedContent segment={lastFeedSegment} />
+        </View>
+        <View style={[styles.segmentContent, activeSegment !== 'hot' && styles.segmentHidden]}>
           <HotListContent />
-        ) : (
-          <FeedContent segment={activeSegment} />
-        )}
+        </View>
       </VStack>
     </ThemedHost>
   );
@@ -532,7 +546,7 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
                         },
                       ]}
                     >
-                      <RNText style={[styles.dislikeChipText, { color: selected ? '#FFF' : colors.textSecondary }]}>
+                      <RNText style={[styles.dislikeChipText, { color: selected ? colors.textOnPrimary : colors.textSecondary }]}>
                         {reason.dislikeReason}
                       </RNText>
                     </Pressable>
@@ -619,7 +633,7 @@ function HotListContent() {
 
   const renderHotItem = useCallback(({ item, index }: { item: HotThreadInfo; index: number }) => {
     const rank = index + 1;
-    const rankColor = rank <= 3 ? ['#FF3B30', '#FF9500', '#FFCC00'][rank - 1] : colors.textTertiary;
+    const rankColor = rank <= 3 ? HOT_RANK_COLORS[rank - 1] : colors.textTertiary;
     const rankBg = rank <= 3 ? rankColor + '15' : 'transparent';
     return (
       <EntranceRow index={index} animateEntry={!entranceDoneRef.current}>
@@ -748,7 +762,7 @@ function HotListContent() {
             ]}
             onPress={() => loadHot('all')}
           >
-            <RNText style={[styles.tabItemText, { color: activeTab === 'all' ? '#FFF' : colors.textSecondary }]}>全部</RNText>
+            <RNText style={[styles.tabItemText, { color: activeTab === 'all' ? colors.textOnPrimary : colors.textSecondary }]}>全部</RNText>
           </Pressable>
           {tabs.slice(0, 6).map((tab) => (
             <Pressable
@@ -760,7 +774,7 @@ function HotListContent() {
               ]}
               onPress={() => loadHot(tab.tabCode)}
             >
-              <RNText style={[styles.tabItemText, { color: activeTab === tab.tabCode ? '#FFF' : colors.textSecondary }]} numberOfLines={1}>
+              <RNText style={[styles.tabItemText, { color: activeTab === tab.tabCode ? colors.textOnPrimary : colors.textSecondary }]} numberOfLines={1}>
                 {tab.tabName}
               </RNText>
             </Pressable>
@@ -853,6 +867,11 @@ function HotListContent() {
 const styles = StyleSheet.create({
   // 分段内容区：crossfade 动画容器需占满剩余空间
   segmentFade: { flex: 1 },
+  // 分段选择器：安全区间距由组件内 insets.top 提供
+  pickerWrap: { width: '100%' },
+  // 分段内容常驻挂载容器：display 切换隐藏，切换回来不重拉数据/不丢滚动位置
+  segmentContent: { flex: 1 },
+  segmentHidden: { display: 'none' },
   // 骨架屏容器
   feedSkeleton: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 100 },
   hotSkeleton: { paddingHorizontal: 16, paddingTop: 8 },
@@ -891,8 +910,7 @@ const styles = StyleSheet.create({
   hotCard: {
     flexDirection: 'row', marginHorizontal: 14, marginVertical: 6,
     padding: 16, borderRadius: 16,
-    shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8,
-    elevation: 2,
+    ...Shadows.card,
   },
   hotRankBadge: {
     width: 38, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2, borderRadius: 10,

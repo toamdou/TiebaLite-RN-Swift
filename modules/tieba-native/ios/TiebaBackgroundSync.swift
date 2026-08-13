@@ -197,6 +197,11 @@ final class TiebaBackgroundSync {
   static let autoSignTaskIdentifier = "com.tiebalite.app.auto-sign"
 
   private let defaults = UserDefaults.standard
+  // `expirationHandler` runs on a system queue while the async work body runs
+  // on the cooperative pool; both may call `finish` concurrently, and
+  // `setTaskCompleted` must fire exactly once. This serial queue makes every
+  // read/write of the `completed` flag mutually exclusive.
+  private let completionLock = DispatchQueue(label: "com.tiebalite.background-sync.completion")
   private let intervalKey = "tiebalite.native.notification_interval_minutes"
   private let autoSignTimeKey = "tiebalite.native.auto_sign_time"
   private let autoSignSuccessPrefixKey = "tiebalite.native.auto_sign_success"
@@ -287,10 +292,16 @@ final class TiebaBackgroundSync {
     }
   }
 
+  /// Mark the BGTask completed exactly once. Both the expiration handler and
+  /// the async work body call this, potentially on different threads; the
+  /// serial queue serializes the flag check-and-set so the task is completed
+  /// at most once (a second `setTaskCompleted` would abort the process).
   private func finish(_ task: BGTask, completed: inout Bool, success: Bool) {
-    guard !completed else { return }
-    completed = true
-    task.setTaskCompleted(success: success)
+    completionLock.sync {
+      guard !completed else { return }
+      completed = true
+      task.setTaskCompleted(success: success)
+    }
   }
 
   func performNotificationSync() async throws {

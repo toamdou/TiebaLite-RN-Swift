@@ -27,7 +27,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius } from '@/theme';
+import { Radius, Spacing } from '@/theme';
 import { relativeTime } from '@/utils';
 import { flattenGroupRows, type GroupedRow } from '@/utils/forumUsers';
 import type { HistoryItem } from '@/types';
@@ -63,8 +63,11 @@ export default function HistoryPage() {
     setError(null);
     try {
       setHistory(await getVisitHistory(activeTab as 'thread' | 'forum'));
-    } catch {
+    } catch (e) {
       setHistory([]);
+      // 之前只 setHistory([]) 从不 setError，L259 的 if(error) ErrorState 分支是死代码；
+      // 补上错误态，让 ErrorState + 重试路径可触发。
+      setError(e instanceof Error ? e.message : '加载失败');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -358,7 +361,7 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
     paddingHorizontal: 4,
   },
-  sectionTitle: { fontSize: 13, fontWeight: '600', letterSpacing: 0 },
+  sectionTitle: { fontSize: 13, fontWeight: '600' },
   // Item
   historyRow: {
     flexDirection: 'row',
@@ -391,7 +394,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemInfo: { flex: 1, gap: 3 },
-  itemTitle: { fontSize: 15, fontWeight: '600', letterSpacing: 0 },
-  itemTime: { fontSize: 12, letterSpacing: 0 },
-  historySeparator: { height: 8 },
+  itemTitle: { fontSize: 15, fontWeight: '600' },
+  itemTime: { fontSize: 12 },
+  historySeparator: { height: Spacing.sm },
 });
