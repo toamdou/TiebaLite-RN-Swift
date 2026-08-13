@@ -106,7 +106,7 @@ function StaticGlassFallback({
     >
       {/* 半透明底色（staticGlass 用 tint 令牌，弱化纯色断档） */}
       <View
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: tint }]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: tint }]}
         pointerEvents="none"
       />
       {/* 顶部高光渐变，静态渲染一次 */}
@@ -114,14 +114,14 @@ function StaticGlassFallback({
         colors={highlight}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
       {/* 细描边（仅带圆角的玻璃面，避免覆盖 GlassNavigationBar 自带边框） */}
       {borderRadius != null && (
         <View
           style={[
-            StyleSheet.absoluteFillObject,
+            StyleSheet.absoluteFill,
             {
               borderRadius,
               borderWidth,
