@@ -4,3 +4,4 @@ export { TiebaRichText } from './TiebaRichText';
 export type { TiebaRichTextProps, TiebaRichTextRun } from './TiebaRichText';
 export { FeedCell } from './TiebaFeedCell';
 export { PressableScale } from './TiebaPressable';
+export { GlassSurface } from './TiebaGlassSurface';
