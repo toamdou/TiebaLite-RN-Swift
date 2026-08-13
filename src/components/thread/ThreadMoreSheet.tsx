@@ -6,7 +6,7 @@
  * screen's API calls and navigation semantics.
  */
 
-import { useCallback, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import {
   Alert,
   Pressable,
@@ -21,12 +21,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { hapticImpact, ImpactFeedbackStyle } from '@/utils/haptics';
 import BottomSheetComponent, { BottomSheetScrollView } from '@expo/ui/community/bottom-sheet';
 import type { BottomSheet } from '@expo/ui/community/bottom-sheet';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { useThreadActions } from '@/services/threadActions';
+import { hapticForScene } from '@/theme/hapticsMap';
 import { PRESS_ENTER, PRESS_SCALE } from '@/theme/springs';
 import { Radius } from '@/theme/spacing';
 
@@ -105,6 +105,14 @@ export default function ThreadMoreSheet({
   const actions = useThreadActions({ threadId, forumId, forumName });
   const { share, copy, report, remove } = actions;
 
+  // sheet-present：可见性翻转（打开）时触发 Soft 震动。
+  // @expo/ui community BottomSheet 无 onPresent 事件，用 visible 打开调用点触发。
+  useEffect(() => {
+    if (visible) {
+      hapticForScene('sheet-present');
+    }
+  }, [visible]);
+
   const runAfterClose = useCallback((action: () => void) => {
     if (!sheetRef.current) {
       onClose();
@@ -123,13 +131,13 @@ export default function ThreadMoreSheet({
   }, [onClose]);
 
   const handleToggleSeeLz = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     onClose();
     onToggleSeeLz();
   }, [onClose, onToggleSeeLz]);
 
   const handleToggleCollect = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     if (!isLoggedIn) {
       Alert.alert('提示', '请先登录');
       return;
@@ -139,29 +147,29 @@ export default function ThreadMoreSheet({
   }, [isLoggedIn, onClose, onToggleCollect]);
 
   const handleToggleImmersive = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     onClose();
     onToggleImmersive();
   }, [onClose, onToggleImmersive]);
 
   const handleToggleSort = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     onClose();
     onToggleSort();
   }, [onClose, onToggleSort]);
 
   const handleJumpToPage = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     runAfterClose(onJumpToPage);
   }, [runAfterClose, onJumpToPage]);
 
   const handleShare = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     runAfterClose(() => share());
   }, [runAfterClose, share]);
 
   const handleCopyLink = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Light);
+    hapticForScene('press');
     runAfterClose(async () => {
       if (await copy()) {
         Alert.alert('已复制', '链接已复制到剪贴板');
@@ -170,7 +178,7 @@ export default function ThreadMoreSheet({
   }, [runAfterClose, copy]);
 
   const handleReport = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Medium);
+    hapticForScene('press');
     Alert.alert('举报', '确定要举报这条帖子吗？', [
       { text: '取消', style: 'cancel' },
       {
@@ -184,7 +192,7 @@ export default function ThreadMoreSheet({
   }, [threadId, report, runAfterClose]);
 
   const handleDelete = useCallback(() => {
-    hapticImpact(ImpactFeedbackStyle.Medium);
+    hapticForScene('press');
     Alert.alert('删除', '确定要删除这条帖子吗？', [
       { text: '取消', style: 'cancel' },
       {
@@ -214,7 +222,6 @@ export default function ThreadMoreSheet({
       snapPoints={['45%', '75%']}
       enablePanDownToClose
       onClose={handleSheetClosed}
-      backgroundStyle={{ backgroundColor: colors.card }}
     >
       <BottomSheetScrollView
         style={styles.scrollContainer}
@@ -302,7 +309,7 @@ export default function ThreadMoreSheet({
         <Pressable
           style={[styles.cancelGroup, { backgroundColor: groupBg }]}
           onPress={() => {
-            hapticImpact(ImpactFeedbackStyle.Light);
+            hapticForScene('press');
             onClose();
           }}
         >
