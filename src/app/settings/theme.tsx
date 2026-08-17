@@ -1,53 +1,34 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
-import { Form, Section, Toggle, Button, Text, Picker, Slider } from '@expo/ui/swift-ui';
-import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
+import { Form, Section, Toggle, Text, Slider } from '@expo/ui/swift-ui';
 import { hapticForScene } from '@/theme/hapticsMap';
-import { useRouter } from 'expo-router';
-import { useThemeColors, useThemeActions } from '@/theme/ThemeContext';
-import type { ThemeName } from '@/types';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { LIGHT_THEME_OPTIONS, DARK_THEME_OPTIONS } from '@/constants/app';
 
 const FONT_SCALE_MIN = 0.8;
 const FONT_SCALE_MAX = 1.5;
 const FONT_SCALE_STEP = 0.05;
 
-export default function ThemeSelectionPage() {
+export default function DisplaySettingsPage() {
   const hydrated = usePreferencesStore((s) => s.hasHydrated);
   // 未水合时返回轻量占位，避免整页白屏闪烁
-  if (!hydrated) return <ThemeHydratedPlaceholder />;
-  return <ThemeSelectionForm />;
+  if (!hydrated) return <DisplayHydratedPlaceholder />;
+  return <DisplaySettingsForm />;
 }
 
 /** 偏好水合完成前的轻量加载占位 */
-function ThemeHydratedPlaceholder() {
-  const { colors } = useThemeColors();
+function DisplayHydratedPlaceholder() {
   return (
     <ThemedHost style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <ActivityIndicator size="large" color={colors.primary} />
+      <ActivityIndicator size="large" color="#2563EB" />
     </ThemedHost>
   );
 }
 
-function ThemeSelectionForm() {
-  const router = useRouter();
+function DisplaySettingsForm() {
   const preferences = usePreferencesStore((s) => s.preferences);
   const setPreference = usePreferencesStore((s) => s.setPreference);
   const [fontScale, setFontScaleState] = useState(preferences.fontScale);
-  const {
-    lightThemeName,
-    darkThemeName,
-    followSystemDarkMode,
-    isDark,
-  } = useThemeColors();
-  const {
-    setLightTheme,
-    setDarkTheme,
-    setDarkMode,
-    setFollowSystemDarkMode,
-  } = useThemeActions();
 
   const handleFontScaleChange = useCallback((value: number) => {
     setFontScaleState(value);
@@ -59,32 +40,12 @@ function ThemeSelectionForm() {
     }
   }, [fontScale, setPreference]);
 
-  const handleFollowSystem = useCallback((follow: boolean) => {
-    hapticForScene('toggle');
-    setFollowSystemDarkMode(follow);
-  }, [setFollowSystemDarkMode]);
-
-  const handleDarkMode = useCallback((enabled: boolean) => {
-    hapticForScene('toggle');
-    setDarkMode(enabled);
-  }, [setDarkMode]);
-
-  const handleLightTheme = useCallback((key: string) => {
-    hapticForScene('toggle');
-    setLightTheme(key as ThemeName);
-  }, [setLightTheme]);
-
-  const handleDarkTheme = useCallback((key: string) => {
-    hapticForScene('toggle');
-    setDarkTheme(key as ThemeName);
-  }, [setDarkTheme]);
-
   return (
     <ThemedHost style={{ flex: 1 }}>
       <Form>
         <Section title="显示">
           <Slider
-            label={`阅读字号 ${fontScale.toFixed(2)}×`}
+            label={<Text>阅读字号 {fontScale.toFixed(2)}×</Text>}
             value={fontScale}
             min={FONT_SCALE_MIN}
             max={FONT_SCALE_MAX}
@@ -94,53 +55,32 @@ function ThemeSelectionForm() {
           />
         </Section>
 
-        <Section title="显示模式">
+        <Section title="工具栏选项">
+          {/* 该开关实际只影响导航栏前景（标题/返回箭头）与状态栏样式，
+              不改变工具栏背景色，故文案按实际作用命名以避免误导 */}
           <Toggle
-            label="跟随系统"
-            systemImage="circle.lefthalf.filled"
-            isOn={followSystemDarkMode}
-            onIsOnChange={handleFollowSystem}
-          />
-          <Toggle
-            label="深色模式"
-            systemImage="moon.fill"
-            isOn={isDark}
-            onIsOnChange={handleDarkMode}
-          />
-        </Section>
-
-        <Section title="浅色主题">
-          <Picker
-            label="主题"
-            selection={lightThemeName}
-            onSelectionChange={handleLightTheme as any}
-            modifiers={[pickerStyle('inline')]}
+            label="导航栏使用主色调"
+            systemImage="paintpalette.fill"
+            isOn={preferences.toolbarPrimaryColor}
+            onIsOnChange={(v) => { hapticForScene('toggle'); setPreference('toolbarPrimaryColor', v); }}
           >
-            {LIGHT_THEME_OPTIONS.map((t) => (
-              <Text key={t.key} modifiers={[tag(t.key)]}>{t.label}</Text>
-            ))}
-          </Picker>
+            <Text>将导航栏标题与图标着色为主色调，并联动状态栏样式</Text>
+          </Toggle>
+          {preferences.toolbarPrimaryColor && (
+            <Toggle
+              label="状态栏深色字体"
+              systemImage="textformat"
+              isOn={preferences.statusBarFontDark}
+              onIsOnChange={(v) => { hapticForScene('toggle'); setPreference('statusBarFontDark', v); }}
+            />
+          )}
         </Section>
 
-        <Section title="暗色主题">
-          <Picker
-            label="主题"
-            selection={darkThemeName}
-            onSelectionChange={handleDarkTheme as any}
-            modifiers={[pickerStyle('inline')]}
-          >
-            {DARK_THEME_OPTIONS.map((t) => (
-              <Text key={t.key} modifiers={[tag(t.key)]}>{t.label}</Text>
-            ))}
-          </Picker>
-        </Section>
-
-        <Section title="高级">
-          <Button
-            label="自定义主题"
-            systemImage="paintbrush.fill"
-            onPress={() => router.push('/settings/custom')}
-          />
+        <Section
+          title="外观"
+          footer={<Text>界面颜色跟随系统外观：浅色模式为白底黑字，深色模式为黑底白字。</Text>}
+        >
+          <Text>浅色模式 / 深色模式</Text>
         </Section>
       </Form>
     </ThemedHost>

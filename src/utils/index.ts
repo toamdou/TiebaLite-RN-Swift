@@ -141,7 +141,9 @@ export function sanitizeUrl(url: string): string {
 /**
  * Convert tieba portrait ID to full avatar URL.
  * Mirrors Kotlin: StringUtil.getAvatarUrl()
- * Portrait IDs like "tb.1.xxx" need prefix "https://tb.himg.baidu.com/sys/portrait/item/"
+ * Portrait IDs like "tb.1.xxx" need prefix "https://himg.bdimg.com/sys/portrait/item/"
+ * ⚠️ 域名必须用 himg.bdimg.com：tb.himg.baidu.com 在当前网络环境返回 HTTP 000
+ * （连不上），实测 himg.bdimg.com 正常返回 200。
  */
 export function getAvatarUrl(portrait?: string | null): string {
   if (!portrait) return '';
@@ -150,7 +152,7 @@ export function getAvatarUrl(portrait?: string | null): string {
   if (portrait.startsWith('file://') || portrait.startsWith('ph://')) return portrait;
   // Baidu portrait CDN serves HTTPS; always use it so the app stays on the
   // TLS surface（ATS 禁止明文 HTTP，http 输入统一升级为 https）。
-  return `https://tb.himg.baidu.com/sys/portrait/item/${portrait}`;
+  return `https://himg.bdimg.com/sys/portrait/item/${portrait}`;
 }
 
 /**

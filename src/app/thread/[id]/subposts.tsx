@@ -12,7 +12,7 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View, StyleSheet, Pressable, Text, useWindowDimensions,
-  RefreshControl, Alert,
+  RefreshControl, Alert, ScrollView,
 } from 'react-native';
 import Reanimated, {
   useAnimatedStyle, withTiming, withDelay, useSharedValue,
@@ -45,6 +45,7 @@ import { TiebaRichText } from '../../../../modules/tieba-native/src/TiebaRichTex
 import { contentToRichTextRuns } from '@/utils/richTextRuns';
 import { thumbnailUrl, THUMB_CARD } from '@/utils/thumbnail';
 import ImageViewer from '@/components/ImageViewer';
+import { getParentPostSummary, type ParentPostSummary } from '@/stores/parentPostCache';
 import type { SubPostInfo } from '@/types';
 
 const subPostKeyExtractor = (item: SubPostInfo) => item.id;
@@ -55,7 +56,7 @@ const SUBPOST_LIST_OVERRIDES = { initialDrawBatchSize: 10 };
 function extractImages(content: SubPostInfo['content']): string[] {
   if (!content) return [];
   return content
-    .filter((c) => c.type === 'image')
+    .filter((c) => c && c.type === 'image')
     .map((c) => (c as any).src || (c as any).cdnSrc || '')
     .filter(Boolean);
 }
@@ -316,6 +317,105 @@ const ReplyItem = React.memo(function ReplyItem({
   );
 });
 
+// ─── 上一级回复卡（ListHeader） ───
+// 用户从帖子页点「查看更多回复」时被点击的回复会经 parentPostCache 快照过来。
+// 这里展示它的完整内容（作者 + 富文本 + 图片），再下面是楼中楼列表。
+function ParentReplyCard({
+  parent,
+  colors,
+  floor,
+  decodedForumName,
+  decodedThreadTitle,
+  threadId,
+  onImagePress,
+}: {
+  parent: ParentPostSummary;
+  colors: any;
+  floor?: string;
+  decodedForumName: string;
+  decodedThreadTitle: string;
+  threadId?: string;
+  onImagePress: (images: string[], index: number) => void;
+}) {
+  const images = extractImages(parent.content);
+
+  return (
+    <View style={[s.mainPostCard, { backgroundColor: colors.card, borderColor: colors.divider }]}>
+      <Text style={[s.mainPostLabel, { color: colors.textTertiary }]}>上一级回复</Text>
+
+      {/* 作者行：头像 + 昵称 + 楼主徽标 + 时间 */}
+      <View style={s.headerRow}>
+        <Link href={{ pathname: '/user/[uid]', params: { uid: parent.authorId } }} push asChild>
+          <Pressable style={s.avatarNameRow}>
+            <Avatar
+              source={parent.authorPortrait}
+              initials={parent.authorName?.slice(0, 2)}
+              size={30}
+            />
+            <Text style={[s.name, { color: colors.text }]} numberOfLines={1}>
+              {parent.authorNameShow || parent.authorName}
+            </Text>
+          </Pressable>
+        </Link>
+        {!!parent.authorIsLz && (
+          <View style={[s.lzChip, { backgroundColor: colors.primary + '15' }]}>
+            <Text style={[s.lzChipText, { color: colors.primary }]}>楼主</Text>
+          </View>
+        )}
+        <View style={s.spacer} />
+        <Text style={[s.meta, { color: colors.textTertiary }]} numberOfLines={1}>
+          {relativeTime(parent.createTime)}
+          {parent.ipLocation ? ` · ${parent.ipLocation}` : ''}
+        </Text>
+      </View>
+
+      {/* 正文全文（原生富文本渲染 @/链接/表情） */}
+      <View style={s.content}>
+        <InlinePostContent content={parent.content} colors={colors} />
+      </View>
+
+      {/* 图片：横向缩略图滑动条 */}
+      {images.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.parentImageStrip}
+        >
+          {images.map((uri, i) => (
+            <Pressable
+              key={i}
+              onPress={() => onImagePress(images, i)}
+              style={({ pressed }) => [s.thumbImage, { opacity: pressed ? 0.75 : 1 }]}
+              accessibilityRole="button"
+              accessibilityLabel={`查看第${i + 1}张图片`}
+            >
+              <Image
+                source={{ uri: thumbnailUrl(uri, THUMB_CARD) }}
+                style={s.thumbImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={uri}
+              />
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* 底部：帖子标题归属 + 打开原帖 */}
+      <View style={s.parentFooter}>
+        <Text style={[s.parentFloor, { color: colors.textTertiary }]} numberOfLines={2}>
+          {decodedThreadTitle || decodedForumName || '原帖'} · 第{floor || '?'}楼回复
+        </Text>
+        <Link href={{ pathname: '/thread/[id]', params: { id: threadId ?? '' } }} push asChild>
+          <Pressable style={({ pressed }) => [s.openThreadBtn, { backgroundColor: colors.primary }, pressed && { opacity: 0.85 }]}>
+            <Text style={[s.openThreadText, { color: colors.textOnPrimary }]}>打开原帖</Text>
+          </Pressable>
+        </Link>
+      </View>
+    </View>
+  );
+}
+
 // ─── Main Page ───
 export default function SubPostsPage() {
   const { threadId, postId, forumId, floor, threadAuthorId, forumName, threadTitle } = useLocalSearchParams<{
@@ -470,32 +570,52 @@ export default function SubPostsPage() {
     [colors, threadAuthorId, handleAgree, accountUid, handleReport, handleDelete, imageViewer.handleImagePress],
   );
 
+  // 上一级回复：从模块级缓存取回被点击的那条回复（帖子页跳转前快照）。
+  // 未命中（如整包 reload 后直接深链进入）时回退展示原"主楼/帖子标题"卡。
+  const parentPost = useMemo(() => getParentPostSummary(postId), [postId]);
+
   const mainPostCard = useMemo(
-    () => (
-      <View style={[s.mainPostCard, { backgroundColor: colors.card, borderColor: colors.divider }]}>
-        <Text style={[s.mainPostLabel, { color: colors.textTertiary }]}>主楼</Text>
-        {decodedThreadTitle ? (
-          <Text style={[s.mainPostTitle, { color: colors.text }]} numberOfLines={2}>
-            {decodedThreadTitle}
-          </Text>
-        ) : (
-          <Text style={[s.mainPostTitle, { color: colors.text }]}>
-            {decodedForumName || '原帖'} · 第{floor || '?'}楼回复
-          </Text>
-        )}
-        {decodedForumName ? (
-          <Text style={[s.mainPostMeta, { color: colors.textTertiary }]}>
-            {decodedForumName} · 第{floor || '?'}楼回复
-          </Text>
-        ) : null}
-        <Link href={{ pathname: '/thread/[id]', params: { id: threadId } }} push asChild>
-          <Pressable style={({ pressed }) => [s.openThreadBtn, { backgroundColor: colors.primary }, pressed && { opacity: 0.85 }]}>
-            <Text style={[s.openThreadText, { color: colors.textOnPrimary }]}>打开原帖</Text>
-          </Pressable>
-        </Link>
-      </View>
-    ),
-    [colors, decodedForumName, decodedThreadTitle, floor, threadId],
+    () => {
+      // 有上一级回复快照 → 展示它（否则只会看到楼中楼列表，缺少上下文）
+      if (parentPost) {
+        return (
+          <ParentReplyCard
+            parent={parentPost}
+            colors={colors}
+            floor={floor}
+            decodedForumName={decodedForumName}
+            decodedThreadTitle={decodedThreadTitle}
+            threadId={threadId}
+            onImagePress={imageViewer.handleImagePress}
+          />
+        );
+      }
+      return (
+        <View style={[s.mainPostCard, { backgroundColor: colors.card, borderColor: colors.divider }]}>
+          <Text style={[s.mainPostLabel, { color: colors.textTertiary }]}>主楼</Text>
+          {decodedThreadTitle ? (
+            <Text style={[s.mainPostTitle, { color: colors.text }]} numberOfLines={2}>
+              {decodedThreadTitle}
+            </Text>
+          ) : (
+            <Text style={[s.mainPostTitle, { color: colors.text }]}>
+              {decodedForumName || '原帖'} · 第{floor || '?'}楼回复
+            </Text>
+          )}
+          {decodedForumName ? (
+            <Text style={[s.mainPostMeta, { color: colors.textTertiary }]}>
+              {decodedForumName} · 第{floor || '?'}楼回复
+            </Text>
+          ) : null}
+          <Link href={{ pathname: '/thread/[id]', params: { id: threadId } }} push asChild>
+            <Pressable style={({ pressed }) => [s.openThreadBtn, { backgroundColor: colors.primary }, pressed && { opacity: 0.85 }]}>
+              <Text style={[s.openThreadText, { color: colors.textOnPrimary }]}>打开原帖</Text>
+            </Pressable>
+          </Link>
+        </View>
+      );
+    },
+    [parentPost, colors, decodedForumName, decodedThreadTitle, floor, threadId, imageViewer.handleImagePress],
   );
 
   const renderFooter = useMemo(
@@ -596,6 +716,23 @@ const s = StyleSheet.create({
   },
   mainPostMeta: {
     fontSize: 12,
+  },
+  parentImageStrip: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 8,
+    paddingVertical: 2,
+  },
+  parentFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 8,
+  },
+  parentFloor: {
+    fontSize: 12,
+    flexShrink: 1,
   },
   openThreadBtn: {
     alignSelf: 'flex-start',

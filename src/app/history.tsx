@@ -276,20 +276,22 @@ export default function HistoryPage() {
   return (
     <ThemedHost style={{ flex: 1 }}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Tabs Row */}
+      {/* Tabs Row（@expo/ui Picker 须为 Host 直子，否则 RedBox） */}
       <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.separator }]}>
-        <Picker
-          selection={activeTab}
-          onSelectionChange={(value: string) => {
-            hapticForScene('toggle');
-            setActiveTab(value);
-          }}
-          modifiers={[pickerStyle('segmented')]}
-        >
-          {TABS.map((t) => (
-            <SWText key={t.value} modifiers={[tag(t.value)]}>{t.label}</SWText>
-          ))}
-        </Picker>
+        <ThemedHost matchContents>
+          <Picker
+            selection={activeTab}
+            onSelectionChange={(value: string) => {
+              hapticForScene('toggle');
+              setActiveTab(value);
+            }}
+            modifiers={[pickerStyle('segmented')]}
+          >
+            {TABS.map((t) => (
+              <SWText key={t.value} modifiers={[tag(t.value)]}>{t.label}</SWText>
+            ))}
+          </Picker>
+        </ThemedHost>
       </View>
 
       {/* Clear All Button */}

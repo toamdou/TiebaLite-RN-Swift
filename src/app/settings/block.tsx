@@ -94,7 +94,6 @@ export default function BlockPage() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch; state updates happen after the async boundary.
     loadBlacklist();
     loadDislikeForums();
   }, [loadBlacklist, loadDislikeForums]);
@@ -381,7 +380,7 @@ export default function BlockPage() {
         ) : activeTab === 'blacklist' ? (
           <Section
             title="云端黑名单"
-            footer="由贴吧服务端维护的社交黑名单，与本地屏蔽相互独立。"
+            footer={<Text>由贴吧服务端维护的社交黑名单，与本地屏蔽相互独立。</Text>}
           >
             <RNHostView matchContents>
               {renderBlacklist()}
@@ -390,7 +389,7 @@ export default function BlockPage() {
         ) : (
           <Section
             title="屏蔽吧（云端）"
-            footer="由贴吧服务端记录，解除请在贴吧客户端中操作。"
+            footer={<Text>由贴吧服务端记录，解除请在贴吧客户端中操作。</Text>}
           >
             <RNHostView matchContents>
               {renderDislikeForums()}

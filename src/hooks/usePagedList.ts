@@ -87,6 +87,13 @@ export function usePagedList<T, P = undefined, E = any>({
   useEffect(() => {
     paramsRef.current = params;
   }, [params]);
+  // fetcher 也走 ref：调用方传内联箭头时（每渲染新身份），run 的 useCallback
+  // 依赖不含 fetcher 就不重建 → 页面 useEffect([load]) 不会反复触发 →
+  // 杜绝"同一请求 abort+重发"的请求风暴（thread/[id] 曾因此每秒发 10+ 次）。
+  const fetcherRef = useRef(fetcher);
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  }, [fetcher]);
 
   const run = useCallback(
     async (targetPage: number, mode: 'initial' | 'refresh' | 'more' | 'jump', overrideParams?: P) => {
@@ -106,7 +113,7 @@ export function usePagedList<T, P = undefined, E = any>({
       }
       setError(null);
       try {
-        const result = await fetcher(
+        const result = await fetcherRef.current(
           targetPage,
           overrideParams ?? paramsRef.current as P,
           controller.signal,
@@ -136,7 +143,8 @@ export function usePagedList<T, P = undefined, E = any>({
         setLoadingMore(false);
       }
     },
-    [fetcher, maxItems],
+    // fetcher 经 fetcherRef 读取，不参与依赖 —— 内联 fetcher 不再引发 run 重建
+    [maxItems],
   );
 
   const load = useCallback(

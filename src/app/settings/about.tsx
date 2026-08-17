@@ -54,7 +54,7 @@ export default function AboutPage() {
           <Label title="iOS 液态玻璃 & SwiftUI" systemImage="circle.lefthalf.filled" />
         </Section>
 
-        <Section footer="感谢原项目 HuanChengFly/TiebaLite 的开源贡献。本应用为非官方贴吧客户端，仅供学习交流使用。">
+        <Section footer={<Text>感谢原项目 HuanChengFly/TiebaLite 的开源贡献。本应用为非官方贴吧客户端，仅供学习交流使用。</Text>}>
           <Text modifiers={[font({ textStyle: 'caption2' }), foregroundStyle({ type: 'hierarchical', style: 'tertiary' })]}>
             {'©'} {new Date().getFullYear()} TiebaLite contributors
           </Text>

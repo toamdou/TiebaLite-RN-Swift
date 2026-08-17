@@ -28,13 +28,22 @@ export async function pbPage(
     seeLz,
     back,
     sortType,
-    stType: 'tb_frslist',
+    // Kotlin proto pbPageFlow 的 st_type 默认空串（仅"提到我的/收藏"来源传非空值；
+    // 'tb_frslist' 是 JSON 老接口的默认值，误用于 proto 端点会被服务端当特殊来源处理）。
+    stType: '',
   }, signal);
   assertProtoSuccess(decoded);
   const data = decoded.data;
+  // Kotlin PbPageRepository 兜底：首楼可能下发在 first_floor_post 而非 post_list
+  const rawPosts = data?.postList ?? [];
+  const posts = rawPosts.length > 0
+    ? mapProtoPosts(rawPosts, threadId, data?.userList ?? [])
+    : (data?.firstFloorPost ? mapProtoPosts([data.firstFloorPost], threadId, data?.userList ?? []) : []);
   return {
-    thread: mapProtoThread(data?.thread, data?.forum),
-    posts: mapProtoPosts(data?.postList ?? [], threadId, data?.userList ?? []),
+    // ⚠️ mapProtoThread 的 opts 结构是 { forum }：直接传 forum 对象会读不到
+    // forum.avatar/forum.id → 吧头像、吧名、forumId 全空（remote 版引入）。
+    thread: mapProtoThread(data?.thread, { forum: data?.forum }),
+    posts,
     page: { current: data?.page?.currentPage ?? page, total: data?.page?.totalPage ?? data?.page?.totalCount ?? 0, hasMore: (data?.page?.hasMore ?? 0) === 1 },
   };
 }
@@ -64,7 +73,11 @@ export async function pbFloor(
   }
   return {
     posts: rawPosts.map((item: any) => {
-      const author = item.author ?? {};
+      // 判空内嵌 author（proto3 空对象 {} 问题，同 mapProtoThread/mapProtoPosts）
+      const rawAuthor = item.author && typeof item.author === 'object' && Object.keys(item.author).length > 0
+        ? item.author
+        : undefined;
+      const author = rawAuthor ?? {};
       return {
         id: String(item.id ?? ''),
         postId: String(item.postId ?? postId),

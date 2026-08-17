@@ -8,38 +8,40 @@ public final class TiebaRichTextView: ExpoView, UITextViewDelegate {
   /// 全量重排（attachment.image 变更 + setNeedsDisplay 不足以刷新布局缓存，
   /// 灰色占位会残留）。
   private var currentAttributed: NSAttributedString?
-  /// props 逐个到达时合并为一次重建（参考 TiebaFeedCellView 的 dirty 模式）：
-  /// runs/fontSize/lineHeight/textColor/linkColor 每次 didSet 都全量重建
-  /// NSAttributedString，一次渲染最多触发 6~7 次。
-  private var contentDirty = false
 
+  // ⚠️ 必须立即重建（didSet → rebuild()）：dirty 延迟模式（layoutSubviews
+  // 才重建）在列表复用/首帧 props 先于布局到达时会永远不触发 → 正文空白。
+  // 楼中楼是 RN Text 能显示、正文/回复走本组件不显示，即此因。
   var contentWidth: CGFloat = 0 {
-    didSet { scheduleRebuild() }
+    didSet { rebuild() }
   }
 
   var fontSize: CGFloat = 15 {
-    didSet { scheduleRebuild() }
+    didSet { rebuild() }
   }
 
   var lineHeight: CGFloat = 22 {
-    didSet { scheduleRebuild() }
+    didSet { rebuild() }
   }
 
   var textColor: UIColor = .label {
-    didSet { scheduleRebuild() }
+    didSet { rebuild() }
   }
 
   var linkColor: UIColor = .systemBlue {
-    didSet { scheduleRebuild() }
+    didSet { rebuild() }
   }
 
   var runs: [[String: Any]] = [] {
-    didSet { scheduleRebuild() }
+    didSet { rebuild() }
   }
 
   let onLinkPress = EventDispatcher()
   let onUserPress = EventDispatcher()
   let onTopicPress = EventDispatcher()
+  /// Fabric 布局引擎不调用 intrinsicContentSize → 自定义 view 高度恒为 0。
+  /// 每次重建后把测量高度发给 JS，JS 设置显式 height（Fabric 尊重显式尺寸）。
+  let onContentHeightChange = EventDispatcher()
 
   public required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
@@ -69,18 +71,6 @@ public final class TiebaRichTextView: ExpoView, UITextViewDelegate {
   public override func layoutSubviews() {
     super.layoutSubviews()
     textView.frame = bounds
-    if contentDirty {
-      contentDirty = false
-      rebuild()
-    } else {
-      invalidateIntrinsicContentSize()
-    }
-  }
-
-  /// 合并重建请求：一批 props 变更只做一次 attributed 构建。
-  private func scheduleRebuild() {
-    contentDirty = true
-    setNeedsLayout()
     invalidateIntrinsicContentSize()
   }
 
@@ -162,6 +152,16 @@ public final class TiebaRichTextView: ExpoView, UITextViewDelegate {
     textView.attributedText = attributed
     currentAttributed = attributed
     invalidateIntrinsicContentSize()
+    // Fabric 布局引擎不调用 intrinsicContentSize：把测量高度发给 JS 设显式
+    // height，否则正文区高度恒为 0 → 文字不可见。
+    let width = contentWidth > 0 ? contentWidth : bounds.width
+    if width > 0 {
+      // 先设 textView 宽度再 sizeThatFits：不设的话 UITextView 按当前 frame
+      // （首帧可能 0 宽）测量，长文会被当成一行 → 高度只有单行。
+      textView.frame = CGRect(x: 0, y: 0, width: width, height: 0)
+      let height = textView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+      onContentHeightChange(["height": height, "width": width])
+    }
   }
 
   /// Map the optional `fontWeight` run key (e.g. "500" / "bold") to a

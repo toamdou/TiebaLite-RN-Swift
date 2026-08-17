@@ -110,15 +110,11 @@ export default function AccountPage() {
                     onPress={() => handleSwitch(item)}
                     modifiers={[frame({ maxWidth: 9999, alignment: 'leading' })]}
                   >
-                    {/* 单一 Fragment 子节点：@expo/ui Button 的 children 类型
-                        不接受 null，条件渲染需收敛进 Fragment */}
-                    <>
-                      <Text>{item.nameShow || item.name || ''}</Text>
-                      <Text>{item.name ? `@${item.name}` : `UID: ${item.uid}`}</Text>
-                      {isCurrent ? (
-                        <Image systemName="checkmark.circle.fill" size={16} color={colors.success} />
-                      ) : undefined}
-                    </>
+                    <Text>{item.nameShow || item.name || ''}</Text>
+                    <Text>{item.name ? `@${item.name}` : `UID: ${item.uid}`}</Text>
+                    {isCurrent
+                      ? <Image systemName="checkmark.circle.fill" size={16} color={colors.success} />
+                      : <></>}
                   </Button>
                   {/* 每行右侧菜单：移除账号，替代「管理」Section 重复的移除行 */}
                   <Menu

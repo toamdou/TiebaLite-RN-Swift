@@ -26,6 +26,7 @@ import {
   Text,
   Pressable,
   StyleSheet,
+  Alert,
   useWindowDimensions,
   type GestureResponderEvent,
 } from 'react-native';
@@ -42,10 +43,8 @@ import Animated, {
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { MenuView, type MenuAction } from '@expo/ui/community/menu';
 import { Avatar } from '@/components/ui/Avatar';
 import { SymbolView } from '@/components/ui/SymbolView';
-import { ThemedHost } from '@/components/ui/ThemedHost';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { PRESS_ENTER, PRESS_EXIT, MOMENTUM } from '@/theme/springs';
@@ -68,12 +67,6 @@ const COLLAPSE_LINES = 6;
 const MEDIA_RATIO_MIN = 2 / 3;
 const MEDIA_RATIO_MAX = 4 / 3;
 const LIKE_COLOR = '#FF3B5C';
-
-const TWEET_MENU_ACTIONS: MenuAction[] = [
-  { id: 'dislike', title: '不感兴趣', image: 'hand.thumbsdown' },
-  { id: 'block', title: '屏蔽作者', image: 'person.badge.minus' },
-  { id: 'copy-title', title: '复制标题', image: 'doc.on.doc' },
-];
 
 export type TweetCardMenuAction = 'dislike' | 'block' | 'copy-title';
 
@@ -200,13 +193,18 @@ const TweetCard = React.memo(function TweetCard({
     router.push(`/thread/${thread.id}`);
   }, [router, thread.id]);
 
-  const handleMenuPress = useCallback(
-    (event: { nativeEvent: { event: string } }) => {
-      const action = event.nativeEvent.event as TweetCardMenuAction;
-      onMenuAction?.(action, thread);
-    },
-    [onMenuAction, thread],
-  );
+  // ── 右上角「···」更多菜单：原生 ActionSheet（SwiftUI Menu 嵌 RN 树在
+  // iOS 26 上点击无响应——与吧页三点菜单同因，见 forum/[name].tsx）──
+  const handleMenuPress = useCallback((e: GestureResponderEvent) => {
+    e.stopPropagation?.();
+    hapticForScene('press');
+    Alert.alert(thread.title || '帖子', undefined, [
+      { text: '不感兴趣', onPress: () => onMenuAction?.('dislike', thread) },
+      { text: '屏蔽作者', onPress: () => onMenuAction?.('block', thread) },
+      { text: '复制标题', onPress: () => onMenuAction?.('copy-title', thread) },
+      { text: '取消', style: 'cancel' as const },
+    ]);
+  }, [thread, onMenuAction]);
 
   // ── 头部文案 ──
   const displayName = thread.authorNameShow || thread.authorName || '吧友';
@@ -262,20 +260,17 @@ const TweetCard = React.memo(function TweetCard({
             ) : null}
           </View>
           {onMenuAction ? (
-            <ThemedHost matchContents>
-              <MenuView style={styles.menuButton} actions={TWEET_MENU_ACTIONS} onPressAction={handleMenuPress}>
-                <Pressable
-                  onPress={stopPropagation}
-                  onPressIn={stopPropagation}
-                  onPressOut={stopPropagation}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel="更多操作"
-                >
-                  <SymbolView name="ellipsis" size={16} weight="bold" tintColor={colors.textTertiary} />
-                </Pressable>
-              </MenuView>
-            </ThemedHost>
+            <Pressable
+              onPress={handleMenuPress}
+              onPressIn={stopPropagation}
+              onPressOut={stopPropagation}
+              style={styles.menuButton}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="更多操作"
+            >
+              <SymbolView name="ellipsis" size={16} weight="bold" tintColor={colors.textTertiary} />
+            </Pressable>
           ) : null}
         </View>
 

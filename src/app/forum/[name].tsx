@@ -316,11 +316,12 @@ export default function ForumPage() {
     if (!name) return;
     try {
       const good = isGood ?? (currentTab === 2);
-      // Tab 0 = 热门 (REPLY_TIME), Tab 1 = 最新 (SEND_TIME), Tab 2 = 精品
+      // Tab 0 = 热门（固定按回复时间），Tab 1 = 最新（用用户选择的排序，
+      // 对齐 Kotlin 最新 tab 的"按回复/按发帖"菜单），Tab 2 = 精品。
       const sort = good
         ? forumSortType
         : currentTab === 1
-          ? ForumSortType.SEND_TIME
+          ? forumSortType
           : ForumSortType.REPLY_TIME;
       await loadForumData(name, p, sort, good);
       setError(null);
@@ -333,6 +334,15 @@ export default function ForumPage() {
   useEffect(() => {
     doLoadRef.current = doLoad;
   }, [doLoad]);
+
+  // ── 最新 tab 排序切换（对齐 Kotlin：按回复时间 / 按发帖时间）──
+  const handleSortChange = useCallback((sort: ForumSortType) => {
+    if (sort === forumSortType) return;
+    hapticForScene('toggle');
+    useForumStore.getState().setForumSortType(sort);
+    // 清空当前列表并重新加载（setForumSortType 已清最新列表）
+    doLoadRef.current(1, false);
+  }, [forumSortType]);
 
   // Initial load — fire once per forum. Guarded by initialLoadKeyRef so the
   // store updating currentForum (forumId/avatar) after data arrives no longer
@@ -789,6 +799,32 @@ export default function ForumPage() {
             ))}
           </Picker>
         </ThemedHost>
+
+        {/* 最新 tab 排序切换（原生 ActionSheet，与三点菜单同理——
+            SwiftUI Menu 嵌 RN 树在 iOS 26 上点击无响应） */}
+        {currentTab === 1 && (
+          <View style={styles.sortRow}>
+            <Pressable
+              style={styles.sortBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="帖子排序方式"
+              onPress={() => {
+                hapticForScene('press');
+                Alert.alert('帖子排序', undefined, [
+                  { text: '按回复时间', onPress: () => handleSortChange(ForumSortType.REPLY_TIME) },
+                  { text: '按发帖时间', onPress: () => handleSortChange(ForumSortType.SEND_TIME) },
+                  { text: '取消', style: 'cancel' as const },
+                ]);
+              }}
+            >
+              <SymbolView name="arrow.up.arrow.down" size={14} weight="semibold" tintColor={colors.primary} />
+              <Text style={[styles.sortBtnText, { color: colors.primary }]}>
+                {forumSortType === ForumSortType.SEND_TIME ? '按发帖时间' : '按回复时间'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Good classify indicator + filter button */}
         {currentTab === 2 && (
@@ -1325,6 +1361,23 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.sm,
   },
+
+  // ── 最新 tab 排序切换行 ──
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+    marginBottom: Spacing.xs,
+  },
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: 10,
+    borderRadius: Radius.chip,
+  },
+  sortBtnText: { fontSize: 13, fontWeight: '600' },
 
   // ── Good classify row ──
   classifyRow: {

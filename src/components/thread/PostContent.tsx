@@ -18,6 +18,7 @@ import {
   Text,
   Pressable,
   StyleSheet,
+  ScrollView,
   useWindowDimensions,
   Alert,
 } from 'react-native';
@@ -129,25 +130,14 @@ function ImageSegment({
   const { colors } = useThemeColors();
   const count = images.length;
   const imageLoadType = useAppPreference('imageLoadType', 'smart_load');
+  // 多图横向分页当前页（页码点高亮）
+  const [pagerPage, setPagerPage] = useState(0);
 
-  // Grid layout: 1 image → full width (height capped), 2 → 2 columns, 3+ → 3 columns
-  const getImageDimensions = (_index: number) => {
-    if (count === 1) {
-      const img = images[0];
-      const aspectRatio = img.width > 0 && img.height > 0 ? img.width / img.height : 1;
-      const displayWidth = contentWidth;
-      const displayHeight = Math.min(displayWidth / aspectRatio, SINGLE_IMAGE_MAX_HEIGHT);
-      return { width: displayWidth, height: displayHeight };
-    }
-
-    if (count === 2) {
-      const w = (contentWidth - IMAGE_GAP) / 2;
-      return { width: w, height: w };
-    }
-
-    // 3 or more images
-    const w = (contentWidth - IMAGE_GAP * 2) / 3;
-    return { width: w, height: w };
+  // 单图 → 全宽按宽高比（高度钳制）；多图分页每页同此尺寸，左右滑动看缩略图
+  const pageDim = (img: { width: number; height: number }) => {
+    const aspectRatio = img.width > 0 && img.height > 0 ? img.width / img.height : 1;
+    const height = Math.min(contentWidth / aspectRatio, SINGLE_IMAGE_MAX_HEIGHT);
+    return { width: contentWidth, height };
   };
 
   // Limit to 9 images
@@ -175,8 +165,8 @@ function ImageSegment({
   if (imageLoadType === 'all_no') {
     return (
       <View style={[styles.imageGrid, style]}>
-        {displayImages.map((_img, idx) => {
-          const dims = getImageDimensions(idx);
+        {displayImages.map((img, idx) => {
+          const dims = pageDim(img);
           return (
             <View
               key={idx}
@@ -206,65 +196,141 @@ function ImageSegment({
   }
 
   // Normal image rendering — smart_origin, smart_load, all_origin
-  return (
-    <View style={[styles.imageGrid, style]}>
-      {displayImages.map((img, idx) => {
-        const dims = getImageDimensions(idx);
-        // 详情页解码 600px 宽的服务端缩略图；点开看原图时用 originSrc
-        const useOriginal = imageLoadType === 'original';
-        const imageUri = useOriginal
-          ? (img.originSrc || img.src)
-          : thumbnailUrl(img.src, THUMB_POST);
-        return (
-          <Pressable
-            key={idx}
-            onPress={() => {
-              hapticForScene('press');
-              onPress?.(images.map((i) => i.originSrc || i.src), idx);
-            }}
-            onLongPress={() => {
-              hapticForScene('press');
-              Alert.alert('图片', '', [
-                {
-                  text: '查看大图',
-                  onPress: () => {
-                    hapticForScene('press');
-                    onPress?.(images.map((i) => i.originSrc || i.src), idx);
+  // 多图 → 横向分页滑动查看缩略图（无需点开）；单图 → 全宽按宽高比
+  if (count > 1) {
+    return (
+      <View style={[styles.imagePagerWrap, style]}>
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          nestedScrollEnabled
+          onMomentumScrollEnd={(e) => {
+            const page = Math.round(e.nativeEvent.contentOffset.x / Math.max(contentWidth, 1));
+            setPagerPage(Math.min(Math.max(page, 0), displayImages.length - 1));
+          }}
+        >
+          {displayImages.map((img, idx) => {
+            const dims = pageDim(img);
+            const useOriginal = imageLoadType === 'original';
+            const imageUri = useOriginal
+              ? (img.originSrc || img.src)
+              : thumbnailUrl(img.src, THUMB_POST);
+            return (
+              <Pressable
+                key={idx}
+                onPress={() => {
+                  hapticForScene('press');
+                  onPress?.(images.map((i) => i.originSrc || i.src), idx);
+                }}
+                onLongPress={() => {
+                  hapticForScene('press');
+                  Alert.alert('图片', '', [
+                    {
+                      text: '查看大图',
+                      onPress: () => {
+                        hapticForScene('press');
+                        onPress?.(images.map((i) => i.originSrc || i.src), idx);
+                      },
+                    },
+                    {
+                      text: '保存图片',
+                      onPress: () => handleSaveImage(imageUri),
+                    },
+                    { text: '取消', style: 'cancel' },
+                  ]);
+                }}
+                style={[
+                  styles.imageWrapper,
+                  {
+                    width: dims.width,
+                    height: dims.height,
+                    backgroundColor: colors.placeholder,
                   },
-                },
-                {
-                  text: '保存图片',
-                  onPress: () => handleSaveImage(imageUri),
-                },
-                { text: '取消', style: 'cancel' },
-              ]);
-            }}
-            style={[
-              styles.imageWrapper,
-              {
-                width: dims.width,
-                height: dims.height,
-                backgroundColor: colors.placeholder,
-              },
-            ]}
-          >
-            <Image
-              cachePolicy="memory-disk" source={{ uri: imageUri }}
-              style={[styles.image, dimmed && { opacity: 0.6 }]}
-              contentFit="cover"
-              recyclingKey={imageUri}
+                ]}
+              >
+                <Image
+                  cachePolicy="memory-disk" source={{ uri: imageUri }}
+                  style={[styles.image, dimmed && { opacity: 0.6 }]}
+                  contentFit="cover"
+                  recyclingKey={imageUri}
+                />
+                {idx === 8 && remainingCount > 0 && (
+                  <View style={styles.imageOverlay}>
+                    <Text style={styles.imageOverlayText}>
+                      +{remainingCount}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        {/* 页码点：当前页高亮加宽 */}
+        <View style={styles.pagerDots} pointerEvents="none">
+          {displayImages.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.pagerDot,
+                i === pagerPage && styles.pagerDotActive,
+                { backgroundColor: i === pagerPage ? colors.primary : colors.textTertiary },
+              ]}
             />
-            {idx === 8 && remainingCount > 0 && (
-              <View style={styles.imageOverlay}>
-                <Text style={styles.imageOverlayText}>
-                  +{remainingCount}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-        );
-      })}
-    </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  // 单图
+  const single = images[0];
+  const dims = pageDim(single);
+  const useOriginalSingle = imageLoadType === 'original';
+  const singleUri = useOriginalSingle
+    ? (single.originSrc || single.src)
+    : thumbnailUrl(single.src, THUMB_POST);
+  return (
+    <Pressable
+      style={[
+        styles.imageWrapper,
+        {
+          width: dims.width,
+          height: dims.height,
+          backgroundColor: colors.placeholder,
+        },
+        style,
+      ]}
+      onPress={() => {
+        hapticForScene('press');
+        onPress?.(images.map((i) => i.originSrc || i.src), 0);
+      }}
+      onLongPress={() => {
+        hapticForScene('press');
+        Alert.alert('图片', '', [
+          {
+            text: '查看大图',
+            onPress: () => {
+              hapticForScene('press');
+              onPress?.(images.map((i) => i.originSrc || i.src), 0);
+            },
+          },
+          {
+            text: '保存图片',
+            onPress: () => handleSaveImage(singleUri),
+          },
+          { text: '取消', style: 'cancel' },
+        ]);
+      }}
+    >
+      <Image
+        cachePolicy="memory-disk" source={{ uri: singleUri }}
+        style={[styles.image, dimmed && { opacity: 0.6 }]}
+        contentFit="cover"
+        recyclingKey={singleUri}
+      />
+    </Pressable>
   );
 }
 // ---------- Video Segment ----------
@@ -1207,6 +1273,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: IMAGE_GAP,
+  },
+  // 多图横向分页：整块圆角裁切，页码点叠在底部
+  imagePagerWrap: {
+    borderRadius: IMAGE_RADIUS,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  pagerDots: {
+    position: 'absolute',
+    bottom: 8,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pagerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  pagerDotActive: {
+    width: 16,
   },
   imageWrapper: {
     borderRadius: IMAGE_RADIUS,

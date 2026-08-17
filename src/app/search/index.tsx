@@ -342,32 +342,40 @@ export default function SearchPage() {
     <ThemedHost style={{ flex: 1 }}>
       <Stack.Screen options={{ title: '搜索', headerSearchBarOptions: searchBarOptions }} />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* ── Tab 栏（搜索后显示，SwiftUI segmented） ── */}
+        {/* ── Tab 栏（搜索后显示，SwiftUI segmented）。
+            ⚠️ @expo/ui SwiftUI 组件必须是 Host 的直接子节点：若中间隔 RN
+            <View>，SwiftUI 视图会挂在标准 UIView 下抛
+            "being mounted inside a standard UIView" RedBox。故用
+            ThemedHost matchContents 直接包 Picker（间距由外层 View 承担）。 ── */}
         {hasSearched && (
           <View style={styles.tabBar}>
-            <Picker
-              selection={activeTab}
-              onSelectionChange={handleTabChange as any}
-              modifiers={[pickerStyle('segmented')]}
-            >
-              {TABS.map((tab) => (
-                <SWText key={tab.key} modifiers={[tag(tab.key)]}>{tab.label}</SWText>
-              ))}
-            </Picker>
+            <ThemedHost matchContents>
+              <Picker
+                selection={activeTab}
+                onSelectionChange={handleTabChange as any}
+                modifiers={[pickerStyle('segmented')]}
+              >
+                {TABS.map((tab) => (
+                  <SWText key={tab.key} modifiers={[tag(tab.key)]}>{tab.label}</SWText>
+                ))}
+              </Picker>
+            </ThemedHost>
           </View>
         )}
 
-        {/* ── 贴子排序（搜索后显示，原生 menu Picker） ── */}
+        {/* ── 贴子排序（搜索后显示，原生 menu Picker，同 Host 直子规则） ── */}
         {hasSearched && activeTab === 'thread' && (
           <View style={styles.sortHost}>
-            <Picker
-              selection={sortOrder}
-              onSelectionChange={handleSortChange as any}
-              modifiers={[pickerStyle('menu')]}
-            >
-              <SWText modifiers={[tag(String(SearchThreadOrder.NEW_FIRST))]}>按时间</SWText>
-              <SWText modifiers={[tag(String(SearchThreadOrder.RELEVANT))]}>按相关性</SWText>
-            </Picker>
+            <ThemedHost matchContents>
+              <Picker
+                selection={sortOrder}
+                onSelectionChange={handleSortChange as any}
+                modifiers={[pickerStyle('menu')]}
+              >
+                <SWText modifiers={[tag(String(SearchThreadOrder.NEW_FIRST))]}>按时间</SWText>
+                <SWText modifiers={[tag(String(SearchThreadOrder.RELEVANT))]}>按相关性</SWText>
+              </Picker>
+            </ThemedHost>
           </View>
         )}
 

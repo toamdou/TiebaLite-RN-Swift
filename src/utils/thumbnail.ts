@@ -31,19 +31,26 @@ export function thumbnailUrl(url: string, width: number): string {
   if (!url || typeof url !== 'string') return url;
   if (!(width > 0)) return url;
 
-  // ATS 禁止明文 HTTP：统一升级协议（本地 URI 原样返回）
-  const httpsUrl = /^http:\/\//i.test(url)
+  // ATS 禁止明文 HTTP：统一升级协议（本地 URI 原样返回）；
+  // 协议相对 URL（//imgsrc.baidu.com/...）同样补全为 https:（expo-image 不识别 // 开头）
+  const httpsUrl = (url.startsWith('http://') || url.startsWith('//'))
     && !url.startsWith('file://') && !url.startsWith('ph://') && !url.startsWith('data:')
-    ? url.replace(/^http:\/\//i, 'https://')
+    ? url.replace(/^http:\/\//i, 'https://').replace(/^\/\//, 'https://')
     : url;
 
   // 仅重写贴吧图床 URL
   if (!TIEBA_CDN_RE.test(httpsUrl)) return httpsUrl;
 
-  // 剥离已有尺寸段，避免嵌套：w%3D580、w%3D580%3Bq%3D90、w=580、query 参数
+  // 剥离已有尺寸段，避免嵌套。贴吧图床尺寸段格式（顺序不固定）：
+  //   w%3D720%3Bq%3D60            （宽+质量）
+  //   w%3D720%3Bq%3D60%3Bg%3D0    （宽+质量+灰度，老接口常见）
+  //   w%3D120%3Bh%3D120           （宽+高，头像/吧徽）
+  // ⚠️ 必须把 w 后所有 %3B<字母>%3D<数字> 段整组剥掉；只剥 q/h 会残留
+  // %3Bg%3D0 之类尾巴 → 生成坏 URL（w%3D96%3Bq%3D90/%3Bg%3D0/...）→ 图片全挂。
   const clean = httpsUrl
-    .replace(/w%3d\d+(?:%3bq%3d\d+|;q=\d+)?/gi, '')
-    .replace(/[?&](?:w|width)=\d+/g, '');
+    .replace(/w%3d\d+(?:%3b[a-z]%3d\d+)*/gi, '')
+    .replace(/[?&](?:w|width)=\d+/g, '')
+    .replace(/\/forum\/\//, '/forum/');
 
   // 非 /forum/ 路径（头像、表情等）无法按此规则缩放，原样返回（已 https 化）
   if (!/\/forum\//i.test(clean)) return httpsUrl;

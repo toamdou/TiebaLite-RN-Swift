@@ -210,7 +210,7 @@ public final class TiebaNativeModule: Module {
     }
 
     View(TiebaRichTextView.self) {
-      Events("onLinkPress", "onUserPress", "onTopicPress")
+      Events("onLinkPress", "onUserPress", "onTopicPress", "onContentHeightChange")
 
       Prop("contentWidth") { (view, width: Double) in
         view.contentWidth = CGFloat(width)

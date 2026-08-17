@@ -54,7 +54,7 @@ final class TiebaLiveActivityManager {
       staleDate: nil,
       relevanceScore: 0
     )
-    await activity.end(content, dismissalPolicy: Self.policy(dismissalPolicy))
+    await activity.end(content, dismissalPolicy: Self.endPolicy(dismissalPolicy))
     activities.removeValue(forKey: activityId)
   }
 
@@ -64,7 +64,7 @@ final class TiebaLiveActivityManager {
       staleDate: nil,
       relevanceScore: 0
     )
-    let policy = Self.policy(dismissalPolicy)
+    let policy = Self.endPolicy(dismissalPolicy)
     for activity in Activity<LiveActivityKitAttributes>.activities {
       await activity.end(content, dismissalPolicy: policy)
     }
@@ -90,7 +90,7 @@ final class TiebaLiveActivityManager {
     )
   }
 
-  private static func policy(_ raw: String) -> Activity.DismissalPolicy {
+  private static func endPolicy(_ raw: String) -> ActivityUIDismissalPolicy {
     raw == "immediate" ? .immediate : .default
   }
 }

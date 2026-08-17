@@ -204,6 +204,9 @@ function RootLayoutInner() {
   const screenOpts = useMemo(() => ({
     gestureEnabled: true,
     headerTintColor: headerTint,
+    headerBackVisible: true,
+    // 'default' 会把上一屏标题（如 tabs 页的“(tabs)”）当作返回文字显示；
+    // 仅要箭头图标，用 'minimal'（iOS 只画 chevron，不带文字）。
     headerBackButtonDisplayMode: 'minimal' as const,
     // react-native-screens 的 BlurEffectTypes 提供 *_Dark / *_Light 显式变体。
     // 应用"强制深色 + 系统浅色"（或反之）时 'systemMaterial' 跟随系统外观，

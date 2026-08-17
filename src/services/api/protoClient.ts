@@ -74,6 +74,22 @@ import { TiebaApiError, TiebaErrorCode, handleAuthExpired } from './interceptors
 // Generic protobuf POST
 // -----------------------------------------------------------
 
+let protoDecoderReady = false;
+
+/**
+ * 把 protos.json descriptor 传给 native 注册表，供 native 解码器使用。
+ * 编码已移到 JS（protobufjs），但解码仍在 native（protoPost 的
+ * TiebaNative.protoPost），没有 descriptor 会抛
+ * "Protobuf message not found" 错误。只初始化一次。
+ */
+function ensureProtoDecoderReady(): void {
+  if (protoDecoderReady) return;
+  TiebaNative.protoInitialize(
+    JSON.stringify(require('./protos.json') as Record<string, unknown>),
+  );
+  protoDecoderReady = true;
+}
+
 /**
  * POST a protobuf-encoded request to the Tieba protobuf API.
  *
@@ -96,6 +112,10 @@ async function protoPost<T>(
   },
 ): Promise<T> {
   const isV12 = opts?.v12 ?? false;
+
+  // 解码仍在 native 完成，需要把 protos.json descriptor 传入 native 注册表
+  // （proto.ts 的 JS 编码不再调用 protoInitialize，这里补上，确保解码可用）
+  ensureProtoDecoderReady();
 
   // 1. Build form fields
   //    Kotlin V12 API (OFFICIAL_PROTOBUF_TIEBA_V12_API): NO CommonParamInterceptor!

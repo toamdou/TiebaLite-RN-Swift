@@ -59,11 +59,14 @@ export default function ThreadStorePage() {
   const insets = useSafeAreaInsets();
   const { colors } = useThemeColors();
   const { isLoggedIn } = useAuthStore();
+  // fetcher 必须稳定引用：内联会导致 usePagedList 的 run/load 每次渲染重建，
+  // 下方 useEffect([load]) 反复触发 → 请求风暴（thread/[id].tsx 同款修复）。
+  const fetchThreadStore = useCallback(async (p: number, _params: unknown, signal?: AbortSignal) => {
+    const data = await threadStore(p, signal);
+    return { items: data.items, hasMore: data.hasMore, nextPage: p + 1 };
+  }, []);
   const paged = usePagedList<FavoriteThread>({
-    fetcher: async (p, _params, signal) => {
-      const data = await threadStore(p, signal);
-      return { items: data.items, hasMore: data.hasMore, nextPage: p + 1 };
-    },
+    fetcher: fetchThreadStore,
     initialPage: 1,
   });
   const {

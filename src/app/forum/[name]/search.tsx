@@ -254,42 +254,47 @@ export default function ForumSearchPage() {
     <ThemedHost style={{ flex: 1 }}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ headerSearchBarOptions: searchBarOptions }} />
-      {/* Sort & Filter native menus */}
+      {/* Sort & Filter native menus（@expo/ui SwiftUI 组件须为 Host 直子，
+          否则 RedBox "being mounted inside a standard UIView"） */}
       <View style={styles.controlsRow}>
-        <Picker<string>
-          selection={sortType}
-          label={SORT_OPTIONS.find((opt) => opt.value === sortType)?.label ?? '排序'}
-          onSelectionChange={(value) => {
-            hapticForScene('toggle');
-            setSortType(String(value));
-          }}
-          modifiers={[
-            pickerStyle('menu'),
-            frame({ minWidth: 104 }),
-            accessibilityLabel('帖子排序'),
-          ]}
-        >
-          {SORT_OPTIONS.map((opt) => (
-            <SWText key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</SWText>
-          ))}
-        </Picker>
-        <Picker<string>
-          selection={filterType}
-          label={FILTER_OPTIONS.find((opt) => opt.value === filterType)?.label ?? '筛选'}
-          onSelectionChange={(value) => {
-            hapticForScene('toggle');
-            setFilterType(String(value));
-          }}
-          modifiers={[
-            pickerStyle('menu'),
-            frame({ minWidth: 104 }),
-            accessibilityLabel('帖子筛选'),
-          ]}
-        >
-          {FILTER_OPTIONS.map((opt) => (
-            <SWText key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</SWText>
-          ))}
-        </Picker>
+        <ThemedHost matchContents>
+          <Picker<string>
+            selection={sortType}
+            label={SORT_OPTIONS.find((opt) => opt.value === sortType)?.label ?? '排序'}
+            onSelectionChange={(value) => {
+              hapticForScene('toggle');
+              setSortType(String(value));
+            }}
+            modifiers={[
+              pickerStyle('menu'),
+              frame({ minWidth: 104 }),
+              accessibilityLabel('帖子排序'),
+            ]}
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <SWText key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</SWText>
+            ))}
+          </Picker>
+        </ThemedHost>
+        <ThemedHost matchContents>
+          <Picker<string>
+            selection={filterType}
+            label={FILTER_OPTIONS.find((opt) => opt.value === filterType)?.label ?? '筛选'}
+            onSelectionChange={(value) => {
+              hapticForScene('toggle');
+              setFilterType(String(value));
+            }}
+            modifiers={[
+              pickerStyle('menu'),
+              frame({ minWidth: 104 }),
+              accessibilityLabel('帖子筛选'),
+            ]}
+          >
+            {FILTER_OPTIONS.map((opt) => (
+              <SWText key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</SWText>
+            ))}
+          </Picker>
+        </ThemedHost>
       </View>
       {/* Search History (only when no results and not searched) */}
       {!searched && history.length > 0 && (

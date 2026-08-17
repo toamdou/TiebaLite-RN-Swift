@@ -1,31 +1,29 @@
 // ============================================================
 // TiebaLite RN — Protobuf Helpers (aligned with Kotlin Wire)
 //
-// Uses the native TiebaNative codec with a pre-compiled JSON descriptor
-// generated from Kotlin's .proto files (protobufjs is only a build-time
-// generator dependency).
+// 编码在 JS 侧用 protobufjs（预编译的 protos.json descriptor），
+// 解码仍在 native TiebaNative codec（protoClient 内）。
 // ============================================================
 
-import { TiebaNative } from '../../../modules/tieba-native/src/TiebaNative';
-
-// -----------------------------------------------------------
-// Init — lazily load descriptor on first use
-// -----------------------------------------------------------
-// The JSON descriptor is ~111KB. Parsing + resolveAll() used to run
-// synchronously at module import time, which penalized app startup even when
-// no protobuf call was made yet. We now defer it until the first encode.
+// ⚠️ 编码在 JS 侧用 protobufjs 完成，不再走 native 编码器：
+// native 编码器会把嵌套 message 平铺（FrsPageRequest.data.common 被压成
+// 顶层字段），导致 frsPage/pbPage/profile 的请求结构错乱、服务器返回
+// 210009 系统错误。热榜恰好因字段 id 巧合不受影响。protobufjs 编码输出
+// 已验证与服务器兼容（嵌套正确、error=0）。解码仍走 native（正常）。
+import protobuf from 'protobufjs';
 
 type TypeRef = { fullName: string };
 
-let nativeReady = false;
+let protoRoot: protobuf.Root | null = null;
 
-/** Pass the descriptor to the native codec once, then keep it native-side. */
-function ensureNativeReady(): void {
-  if (nativeReady) return;
-  TiebaNative.protoInitialize(
-    JSON.stringify(require('./protos.json') as Record<string, unknown>),
-  );
-  nativeReady = true;
+/** 惰性加载 protobuf descriptor（首次编码时才解析 111KB JSON） */
+function getProtoRoot(): protobuf.Root {
+  if (!protoRoot) {
+    protoRoot = protobuf.Root.fromJSON(
+      require('./protos.json') as unknown as protobuf.INamespace,
+    );
+  }
+  return protoRoot;
 }
 
 /**
@@ -73,8 +71,14 @@ const PbFloorRequest = lazyType('tieba.pbFloor.PbFloorRequest');
  */
 
 function encodeProtobuf(type: TypeRef, data: Record<string, unknown>): string {
-  ensureNativeReady();
-  return TiebaNative.protoEncode(type.fullName, data);
+  // JS 端 protobufjs 编码（native 编码器嵌套平铺 bug 的绕过方案，见文件头注释）
+  const messageType = getProtoRoot().lookupType(type.fullName);
+  const err = messageType.verify(data);
+  if (err) throw new Error(`protobuf verify ${type.fullName}: ${err}`);
+  const bytes = messageType.encode(messageType.create(data)).finish();
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return globalThis.btoa(binary);
 }
 
 // -----------------------------------------------------------
@@ -398,6 +402,7 @@ export interface DecodedPbPageResponse {
   data?: {
     thread?: Record<string, any>;
     postList?: Record<string, any>[];
+    firstFloorPost?: Record<string, any>;
     page?: { currentPage?: number; totalPage?: number; totalCount?: number; pageSize?: number; hasMore?: number; hasPrev?: number };
     userList?: Record<string, any>[];
     forum?: Record<string, any>;

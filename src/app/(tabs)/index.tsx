@@ -27,6 +27,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GlassView } from 'expo-glass-effect';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { useAuthStore } from '@/stores/authStore';
@@ -329,9 +330,12 @@ function LoggedInHome() {
   );
 
   return (
+    // ⚠️ 登录后主界面：ThemedHost 直包 VStack（SwiftUI 组件须为 Host 直子，
+    // 否则在 RN View 中间层时挂 "being mounted inside a standard UIView"
+    // RedBox）。top inset/padding 由外层 RN View 承担（同 notifications 写法）。
+    <View style={[styles.container, { paddingTop: insets.top }]}>
     <ThemedHost style={{ flex: 1 }}>
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-      <VStack spacing={0}>
+    <VStack spacing={0}>
         {/* §5.7: 搜索栏 (flex-1) + 一键签到 同一行，签到按钮在右上 */}
         <HStack spacing={10} modifiers={[padding({ horizontal: Spacing.lg, top: Spacing.sm })]}>
           <RNHostView>
@@ -435,15 +439,15 @@ function LoggedInHome() {
           </RNHostView>
         )}
       </VStack>
-      </View>
     </ThemedHost>
+    </View>
   );
 }
 
 // ── 液态玻璃搜索栏组件（参考设计：头像 + 玻璃搜索胶囊 + 签到按钮） ──
 
 function SearchBarPill({ onPress }: { onPress: () => void }) {
-  const { colors } = useThemeColors();
+  const { colors, isDark } = useThemeColors();
   const account = useAuthStore((s) => s.account);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const router = useRouter();
@@ -475,9 +479,14 @@ function SearchBarPill({ onPress }: { onPress: () => void }) {
           />
         </Pressable>
 
-        {/* Center: Search Pill（纯色底：胶囊下方是纯色页面背景，实时毛玻璃
-            无内容可模糊，反而白占一个全局实时玻璃槽位） */}
-        <Pressable onPress={onPress} style={({ pressed }) => [searchStyles.pill, { backgroundColor: colors.surfaceSecondary, transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
+        {/* Center: Glass Search Pill */}
+        <Pressable onPress={onPress} style={({ pressed }) => [searchStyles.pill, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
+          {/* 默认 glassEffectStyle（regular 磨砂）与全局 GlassView 质感统一，
+              不再叠加 clear 液态玻璃 + 手写 rgba 底 */}
+          <GlassView
+            style={StyleSheet.absoluteFill}
+            colorScheme={isDark ? 'dark' : 'light'}
+          />
           <View style={searchStyles.pillInner}>
             <SymbolView name="magnifyingglass" size={15} tintColor={colors.textTertiary} style={{ marginRight: Spacing.sm }} />
             <RNText style={[searchStyles.text, { color: colors.textTertiary }]} numberOfLines={1}>

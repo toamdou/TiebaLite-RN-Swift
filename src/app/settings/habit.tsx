@@ -1,13 +1,25 @@
-import { Form, Section, Toggle } from '@expo/ui/swift-ui';
+import { useCallback } from 'react';
+import { Form, Section, Toggle, Picker, Text } from '@expo/ui/swift-ui';
+import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import { PreferenceToggleRow } from '@/components/settings/PreferenceToggleRow';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { DEFAULT_SORT_OPTIONS, FORUM_FAB_OPTIONS } from '@/constants/settings';
 
 export default function HabitSettingsPage() {
-  // 卡片风格：开 = 经典 Hero 玻璃卡（备选）；关 = 推特圆角卡片（默认）。立即生效。
-  const feedCardStyle = usePreferencesStore((s) => s.preferences.feedCardStyle);
+  const preferences = usePreferencesStore((s) => s.preferences);
   const setPreference = usePreferencesStore((s) => s.setPreference);
+
+  const handleSortChange = useCallback((v: string) => {
+    hapticForScene('toggle');
+    setPreference('defaultSortType', v);
+  }, [setPreference]);
+
+  const handleFabChange = useCallback((v: string) => {
+    hapticForScene('toggle');
+    setPreference('forumFabFunction', v);
+  }, [setPreference]);
 
   return (
     <ThemedHost style={{ flex: 1 }}>
@@ -18,6 +30,7 @@ export default function HabitSettingsPage() {
             label="显示历史吧"
             systemImage="clock.fill"
           />
+          {/* 贴吧布局/排序偏好已随主页改版移除（AppPreferences 无对应键） */}
         </Section>
 
         <Section title="浏览">
@@ -36,20 +49,31 @@ export default function HabitSettingsPage() {
             label="自动刷新动态"
             systemImage="arrow.clockwise"
           />
-          <Toggle
-            label="经典卡片风格"
-            systemImage="rectangle.fill.on.rectangle.fill"
-            isOn={feedCardStyle === 'hero'}
-            onIsOnChange={(next) => {
-              hapticForScene('toggle');
-              setPreference('feedCardStyle', next ? 'hero' : 'twitter');
-            }}
+          <Picker
+            label="默认排序方式"
+            selection={preferences.defaultSortType}
+            onSelectionChange={handleSortChange}
+            modifiers={[pickerStyle('menu')]}
           >
-            开启后动态与吧内帖子使用经典 Hero 玻璃卡片；关闭恢复推特风格圆角卡片（立即生效）
-          </Toggle>
+            {DEFAULT_SORT_OPTIONS.map((opt) => (
+              <Text key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</Text>
+            ))}
+          </Picker>
+          <Toggle
+            label="隐藏媒体内容"
+            systemImage="photo.on.rectangle.angled"
+            isOn={preferences.hideMedia}
+            onIsOnChange={(v) => { hapticForScene('toggle'); setPreference('hideMedia', v); }}
+          />
         </Section>
 
         <Section title="贴子">
+          <PreferenceToggleRow
+            preferenceKey="forumSingleColumn"
+            label="单列布局"
+            systemImage="rectangle.grid.1x2.fill"
+            description="贴吧信息流使用单列大卡片"
+          />
           <PreferenceToggleRow
             preferenceKey="showBothUsername"
             label="显示两个用户名"
@@ -65,6 +89,16 @@ export default function HabitSettingsPage() {
             label="隐藏回复框"
             systemImage="bubble.left.fill"
           />
+          <Picker
+            label="悬浮按钮功能"
+            selection={preferences.forumFabFunction}
+            onSelectionChange={handleFabChange}
+            modifiers={[pickerStyle('menu')]}
+          >
+            {FORUM_FAB_OPTIONS.map((opt) => (
+              <Text key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</Text>
+            ))}
+          </Picker>
         </Section>
 
         <Section title="内容">
@@ -75,8 +109,23 @@ export default function HabitSettingsPage() {
           />
           <PreferenceToggleRow
             preferenceKey="blockVideo"
-            label="屏蔽视频"
+            label="不显示视频贴"
             systemImage="video.slash.fill"
+          />
+        </Section>
+
+        <Section title="收藏">
+          <Toggle
+            label="收藏贴子只看楼主"
+            systemImage="person.fill"
+            isOn={preferences.collectSeeLz}
+            onIsOnChange={(v) => { hapticForScene('toggle'); setPreference('collectSeeLz', v); }}
+          />
+          <Toggle
+            label="收藏贴子倒序查看"
+            systemImage="arrow.up.arrow.down"
+            isOn={preferences.collectDescSort}
+            onIsOnChange={(v) => { hapticForScene('toggle'); setPreference('collectDescSort', v); }}
           />
         </Section>
       </Form>

@@ -15,6 +15,7 @@ import {
   Text,
   Pressable,
   StyleSheet,
+  ScrollView,
   Share,
   ActionSheetIOS,
 } from 'react-native';
@@ -27,10 +28,11 @@ import { useThemeColors } from '@/theme/ThemeContext';
 import { useAppPreference } from '@/hooks/useAppPreference';
 import { Radius } from '@/theme/spacing';
 import { contentToText , relativeTime, formatCount, getLevelColor } from '@/utils';
+import { thumbnailUrl, THUMB_CARD } from '@/utils/thumbnail';
 import { Avatar } from '@/components/ui/Avatar';
 import PostContent from './PostContent';
 import { openLink } from '@/utils/linkOpener';
-import type { PostInfo, SubPostInfo } from '@/types';
+import type { PostInfo, PostContent as PostContentType, SubPostInfo } from '@/types';
 
 interface PostCardProps {
   post: PostInfo;
@@ -52,102 +54,134 @@ interface PostCardProps {
 function InlineQuoteContent({
   content,
   colors,
+  onImagePress,
 }: {
   content: SubPostInfo['content'];
   colors: any;
+  onImagePress?: (images: string[], index: number) => void;
 }) {
   const router = useRouter();
   if (!content || content.length === 0) {
     return <Text style={[s.quoteInlineText, { color: colors.textSecondary }]}>[内容已删除]</Text>;
   }
+  // 楼中楼图片：收集成可横向滑动的缩略图条（紧凑引用块内 90pt 高）
+  const images = content.filter(
+    (seg): seg is Extract<PostContentType, { type: 'image' }> =>
+      seg.type === 'image' && !!(seg.src || seg.originSrc),
+  );
+  // 文字/表情/@/链接合并进单个 Text + numberOfLines 省略：
+  // 楼中楼超长文字在预览区只显示前 2 行，点进完整页再看全文。
   return (
     <View style={s.quoteInlineFlow}>
-      {content.map((seg, idx) => {
-        switch (seg.type) {
-          case 'text':
-          case 'emoji':
-            return (
-              <Text key={idx} style={[s.quoteInlineText, { color: colors.textSecondary }]}>
-                {seg.text}
-              </Text>
-            );
-          case 'at':
+      <Text
+        style={[s.quoteInlineText, { color: colors.textSecondary }]}
+        numberOfLines={2}
+        ellipsizeMode="tail"
+      >
+        {content.map((seg, idx) => {
+          switch (seg.type) {
+            case 'text':
+            case 'emoji':
+              return <Text key={idx}>{seg.text}</Text>;
+            case 'at':
+              return (
+                <Text
+                  key={idx}
+                  style={{ color: colors.primary }}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    router.push(`/user/${seg.uid}`);
+                  }}
+                >
+                  @{seg.text}
+                </Text>
+              );
+            case 'link':
+              return (
+                <Text
+                  key={idx}
+                  style={{ color: colors.primary }}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    openLink(seg.url);
+                  }}
+                >
+                  {seg.text || seg.url}
+                </Text>
+              );
+            case 'topic':
+              return (
+                <Text
+                  key={idx}
+                  style={{ color: colors.primary }}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    router.push(`/topic/${seg.topicId}?name=${encodeURIComponent(seg.text)}`);
+                  }}
+                >
+                  #{seg.text}#
+                </Text>
+              );
+            case 'emoticon':
+              return (
+                <Image
+                  key={idx}
+                  source={{ uri: seg.src }}
+                  style={s.quoteEmoticon}
+                  cachePolicy="memory-disk"
+                  accessibilityLabel={seg.text}
+                />
+              );
+            case 'linebreak':
+              return <Text key={idx}>{"\n"}</Text>;
+            case 'video':
+              return <Text key={idx}>[视频]</Text>;
+            case 'audio':
+              return <Text key={idx}>[语音]</Text>;
+            default:
+              return null;
+          }
+        })}
+      </Text>
+
+      {/* 楼中楼图片：横向滑动查看缩略图，点击看大图 */}
+      {images.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          nestedScrollEnabled
+          contentContainerStyle={s.quoteImageStrip}
+        >
+          {images.map((img, imgIdx) => {
+            const ratio = img.width > 0 && img.height > 0 ? img.width / img.height : 1;
+            const thumbW = Math.min(Math.max(90 * ratio, 56), 140);
+            const uri = thumbnailUrl(img.src ?? '', THUMB_CARD);
             return (
               <Pressable
-                key={idx}
-                hitSlop={4}
+                key={imgIdx}
                 onPress={(e) => {
                   e.stopPropagation();
-                  router.push(`/user/${seg.uid}`);
+                  hapticForScene('press');
+                  const urls = images.map((i) => i.originSrc || i.src || '');
+                  onImagePress?.(urls, imgIdx);
                 }}
+                style={[
+                  s.quoteImageThumb,
+                  { backgroundColor: colors.placeholder, width: thumbW, height: 90 },
+                ]}
               >
-                <Text style={[s.quoteInlineText, { color: colors.primary }]}>@{seg.text}</Text>
+                <Image
+                  source={{ uri }}
+                  style={s.quoteImageThumbImg}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  recyclingKey={img.src ?? ''}
+                />
               </Pressable>
             );
-          case 'link':
-            return (
-              <Pressable
-                key={idx}
-                hitSlop={4}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  openLink(seg.url);
-                }}
-              >
-                <Text style={[s.quoteInlineText, { color: colors.primary }]}>{seg.text || seg.url}</Text>
-              </Pressable>
-            );
-          case 'topic':
-            return (
-              <Pressable
-                key={idx}
-                hitSlop={4}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  router.push(`/topic/${seg.topicId}?name=${encodeURIComponent(seg.text)}`);
-                }}
-              >
-                <Text style={[s.quoteInlineText, { color: colors.primary }]}>#{seg.text}#</Text>
-              </Pressable>
-            );
-          case 'emoticon':
-            return (
-              <Image
-                key={idx}
-                source={{ uri: seg.src }}
-                style={s.quoteEmoticon}
-                cachePolicy="memory-disk"
-                accessibilityLabel={seg.text}
-              />
-            );
-          case 'linebreak':
-            return <View key={idx} style={s.quoteLineBreak} />;
-          case 'image':
-            return (
-              <Text key={idx} style={[s.quoteInlineText, { color: colors.textSecondary }]}>
-                [图片]
-              </Text>
-            );
-          case 'video':
-            return (
-              <Text key={idx} style={[s.quoteInlineText, { color: colors.textSecondary }]}>
-                [视频]
-              </Text>
-            );
-          case 'audio':
-            return (
-              <Text key={idx} style={[s.quoteInlineText, { color: colors.textSecondary }]}>
-                [语音]
-              </Text>
-            );
-          default:
-            return (
-              <Text key={idx} style={[s.quoteInlineText, { color: colors.textSecondary }]}>
-                [图片]
-              </Text>
-            );
-        }
-      })}
+          })}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -315,7 +349,7 @@ const PostCard = React.memo(function PostCard({
                       <Text style={[s.quoteName, { color: colors.textSecondary }]} numberOfLines={1}>
                         {sp.authorNameShow || sp.authorName}：
                       </Text>
-                      <InlineQuoteContent content={sp.content} colors={colors} />
+                      <InlineQuoteContent content={sp.content} colors={colors} onImagePress={onImagePress} />
                     </View>
                   );
                 })}
@@ -462,6 +496,21 @@ const s = StyleSheet.create({
   quoteLineBreak: {
     width: '100%',
     height: 0,
+  },
+  // 楼中楼图片：横向滑动缩略图条
+  quoteImageStrip: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingTop: 6,
+    alignItems: 'flex-start',
+  },
+  quoteImageThumb: {
+    borderRadius: Radius.input - 2,
+    overflow: 'hidden',
+  },
+  quoteImageThumbImg: {
+    width: '100%',
+    height: '100%',
   },
   quoteMore: {
     fontSize: 13,

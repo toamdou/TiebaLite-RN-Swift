@@ -26,7 +26,6 @@ import {
 } from '@expo/ui/swift-ui';
 import { keyboardType } from '@expo/ui/swift-ui/modifiers';
 import Reanimated, {
-  useAnimatedScrollHandler,
   useSharedValue, useAnimatedStyle,
   withTiming,
   type SharedValue,
@@ -35,6 +34,7 @@ import { GlassContainer } from 'expo-glass-effect';
 import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, Stack, Link, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { cacheParentPost } from '@/stores/parentPostCache';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { GlassView } from '@/components/ui/GlassView';
 import { hapticForScene } from '@/theme/hapticsMap';
@@ -47,7 +47,6 @@ import ImageViewer from '@/components/ImageViewer';
 import PostCard from '@/components/thread/PostCard';
 import PostContent from '@/components/thread/PostContent';
 import ThreadMoreSheet from '@/components/thread/ThreadMoreSheet';
-import { GlassSurface } from '../../../modules/tieba-native/src/TiebaGlassSurface';
 import { LoadMoreFooter } from '@/components/ui/LoadMoreFooter';
 import { SkeletonList } from '../../components/ui/Skeleton';
 import { useThemeColors } from '@/theme/ThemeContext';
@@ -124,11 +123,21 @@ const ThreadHeader = memo(function ThreadHeader({
   return (
     <View>
       {/* ── Main Post (OP) — visually distinct glass card section ── */}
-      <GlassSurface
-        material="regular"
-        cornerRadius={Radius.card}
-        borderColor={colors.divider}
-        style={[styles.mainPostSection, { marginHorizontal: 12, marginBottom: 8, padding: 16 }]}
+      {/* ⚠️ 不用 GlassSurface：其 onPress 注册为 bubbling 事件，与内部 Pressable
+          的 onPress（direct）冲突 → "Event cannot be both direct and bubbling:
+          topPress"，整页崩溃。改用 RN View 模拟玻璃卡片。 */}
+      <View
+        style={[
+          styles.mainPostSection,
+          styles.glassCard,
+          {
+            marginHorizontal: 12,
+            marginBottom: 8,
+            padding: 16,
+            backgroundColor: colors.surfaceSecondary,
+            borderColor: colors.divider,
+          },
+        ]}
       >
         {/* Author row */}
         <Link href={{ pathname: '/user/[uid]', params: { uid: thread.authorId } }} push asChild>
@@ -166,14 +175,20 @@ const ThreadHeader = memo(function ThreadHeader({
             />
           </View>
         )}
-      </GlassSurface>
+      </View>
 
       {/* ── Reply Toolbar (below main post) ── */}
-      <GlassSurface
-        material="regular"
-        cornerRadius={Radius.card}
-        borderColor={colors.divider}
-        style={[styles.replyToolbar, { marginHorizontal: 12, marginBottom: 8 }]}
+      <View
+        style={[
+          styles.replyToolbar,
+          styles.glassCard,
+          {
+            marginHorizontal: 12,
+            marginBottom: 8,
+            backgroundColor: colors.surfaceSecondary,
+            borderColor: colors.divider,
+          },
+        ]}
       >
         <Text style={[styles.replyCount, { color: colors.text }]}>
           回复 {formatCount(replyCount)}
@@ -213,7 +228,7 @@ const ThreadHeader = memo(function ThreadHeader({
             </Text>
           </Pressable>
         </View>
-      </GlassSurface>
+      </View>
     </View>
   );
 });
@@ -284,16 +299,28 @@ export default function ThreadPage() {
   const openFromFavorites = fromFavorites === '1';
 
   // ── State ──
-  const paged = usePagedList<PostInfo, { id: string; postId?: string; seeLz: boolean; reverse: boolean }, { thread: ThreadInfo | null; total: number; current: number }>({
-    fetcher: async (page, params, signal) => {
-      const data = await pbPage(params.id, page, params.postId, params.seeLz, false, params.reverse ? 1 : 0, signal);
-      return {
-        items: data.posts,
-        hasMore: data.page.hasMore,
-        nextPage: data.page.current + 1,
-        extra: { thread: data.thread, total: data.page.total, current: data.page.current ?? page },
-      };
+  // fetcher 必须 useCallback 稳定引用：内联箭头每次渲染新身份 → run/load
+  // 重建 → useEffect 反复触发 load → 同一请求被 abort+重发、请求风暴（remote 版曾踩）。
+  const fetchThreadPage = useCallback(
+    async (page: number, params: { id: string; postId?: string; seeLz: boolean; reverse: boolean }, signal?: AbortSignal) => {
+      try {
+        const data = await pbPage(params.id, page, params.postId, params.seeLz, false, params.reverse ? 1 : 0, signal);
+        if (__DEV__) console.log('[thread] pbPage OK page=', page, 'posts=', data.posts.length, 'hasMore=', data.page.hasMore);
+        return {
+          items: data.posts,
+          hasMore: data.page.hasMore,
+          nextPage: data.page.current + 1,
+          extra: { thread: data.thread, total: data.page.total, current: data.page.current ?? page },
+        };
+      } catch (e: any) {
+        if (__DEV__) console.warn('[thread] pbPage ERR page=', page, 'err=', e?.message, 'code=', e?.code, 'errorCode=', e?.errorCode);
+        throw e;
+      }
     },
+    [],
+  );
+  const paged = usePagedList<PostInfo, { id: string; postId?: string; seeLz: boolean; reverse: boolean }, { thread: ThreadInfo | null; total: number; current: number }>({
+    fetcher: fetchThreadPage,
     params: { id, postId, seeLz: initialSeeLz === '1' || (openFromFavorites && !!collectSeeLz), reverse: openFromFavorites && !!collectDescSort },
     maxItems: MAX_POSTS,
   });
@@ -385,43 +412,44 @@ export default function ThreadPage() {
     }
   }, [loading, posts.length, reduceMotion, entranceProgress, entryTotalSV]);
 
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      'worklet';
-      const e = event as any;
-      const y = e?.contentOffset?.y ?? 0;
-      const now = typeof e?.timestamp === 'number' ? e.timestamp : 0;
-      const animateBar = (visible: boolean) => {
-        barVisible.value = visible ? 1 : 0;
-        barTranslateY.value = reduceMotionSV.value
-          ? (visible ? 0 : 120)
-          : withTiming(visible ? 0 : 120, { duration: visible ? DURATION.enter : DURATION.exit });
-      };
+  // ⚠️ FlashList 2.3.2 要求 onScroll 是普通函数（内部直接 props.onScroll(event)
+  // 调用）；useAnimatedScrollHandler 返回的对象会触发
+  // "TypeError: undefined is not a function"。改普通函数 + JS 线程设
+  // sharedValue（withTiming 动画仍在 UI 线程跑）。
+  const scrollHandler = useCallback((event: any) => {
+    const e = event?.nativeEvent ?? event ?? {};
+    const y = e?.contentOffset?.y ?? 0;
+    const now = typeof e?.timestamp === 'number' ? e.timestamp : Date.now();
+    const animateBar = (visible: boolean) => {
+      barVisible.value = visible ? 1 : 0;
+      barTranslateY.value = reduceMotionSV.value
+        ? (visible ? 0 : 120)
+        : withTiming(visible ? 0 : 120, { duration: visible ? DURATION.enter : DURATION.exit });
+    };
 
-      // Near the top: reveal immediately, never throttle.
-      if (y < 10) {
-        lastScrollProcessedAt.value = now;
-        if (barVisible.value === 0) animateBar(true);
-        return;
-      }
-
-      // Sample velocity at most every 60ms; mid-list scrolls only drive shared values.
-      if (now - lastScrollProcessedAt.value < 60) return;
+    // Near the top: reveal immediately, never throttle.
+    if (y < 10) {
       lastScrollProcessedAt.value = now;
+      if (barVisible.value === 0) animateBar(true);
+      return;
+    }
 
-      const dt = now - lastScrollTime.value;
-      const dy = y - lastScrollY.value;
-      lastScrollY.value = y;
-      lastScrollTime.value = now;
+    // Sample velocity at most every 60ms; mid-list scrolls only drive shared values.
+    if (now - lastScrollProcessedAt.value < 60) return;
+    lastScrollProcessedAt.value = now;
 
-      const velocity = dt > 0 ? dy / dt : 0;
-      if (velocity > 0.3 && barVisible.value === 1) {
-        animateBar(false);
-      } else if (velocity < -0.3 && barVisible.value === 0) {
-        animateBar(true);
-      }
-    },
-  });
+    const dt = now - lastScrollTime.value;
+    const dy = y - lastScrollY.value;
+    lastScrollY.value = y;
+    lastScrollTime.value = now;
+
+    const velocity = dt > 0 ? dy / dt : 0;
+    if (velocity > 0.3 && barVisible.value === 1) {
+      animateBar(false);
+    } else if (velocity < -0.3 && barVisible.value === 0) {
+      animateBar(true);
+    }
+  }, [reduceMotionSV, barVisible, barTranslateY, lastScrollProcessedAt, lastScrollTime, lastScrollY]);
 
   const floatingBarStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: barTranslateY.value }],
@@ -653,6 +681,9 @@ export default function ThreadPage() {
   // Extracted from renderItem so the PostCard callback identity is stable (Issue #8)
   const threadAuthorId = thread?.authorId;
   const handleSubPostsPress = useCallback((post: any) => {
+    // 楼中楼页要展示"上一级回复"原文：跳转前把该回复快照进模块级缓存，
+    // subposts 页按 postId 取回（富文本 content 不适合走 URL 参数）。
+    cacheParentPost(post as PostInfo);
     router.push(
       `/thread/${id}/subposts?postId=${post.id}&threadId=${id}&forumId=${thread?.forumId || ''}&floor=${post.floor}&threadAuthorId=${thread?.authorId || ''}&forumName=${encodeURIComponent(thread?.forumName || '')}&threadTitle=${encodeURIComponent(thread?.title || '')}`,
     );
@@ -987,6 +1018,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10, marginBottom: 10, borderRadius: 12, gap: 6,
   },
   loadPrevText: { fontSize: 13, fontWeight: '600' },
+
+  // 模拟玻璃卡片（替代 GlassSurface：onPress 事件与内部 Pressable 冲突会整页崩溃）
+  glassCard: {
+    borderRadius: Radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
 
   mainPostSection: {
     paddingBottom: 12,

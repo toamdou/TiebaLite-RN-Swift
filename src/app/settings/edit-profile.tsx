@@ -97,6 +97,8 @@ export default function EditProfilePage() {
   const openPicker = useCallback(async () => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
+      // 新版 expo-media-library：PermissionStatus 不再有 'limited'（iOS limited
+      // 权限并入 granted 分支），旧判断会与类型系统冲突。
       if (status !== 'granted') {
         Alert.alert('需要相册权限', '请在系统设置中允许访问相册以选择头像。');
         return;
@@ -201,7 +203,9 @@ export default function EditProfilePage() {
                       />
                       {uploading && (
                         <View style={styles.uploadProgress}>
-                          <ProgressView modifiers={[progressViewStyle('circular')]} />
+                          <ThemedHost matchContents>
+                            <ProgressView modifiers={[progressViewStyle('circular')]} />
+                          </ThemedHost>
                         </View>
                       )}
                     </View>
@@ -282,7 +286,9 @@ export default function EditProfilePage() {
             </View>
             {pickerLoading ? (
               <View style={styles.modalLoading}>
-                <ProgressView modifiers={[progressViewStyle('circular')]} />
+                <ThemedHost matchContents>
+                  <ProgressView modifiers={[progressViewStyle('circular')]} />
+                </ThemedHost>
               </View>
             ) : (
               <ScrollView contentContainerStyle={styles.grid}>

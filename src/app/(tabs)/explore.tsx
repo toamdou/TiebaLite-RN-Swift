@@ -18,7 +18,7 @@ import {
 } from '@expo/ui/swift-ui';
 import { font, padding, buttonStyle, buttonBorderShape, presentationDetents, presentationDragIndicator } from '@expo/ui/swift-ui/modifiers';
 import {
-  View, Pressable, StyleSheet, Text as RNText, ActivityIndicator, Share,
+  View, Pressable, StyleSheet, Text as RNText, ActivityIndicator, Share, Alert,
   ScrollView as RNScrollView, DeviceEventEmitter, RefreshControl,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
@@ -51,7 +51,6 @@ import TweetCard, { type TweetCardMenuAction } from '@/components/feed/TweetCard
 import FeedTabBar from '@/components/feed/FeedTabBar';
 import { FeedCell } from '../../../modules/tieba-native/src/TiebaFeedCell';
 import * as Clipboard from 'expo-clipboard';
-import { MenuView, type MenuAction } from '@expo/ui/community/menu';
 import ImageViewer from '@/components/ImageViewer';
 import { LoadMoreFooter } from '@/components/ui/LoadMoreFooter';
 import { ThemedHost } from '@/components/ui/ThemedHost';
@@ -220,13 +219,6 @@ function SegmentFade({ segment, children }: { segment: string; children: React.R
 /** 原生 FeedCell 有图帖 Hero 高度，与 TiebaFeedCellView.swift 的 heroImageHeight=200 保持一致 */
 const NATIVE_HERO_HEIGHT = 200;
 
-/** 帖子卡片更多菜单（不感兴趣/屏蔽作者/复制标题），对齐 FeedCard.FEED_MENU_ACTIONS */
-const THREAD_FEED_MENU_ACTIONS: MenuAction[] = [
-  { id: 'dislike', title: '不感兴趣', image: 'hand.thumbsdown' },
-  { id: 'block', title: '屏蔽作者', image: 'person.badge.minus' },
-  { id: 'copy-title', title: '复制标题', image: 'doc.on.doc' },
-];
-
 /** 有图帖首图原址（视频取 poster）。原址直接交给原生 TiebaImageIO 做缩略缓存，
  *  原生 targetWidth 750 的效果优于 RN 侧传 200px 缩略图。 */
 function threadHeroImage(thread: ThreadInfo): string | undefined {
@@ -298,8 +290,8 @@ const NativeThreadCell = memo(function NativeThreadCell({
   }, [thread, item, onBlockAuthor]);
 
   const handleMenuAction = useCallback(
-    (event: { nativeEvent: { event: string } }) => {
-      switch (event.nativeEvent.event) {
+    (action: string) => {
+      switch (action) {
         case 'dislike':
           onDislike(item);
           break;
@@ -378,22 +370,24 @@ const NativeThreadCell = memo(function NativeThreadCell({
             </RNText>
           </Pressable>
           <View style={styles.nativeActionSpacer} />
-          <ThemedHost matchContents>
-            <MenuView
-              style={styles.nativeActionMenu}
-              actions={THREAD_FEED_MENU_ACTIONS}
-              onPressAction={handleMenuAction}
-            >
-              <Pressable
-                hitSlop={8}
-                style={({ pressed }) => [styles.nativeActionItem, pressed && styles.nativeActionItemPressed]}
-                accessibilityRole="button"
-                accessibilityLabel="更多操作"
-              >
-                <SymbolView name="ellipsis" size={15} weight="bold" tintColor={colors.textTertiary} />
-              </Pressable>
-            </MenuView>
-          </ThemedHost>
+          {/* 更多菜单：原生 ActionSheet（SwiftUI Menu 嵌 RN 树在 iOS 26 上点击无响应） */}
+          <Pressable
+            hitSlop={8}
+            style={({ pressed }) => [styles.nativeActionItem, pressed && styles.nativeActionItemPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="更多操作"
+            onPress={() => {
+              hapticForScene('press');
+              Alert.alert(thread.title || '帖子', undefined, [
+                { text: '不感兴趣', onPress: () => handleMenuAction('dislike') },
+                { text: '屏蔽作者', onPress: () => handleMenuAction('block') },
+                { text: '复制标题', onPress: () => handleMenuAction('copy-title') },
+                { text: '取消', style: 'cancel' as const },
+              ]);
+            }}
+          >
+            <SymbolView name="ellipsis" size={15} weight="bold" tintColor={colors.textTertiary} />
+          </Pressable>
         </View>
       </EntranceRow>
     </View>
@@ -424,12 +418,21 @@ export default function ExploreScreen() {
         <FeedTabBar tabs={SEGMENTS} active={activeSegment} onChange={handleSegmentChange} />
 
         {/* 内容区：Feed 与热榜常驻挂载，display 隐藏切换 —— 热榜切回推荐
-            不再卸载 FeedContent，数据与滚动位置得以保留；热榜数据同样驻留。 */}
+            不再卸载 FeedContent，数据与滚动位置得以保留；热榜数据同样驻留。
+            ⚠️ 每个内容面板再包一层 ThemedHost：FeedContent/HotListContent
+            返回的 SwiftUI 根节点（VStack/ContentUnavailableView）必须是某个
+            Host 的直接子节点，否则挂在 RN View 下抛
+            "being mounted inside a standard UIView" RedBox（动态页未登录态
+            实测必现）。外层 RN View 只为 ×flex 布局，内层 Host 承载 SwiftUI。 */}
         <View style={[styles.segmentContent, activeSegment === 'hot' && styles.segmentHidden]}>
-          <FeedContent segment={lastFeedSegment} />
+          <ThemedHost style={{ flex: 1 }}>
+            <FeedContent segment={lastFeedSegment} />
+          </ThemedHost>
         </View>
         <View style={[styles.segmentContent, activeSegment !== 'hot' && styles.segmentHidden]}>
-          <HotListContent />
+          <ThemedHost style={{ flex: 1 }}>
+            <HotListContent />
+          </ThemedHost>
         </View>
       </View>
     </ThemedHost>

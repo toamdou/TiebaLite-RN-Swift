@@ -26,10 +26,12 @@ public final class TiebaGlassSurfaceView: ExpoView {
 
   /// 材质着色；UIVisualEffectView 无直接 tint，用覆盖半透明色层实现。
   /// 建议传入 alpha ≤ 0.15 的颜色，避免盖死内容。
-  var tintColor: UIColor? {
+  /// 命名避开 `UIView.tintColor`（open 属性），否则需 override 且语义会被
+  /// UIView 的 tint 渲染接管；JS prop 键名仍为 "tintColor"（见 TiebaNativeModule）。
+  var glassTintColor: UIColor? {
     didSet {
-      tintView.backgroundColor = tintColor
-      tintView.isHidden = tintColor == nil
+      tintView.backgroundColor = glassTintColor
+      tintView.isHidden = glassTintColor == nil
     }
   }
 
