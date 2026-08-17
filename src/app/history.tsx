@@ -21,8 +21,8 @@ import { hapticForScene } from '@/theme/hapticsMap';
 import { MenuView, type MenuAction } from '@expo/ui/community/menu';
 
 import { Button } from '@/components/ui/Button';
-import { Picker, Text as SWText } from '@expo/ui/swift-ui';
-import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
+import { Picker, Text as SWText, VStack, RNHostView } from '@expo/ui/swift-ui';
+import { pickerStyle, tag, padding } from '@expo/ui/swift-ui/modifiers';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -275,22 +275,23 @@ export default function HistoryPage() {
 
   return (
     <ThemedHost style={{ flex: 1 }}>
+      <VStack spacing={0}>
+      {/* Tabs Row — swift-ui Picker 必须直接置于 SwiftUI 容器，
+          嵌进 RN UIView 会触发 SwiftUIVirtualViewObjCDev 断言崩溃 */}
+      <Picker
+        selection={activeTab}
+        onSelectionChange={(value: string) => {
+          hapticForScene('toggle');
+          setActiveTab(value);
+        }}
+        modifiers={[pickerStyle('segmented'), padding({ horizontal: Spacing.lg, top: 10, bottom: 10 })]}
+      >
+        {TABS.map((t) => (
+          <SWText key={t.value} modifiers={[tag(t.value)]}>{t.label}</SWText>
+        ))}
+      </Picker>
+      <RNHostView>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Tabs Row */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.separator }]}>
-        <Picker
-          selection={activeTab}
-          onSelectionChange={(value: string) => {
-            hapticForScene('toggle');
-            setActiveTab(value);
-          }}
-          modifiers={[pickerStyle('segmented')]}
-        >
-          {TABS.map((t) => (
-            <SWText key={t.value} modifiers={[tag(t.value)]}>{t.label}</SWText>
-          ))}
-        </Picker>
-      </View>
 
       {/* Clear All Button */}
       {history.length > 0 && (
@@ -340,6 +341,8 @@ export default function HistoryPage() {
         ItemSeparatorComponent={HistoryRowSeparator}
       />
       </View>
+      </RNHostView>
+      </VStack>
     </ThemedHost>
   );
 }

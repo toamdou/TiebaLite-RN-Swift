@@ -1,155 +1,52 @@
 // ============================================================
-// TiebaLite React Native - Split Theme Context (Performance)
+// TiebaLite React Native - Theme Context (固定浅色/深色，跟随系统)
 //
-// Theme state is persisted through the Zustand preferences store;
-// this context only splits color consumers from action consumers to
-// avoid unnecessary re-renders.
+// 主题选择系统已移除：界面固定使用 iOS 浅色（白底黑字）或深色
+// （黑底白字），由系统外观自动切换（useColorScheme）。
 // ============================================================
 
 import React, {
   createContext,
-  useCallback,
   useContext,
   useMemo,
 } from 'react';
 import { useColorScheme } from 'react-native';
 
-import type { ThemeColors, ThemeName } from '@/types';
-import { getThemeColors, toLegacyThemeColors } from './colors';
 import type { SemanticColors } from './colors';
-import { usePreferencesStore } from '@/stores/preferencesStore';
-import { LIGHT_THEME_OPTIONS, DARK_THEME_OPTIONS } from '@/constants/app';
+import { getThemeColors } from './colors';
 
 // ---------- Types ----------
 
 interface ThemeColorsValue {
   colors: SemanticColors;
-  themeColors: ThemeColors;
   isDark: boolean;
-  lightThemeName: ThemeName;
-  darkThemeName: ThemeName;
-  themeName: ThemeName;
-  followSystemDarkMode: boolean;
-  darkMode: boolean;
+  themeName: 'tieba';
   translucentAlpha: number;
 }
 
-interface ThemeActionsValue {
-  setTheme: (name: ThemeName) => void;
-  setLightTheme: (name: ThemeName) => void;
-  setDarkTheme: (name: ThemeName) => void;
-  setDarkMode: (enabled: boolean) => void;
-  setFollowSystemDarkMode: (follow: boolean) => void;
-  setCustomPrimaryColor: (color: string) => void;
-  setTranslucentAlpha: (alpha: number) => void;
-  /** @deprecated Use setFollowSystemDarkMode */
-  setFollowSystem: (follow: boolean) => void;
-}
-
 const ThemeColorsContext = createContext<ThemeColorsValue | null>(null);
-const ThemeActionsContext = createContext<ThemeActionsValue | null>(null);
-
-const LIGHT_THEME_NAMES = new Set<ThemeName>(LIGHT_THEME_OPTIONS.map((t) => t.key));
-const DARK_THEME_NAMES = new Set<ThemeName>(DARK_THEME_OPTIONS.map((t) => t.key));
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemColorScheme = useColorScheme();
-  const systemIsDark = systemColorScheme === 'dark';
-
-  const preferences = usePreferencesStore((s) => s.preferences);
-  const setPreference = usePreferencesStore((s) => s.setPreference);
-
-  const lightThemeName: ThemeName = LIGHT_THEME_NAMES.has(preferences.lightTheme)
-    ? preferences.lightTheme
-    : 'tieba';
-  const darkThemeName: ThemeName = DARK_THEME_NAMES.has(preferences.darkTheme)
-    ? preferences.darkTheme
-    : 'dark';
-  const darkMode = preferences.darkMode;
-  const followSystemDarkMode = preferences.followSystemDarkMode;
-  const customPrimaryColor = preferences.customPrimaryColor;
-  const translucentAlpha = preferences.translucentAlpha;
-
-  const isDark = followSystemDarkMode ? systemIsDark : darkMode;
-  const effectiveTheme: ThemeName = isDark ? darkThemeName : lightThemeName;
+  const systemIsDark = useColorScheme() === 'dark';
 
   const colors = useMemo<SemanticColors>(
-    () => getThemeColors(effectiveTheme, customPrimaryColor, isDark),
-    [effectiveTheme, customPrimaryColor, isDark],
+    () => getThemeColors(systemIsDark),
+    [systemIsDark],
   );
-
-  const themeColors = useMemo<ThemeColors>(
-    () => toLegacyThemeColors(colors, effectiveTheme),
-    [colors, effectiveTheme],
-  );
-
-  const setLightTheme = useCallback(
-    (name: ThemeName) => setPreference('lightTheme', name),
-    [setPreference],
-  );
-  const setDarkTheme = useCallback(
-    (name: ThemeName) => setPreference('darkTheme', name),
-    [setPreference],
-  );
-  const setTheme = useCallback(
-    (name: ThemeName) => {
-      setPreference('lightTheme', name);
-      setPreference('darkTheme', name);
-    },
-    [setPreference],
-  );
-  const setDarkMode = useCallback(
-    (enabled: boolean) => setPreference('darkMode', enabled),
-    [setPreference],
-  );
-  const setFollowSystemDarkMode = useCallback(
-    (follow: boolean) => setPreference('followSystemDarkMode', follow),
-    [setPreference],
-  );
-  const setCustomPrimaryColor = useCallback(
-    (color: string) => setPreference('customPrimaryColor', color),
-    [setPreference],
-  );
-  const setTranslucentAlpha = useCallback(
-    (alpha: number) => setPreference('translucentAlpha', alpha),
-    [setPreference],
-  );
-  const setFollowSystem = setFollowSystemDarkMode;
 
   const colorsValue = useMemo<ThemeColorsValue>(
     () => ({
       colors,
-      themeColors,
-      isDark,
-      lightThemeName,
-      darkThemeName,
-      themeName: effectiveTheme,
-      followSystemDarkMode,
-      darkMode,
-      translucentAlpha,
+      isDark: systemIsDark,
+      themeName: 'tieba',
+      translucentAlpha: 0.85,
     }),
-    [colors, themeColors, isDark, lightThemeName, darkThemeName, effectiveTheme, followSystemDarkMode, darkMode, translucentAlpha],
-  );
-
-  const actionsValue = useMemo<ThemeActionsValue>(
-    () => ({
-      setTheme,
-      setLightTheme,
-      setDarkTheme,
-      setDarkMode,
-      setFollowSystemDarkMode,
-      setCustomPrimaryColor,
-      setTranslucentAlpha,
-      setFollowSystem,
-    }),
-    [setTheme, setLightTheme, setDarkTheme, setDarkMode, setFollowSystemDarkMode, setCustomPrimaryColor, setTranslucentAlpha, setFollowSystem],
+    [colors, systemIsDark],
   );
 
   return (
     <ThemeColorsContext.Provider value={colorsValue}>
-      <ThemeActionsContext.Provider value={actionsValue}>
-        {children}
-      </ThemeActionsContext.Provider>
+      {children}
     </ThemeColorsContext.Provider>
   );
 }
@@ -160,19 +57,11 @@ export function useThemeColors(): ThemeColorsValue {
   return ctx;
 }
 
-export function useThemeActions(): ThemeActionsValue {
-  const ctx = useContext(ThemeActionsContext);
-  if (!ctx) throw new Error('useThemeActions must be used within ThemeProvider');
-  return ctx;
+export function useThemeContext(): ThemeColorsValue {
+  return useThemeColors();
 }
 
-export function useThemeContext(): ThemeColorsValue & ThemeActionsValue {
-  const colors = useThemeColors();
-  const actions = useThemeActions();
-  return useMemo(() => ({ ...colors, ...actions }), [colors, actions]);
-}
-
-/** @deprecated Use useThemeColors() for UI components, useThemeActions() for controls */
+/** @deprecated Use useThemeColors() */
 export const useAppTheme = useThemeContext;
 
 export default ThemeColorsContext;

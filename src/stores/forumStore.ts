@@ -120,7 +120,10 @@ export const useForumStore = create<ForumState>((set, get) => ({
   // 返回 forum + thread_list + user_list + page + anti + nav_tab_info
   loadForumData: async (forumName: string, page: number, sortType: ForumSortType, isGood?: boolean) => {
     const seq = ++forumLoadSeq;
-    const sortTypeNum = sortType === ForumSortType.SEND_TIME ? 7 : 5;
+    // ⚠️ sort_type 必须对齐 Kotlin 原版（ForumSortType: REPLY_TIME=0, SEND_TIME=1；
+    // 精品 tab 传 -1）。RN 之前传 5/7 是"综合/推荐"排序值，服务器收到后把
+    // 吧页当成推荐流处理 → 返回跨吧推荐帖（"高通吧里是别的吧的帖子"）。
+    const sortTypeNum = isGood ? -1 : (sortType === ForumSortType.SEND_TIME ? 1 : 0);
 
     // Add good classify if selected
     const { goodClassifyId } = get();
@@ -133,7 +136,9 @@ export const useForumStore = create<ForumState>((set, get) => ({
         sortType: sortTypeNum,
         isGood: !!isGood,
         goodClassifyId: cidNum,
-        loadType: 0,
+        // Kotlin FrsPageRepository 吧页请求统一 loadType=1（RN 之前传 0，
+        // 与 sort_type=5/7 一样会把请求推向推荐流分支）。
+        loadType: 1,
       });
       if (seq !== forumLoadSeq) return;
 

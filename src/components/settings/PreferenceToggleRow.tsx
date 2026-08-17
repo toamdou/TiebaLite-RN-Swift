@@ -1,11 +1,13 @@
 /**
  * PreferenceToggleRow — SwiftUI Toggle bound directly to the preferences store.
+ *
+ * 直接置于 Form/Section 内（不经 ThemedHost matchContents 包裹）：
+ * 包裹会让 Toggle 按内容宽度收缩导致整行居中；原生 Section 行默认左对齐并填满。
  */
 
 import { Toggle, Text } from '@expo/ui/swift-ui';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { ThemedHost } from '@/components/ui/ThemedHost';
 import type { AppPreferences } from '@/types';
 
 export interface PreferenceToggleRowProps {
@@ -25,18 +27,16 @@ export function PreferenceToggleRow({
   const setPreference = usePreferencesStore((s) => s.setPreference);
 
   return (
-    <ThemedHost matchContents>
-      <Toggle
-        label={label}
-        systemImage={systemImage as any}
-        isOn={Boolean(value)}
-        onIsOnChange={(next) => {
-          hapticForScene('toggle');
-          setPreference(preferenceKey, next as never);
-        }}
-      >
-        {description ? <Text>{description}</Text> : null}
-      </Toggle>
-    </ThemedHost>
+    <Toggle
+      label={label}
+      systemImage={systemImage as any}
+      isOn={Boolean(value)}
+      onIsOnChange={(next) => {
+        hapticForScene('toggle');
+        setPreference(preferenceKey, next as never);
+      }}
+    >
+      {description ? <Text>{description}</Text> : null}
+    </Toggle>
   );
 }

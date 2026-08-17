@@ -6,7 +6,7 @@
  * search history, and paginated results.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -254,42 +254,55 @@ export default function ForumSearchPage() {
     <ThemedHost style={{ flex: 1 }}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ headerSearchBarOptions: searchBarOptions }} />
+      {/* 当前搜索词：iOS 原生搜索栏搜索后可能不显示输入文字，这里常驻展示 */}
+      {searched && (
+        <View style={styles.keywordBar}>
+          <SymbolView name="magnifyingglass" size={13} tintColor={colors.textTertiary} />
+          <Text style={[styles.keywordText, { color: colors.text }]} numberOfLines={1}>
+            “{searchQuery}”
+          </Text>
+        </View>
+      )}
       {/* Sort & Filter native menus */}
       <View style={styles.controlsRow}>
-        <Picker<string>
-          selection={sortType}
-          label={SORT_OPTIONS.find((opt) => opt.value === sortType)?.label ?? '排序'}
-          onSelectionChange={(value) => {
-            hapticForScene('toggle');
-            setSortType(String(value));
-          }}
-          modifiers={[
-            pickerStyle('menu'),
-            frame({ minWidth: 104 }),
-            accessibilityLabel('帖子排序'),
-          ]}
-        >
-          {SORT_OPTIONS.map((opt) => (
-            <SWText key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</SWText>
-          ))}
-        </Picker>
-        <Picker<string>
-          selection={filterType}
-          label={FILTER_OPTIONS.find((opt) => opt.value === filterType)?.label ?? '筛选'}
-          onSelectionChange={(value) => {
-            hapticForScene('toggle');
-            setFilterType(String(value));
-          }}
-          modifiers={[
-            pickerStyle('menu'),
-            frame({ minWidth: 104 }),
-            accessibilityLabel('帖子筛选'),
-          ]}
-        >
-          {FILTER_OPTIONS.map((opt) => (
-            <SWText key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</SWText>
-          ))}
-        </Picker>
+        <ThemedHost matchContents>
+          <Picker<string>
+            selection={sortType}
+            label={SORT_OPTIONS.find((opt) => opt.value === sortType)?.label ?? '排序'}
+            onSelectionChange={(value) => {
+              hapticForScene('toggle');
+              setSortType(String(value));
+            }}
+            modifiers={[
+              pickerStyle('menu'),
+              frame({ minWidth: 104 }),
+              accessibilityLabel('帖子排序'),
+            ]}
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <SWText key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</SWText>
+            ))}
+          </Picker>
+        </ThemedHost>
+        <ThemedHost matchContents>
+          <Picker<string>
+            selection={filterType}
+            label={FILTER_OPTIONS.find((opt) => opt.value === filterType)?.label ?? '筛选'}
+            onSelectionChange={(value) => {
+              hapticForScene('toggle');
+              setFilterType(String(value));
+            }}
+            modifiers={[
+              pickerStyle('menu'),
+              frame({ minWidth: 104 }),
+              accessibilityLabel('帖子筛选'),
+            ]}
+          >
+            {FILTER_OPTIONS.map((opt) => (
+              <SWText key={opt.value} modifiers={[tag(opt.value)]}>{opt.label}</SWText>
+            ))}
+          </Picker>
+        </ThemedHost>
       </View>
       {/* Search History (only when no results and not searched) */}
       {!searched && history.length > 0 && (
@@ -373,6 +386,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // 当前搜索词
+  keywordBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+  },
+  keywordText: {
+    fontSize: 15,
+    fontWeight: '600',
+    flexShrink: 1,
   },
   controlsRow: {
     flexDirection: 'row',

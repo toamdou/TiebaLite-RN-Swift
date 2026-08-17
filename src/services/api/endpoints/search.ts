@@ -15,7 +15,16 @@ import { SearchThreadFilter, SearchThreadOrder } from '@/types';
 
 function toArray(val: any): any[] { if (!val) return []; if (Array.isArray(val)) return val; return Object.values(val); }
 function toExact(val: any): any | null { if (!val || Array.isArray(val)) return null; return val; }
-const mapForumItem = (item: any): SearchForumResult => ({ forumId: String(item.forum_id ?? ''), forumName: item.forum_name ?? '', avatar: item.avatar ?? '', memberCount: parseInt(String(item.concern_num ?? '0'), 10), threadCount: parseInt(String(item.post_num ?? '0'), 10), isLike: (item.has_concerned ?? 0) === 1 });
+const mapForumItem = (item: any): SearchForumResult => ({
+  forumId: String(item.forum_id ?? ''),
+  forumName: item.forum_name ?? '',
+  avatar: item.avatar ?? '',
+  // ⚠️ 必须用 *_ori 原始数字字段：concern_num/post_num 是格式化字符串
+  // （"19W"/"522W"），parseInt 会得到 19/522 这种错误数据。
+  memberCount: parseInt(String(item.concern_num_ori ?? item.concernNum ?? item.concern_num ?? '0'), 10) || 0,
+  threadCount: parseInt(String(item.post_num_ori ?? item.postNum ?? item.post_num ?? '0'), 10) || 0,
+  isLike: (item.has_concerned ?? 0) === 1,
+});
 
 export async function searchForum(keyword: string, signal?: AbortSignal): Promise<SearchForumResult[]> {
   const raw = (

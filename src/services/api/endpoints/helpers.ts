@@ -86,29 +86,45 @@ function buildUserMap(userList: any[], keyOf: (u: any) => string): Map<string, a
   return map;
 }
 
+/** 贴吧图床域名（头像/帖子图）——iOS ATS 禁 http，图床 URL 升级为 https */
+const TIEBA_IMG_RE = /(imgsrc|tiebapic|hiphotos|himg|gss\d?)\.baidu\.com/i;
+
+/** 图床 http/协议相对 → https（ATS 明文拦截；非图床 URL 原样透传） */
+export function toHttpsImgUrl(src: string): string {
+  if (!src) return src;
+  if (src.startsWith('http://')) {
+    return TIEBA_IMG_RE.test(src) ? src.replace(/^http:\/\//i, 'https://') : src;
+  }
+  // 协议相对 URL（//imgsrc.baidu.com/...）：expo-image 不识别 // 开头
+  if (src.startsWith('//')) {
+    return TIEBA_IMG_RE.test(src) ? `https:${src}` : src;
+  }
+  return src;
+}
+
 export function mapMediaList(raw: any): MediaInfo[] {
   const list = [raw?.media, raw?.media_list].find(Array.isArray) ?? (Array.isArray(raw) ? raw : []);
   const result: MediaInfo[] = [];
   for (const m of list) {
     if (!m || typeof m !== 'object') continue;
     const mediaType = String(m.type ?? '');
+    // ⚠️ 只有显式视频类型/字段才算视频。贴吧 media 的数字 type（1/2/3…）
+    // 是图片类型（普通图/动图/长图），不能当视频——之前误判导致所有
+    // 帖子左上角都出现播放标识。
     const isVideo =
       mediaType === 'video' ||
-      mediaType === '1' ||
-      mediaType === '2' ||
-      mediaType === '3' ||
       !!(m.vsrc ?? m.video_src ?? m.videoSrc ?? m.video);
-    const src = String(
+    const src = toHttpsImgUrl(String(
       m.bigPic ?? m.big_pic ?? m.bigSrc ?? m.big_src ??
       m.originPic ?? m.origin_pic ?? m.originSrc ?? m.origin_src ??
       m.srcPic ?? m.src_pic ?? m.src ?? '',
-    );
+    ));
     if (!src) continue;
     result.push({
       type: isVideo ? 'video' : 'image',
       src,
       originSrc:
-        String(m.originPic ?? m.origin_pic ?? m.originSrc ?? m.origin_src ?? m.bigPic ?? m.big_pic ?? '') || undefined,
+        toHttpsImgUrl(String(m.originPic ?? m.origin_pic ?? m.originSrc ?? m.origin_src ?? m.bigPic ?? m.big_pic ?? '')) || undefined,
       poster:
         String(m.poster ?? m.video_poster ?? m.videoPoster ?? '') ||
         (isVideo ? src : undefined),
@@ -129,7 +145,13 @@ export function mapProtoThread(
   const userList = opts?.userList ?? [];
   const userMap = buildUserMap(userList, (u) => u.id ?? u.uid ?? u.user_id ?? '');
   const authorId = String(raw.authorId ?? raw.author_id ?? raw.author?.id ?? '');
-  const author = raw.author ?? userMap.get(authorId) ?? {};
+  // ⚠️ raw.author 可能是"存在但为空对象 {}"（proto3 解码产物），`??` 不会
+  // 回退到 userMap → 作者名/头像全空。必须判空：author 有键才用内嵌，
+  // 否则从 userList 按 authorId 匹配（对齐 Kotlin userList.first { id == authorId }）。
+  const rawAuthor = raw.author && typeof raw.author === 'object' && Object.keys(raw.author).length > 0
+    ? raw.author
+    : undefined;
+  const author = rawAuthor ?? userMap.get(authorId) ?? {};
   const forum = opts?.forum ?? {};
   const forumName = opts?.forumName ?? raw.forumName ?? raw.forum_name ?? forum?.name ?? '';
   const abstractRaw = raw._abstract ?? raw.abstract;
@@ -188,25 +210,26 @@ export function mapProtoPosts(rawPosts: any[], threadId: string, userList: any[]
   // Build user lookup map (mirrors Kotlin PbPageRepository: userList.first { user.id == post.author_id })
   const userMap = buildUserMap(userList, (u) => u.id ?? '');
 
-  if (__DEV__) {
-    console.log(`[mapProtoPosts] rawPosts.length=${rawPosts?.length ?? 0} userList.length=${userList.length}`);
-    if (rawPosts?.[0]) {
-      const p0 = rawPosts[0];
-      console.log(`[mapProtoPosts] post[0] id=${p0.id} floor=${p0.floor} contentLen=${p0.content?.length ?? 0}`);
-      console.log(`[mapProtoPosts] post[0].content[0..1]=${JSON.stringify((p0.content ?? []).slice(0, 2))}`);
-    }
-  }
   return rawPosts.map((p: any) => {
     // Lookup author: embedded in post, or from userList by authorId
+    // ⚠️ p.author 可能是空对象 {}（proto3 解码产物），`??` 不会回退到
+    // userMap → 回复者头像/名称全空。必须判空（与 mapProtoThread 同因）。
     const authorId = String(p.authorId ?? p.author?.id ?? '');
-    const author = p.author ?? userMap.get(authorId) ?? {};
+    const rawAuthor = p.author && typeof p.author === 'object' && Object.keys(p.author).length > 0
+      ? p.author
+      : undefined;
+    const author = rawAuthor ?? userMap.get(authorId) ?? {};
     const rawSubPosts = p.subPostList?.subPostList ?? p.subPostList?.sub_post_list ?? [];
     // 字段裁剪（性能 P1）：UI 预览最多展示前 3 条楼中楼（PostCard slice(0,3)），
     // 完整楼中楼走 pbFloor 单独加载，故这里只映射前 3 条，避免整篇 subPosts 全文驻留内存。
     const cappedSubPosts = Array.isArray(rawSubPosts) ? rawSubPosts.slice(0, 3) : [];
     const mappedSubPosts: SubPostInfo[] = cappedSubPosts.map((sp: any) => {
       const spAuthorId = String(sp.authorId ?? sp.author_id ?? sp.author?.id ?? '');
-      const spAuthor = sp.author ?? userMap.get(spAuthorId) ?? {};
+      // 判空内嵌 author（同 mapProtoThread 空对象 {} 问题）
+      const spRawAuthor = sp.author && typeof sp.author === 'object' && Object.keys(sp.author).length > 0
+        ? sp.author
+        : undefined;
+      const spAuthor = spRawAuthor ?? userMap.get(spAuthorId) ?? {};
       return {
         id: String(sp.id ?? ''),
         postId: String(p.id ?? ''),

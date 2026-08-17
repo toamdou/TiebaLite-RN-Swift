@@ -18,15 +18,16 @@ import {
   RefreshControl,
 } from 'react-native';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, withTiming, withSequence, withDelay,
+  useSharedValue, useAnimatedStyle,
+  withSpring, withTiming, withSequence, withDelay,
 } from 'react-native-reanimated';
 import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, Stack, Link, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Picker, Text as SWText, Menu, ConfirmationDialog, Button as SWButton } from '@expo/ui/swift-ui';
-import { pickerStyle, tag, labelStyle, buttonStyle } from '@expo/ui/swift-ui/modifiers';
+import { Picker, Text as SWText, ConfirmationDialog, Button as SWButton } from '@expo/ui/swift-ui';
+import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import BottomSheetComponent, { BottomSheetScrollView } from '@expo/ui/community/bottom-sheet';
 import type { BottomSheet } from '@expo/ui/community/bottom-sheet';
 import { SymbolView } from '@/components/ui/SymbolView';
@@ -118,7 +119,7 @@ function parseGeneralThread(item: any, forumName: string, userList: any[]): Thre
 export default function ForumPage() {
   const { name } = useLocalSearchParams<{ name: string }>();
   const insets = useSafeAreaInsets();
-  const { colors } = useThemeColors();
+  const { colors, isDark } = useThemeColors();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const router = useRouter();
 
@@ -144,6 +145,7 @@ export default function ForumPage() {
 
   const incognitoMode = useAppPreference('incognitoMode', false);
   const forumSingleColumn = useAppPreference('forumSingleColumn', false);
+  const blockVideo = useAppPreference('blockVideo', false);
   const numColumns = forumSingleColumn ? 1 : 2;
 
   const customTabs = useMemo(
@@ -166,19 +168,20 @@ export default function ForumPage() {
       const data = await generalTabList(params.fid, {
         pn: page,
         rn: 30,
-        tabCode: params.tab.tabCode,
+        tabId: params.tab.tabId,
         tabName: params.tab.tabName,
         tabType: params.tab.tabType,
         sortType: params.tab.sortType,
+        isGeneralTab: params.tab.isGeneralTab,
       }, signal);
-      const rawThreads = data?.threadList ?? data?.thread_list ?? [];
+      const rawThreads = data?.generalList ?? data?.threadList ?? data?.thread_list ?? [];
       const userList = data?.userList ?? data?.user_list ?? [];
       const threads: ThreadInfo[] = rawThreads.map((item: any) =>
         parseGeneralThread(item, params.forumName, userList),
       );
       return {
         items: threads,
-        hasMore: (data?.page?.hasMore ?? data?.page?.has_more ?? 0) === 1,
+        hasMore: (data?.hasMore ?? data?.has_more ?? 0) === 1,
         nextPage: page + 1,
       };
     },
@@ -217,14 +220,16 @@ export default function ForumPage() {
   const { reduceMotion } = useReducedMotion();
 
   const visibleThreads = useMemo(() => {
-    if (blockedWords.length === 0 && blockedUsers.length === 0) return forumThreads;
-    return forumThreads.filter((t) => {
+    let list = forumThreads;
+    if (blockVideo) list = list.filter((t) => !t.isVideo);
+    if (blockedWords.length === 0 && blockedUsers.length === 0) return list;
+    return list.filter((t) => {
       const text = `${t.title || ''} ${t.abstract || ''}`;
       if (BlockManager.shouldBlockContent(text, blockedWords)) return false;
       if (t.authorId && BlockManager.shouldBlockUser(t.authorId, t.authorName || null, blockedUsers)) return false;
       return true;
     });
-  }, [forumThreads, blockedWords, blockedUsers]);
+  }, [forumThreads, blockedWords, blockedUsers, blockVideo]);
 
   // ── iOS 26+ Hero Entrance Animation (Reanimated 4) ──
   const heroAvatarScale = useSharedValue(0.92);
@@ -260,9 +265,42 @@ export default function ForumPage() {
     opacity: heroContentOpacity.value,
     transform: [{ translateY: heroContentSlideY.value }],
   }));
+
+  // ── FAB 滚动自动隐藏：向下滚隐藏、向上滚/回顶部显示（对齐底栏行为）──
+  // ⚠️ FlashList 2.3.2 要求 onScroll 是普通函数（内部直接 props.onScroll(event)
+  // 调用）；useAnimatedScrollHandler 返回的 {onScroll: worklet} 对象会触发
+  // "TypeError: undefined is not a function"。这里用普通函数读滚动事件、
+  // 在 JS 线程设 sharedValue（withSpring 动画仍在 UI 线程跑），兼容且丝滑。
+  const fabTranslateY = useSharedValue(0);
+  const fabVisibleSV = useSharedValue(1);
+  const lastFabScrollY = useSharedValue(0);
   const fabAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: fabScale.value }],
+    transform: [{ scale: fabScale.value }, { translateY: fabTranslateY.value }],
+    opacity: fabVisibleSV.value,
   }));
+  const handleFabScroll = useCallback((event: any) => {
+    const raw = event?.nativeEvent ?? event ?? {};
+    const y = raw?.contentOffset?.y ?? 0;
+    const dy = y - lastFabScrollY.value;
+    lastFabScrollY.value = y;
+    // 顶部附近：总是显示
+    if (y < 10) {
+      if (fabVisibleSV.value === 0) {
+        fabVisibleSV.value = 1;
+        fabTranslateY.value = withSpring(0, MOMENTUM);
+      }
+      return;
+    }
+    if (dy > 2 && fabVisibleSV.value === 1) {
+      // 向下滚 → 隐藏（移出屏幕）
+      fabVisibleSV.value = 0;
+      fabTranslateY.value = withSpring(120, MOMENTUM);
+    } else if (dy < -2 && fabVisibleSV.value === 0) {
+      // 向上滚 → 显示
+      fabVisibleSV.value = 1;
+      fabTranslateY.value = withSpring(0, MOMENTUM);
+    }
+  }, [lastFabScrollY, fabVisibleSV, fabTranslateY]);
 
   useEffect(() => {
     if (loaded && currentForum) {
@@ -289,15 +327,39 @@ export default function ForumPage() {
   const flatListRef = useRef<any>(null);
 
   // ── Load forum data ──
+  // 吧切换时重置上一个吧的残留数据（forumStore 是全局单例，不清理会
+  // 显示上个吧的内容 → "点进哪个吧内容都一样/内容错乱"）。
+  // currentTab/navTabInfo/goodClassify 必须一并重置：若上个吧停在自定义
+  // Tab（currentTab>=3），切到新吧后 currentTab 保持旧值，会继续用旧吧的
+  // customPaged 缓存渲染列表（串吧），且 navTabInfo 是上个吧的 tab 结构。
+  useEffect(() => {
+    if (__DEV__) console.log('[forum] name param =', JSON.stringify(name));
+    setError(null);
+    setLoaded(false);
+    customPaged.reset();
+    useForumStore.setState({
+      latestThreads: [],
+      goodThreads: [],
+      latestPage: 1,
+      goodPage: 1,
+      currentForum: null,
+      currentTab: 0,
+      goodClassifyId: null,
+      goodClassify: [],
+      navTabInfo: null,
+    });
+  }, [name]);
+
   const doLoad = useCallback(async (p: number, isGood?: boolean) => {
     if (!name) return;
     try {
       const good = isGood ?? (currentTab === 2);
-      // Tab 0 = 热门 (REPLY_TIME), Tab 1 = 最新 (SEND_TIME), Tab 2 = 精品
+      // Tab 0 = 热门（固定按回复时间），Tab 1 = 最新（用用户选择的排序，
+      // 对齐 Kotlin 最新 tab 的"按回复/按发帖"菜单），Tab 2 = 精品。
       const sort = good
         ? forumSortType
         : currentTab === 1
-          ? ForumSortType.SEND_TIME
+          ? forumSortType
           : ForumSortType.REPLY_TIME;
       await loadForumData(name, p, sort, good);
       setError(null);
@@ -363,8 +425,8 @@ export default function ForumPage() {
     }
 
     if (currentTab === 0 || currentTab === 1) {
-      // 热门 or 最新 — always reload with the correct sort type
-      const sort = currentTab === 0 ? ForumSortType.REPLY_TIME : ForumSortType.SEND_TIME;
+      // 热门固定按回复时间；最新用用户选择的排序（按回复/按发帖）
+      const sort = currentTab === 0 ? ForumSortType.REPLY_TIME : forumSortType;
       loadForumData(name, 1, sort, false).catch(() => {});
     } else if (currentTab === 2) {
       // 精品 — only load if no data yet
@@ -473,6 +535,15 @@ export default function ForumPage() {
     if (!isNaN(tab)) setCurrentTab(tab);
   }, [setCurrentTab]);
 
+  // ── 最新 tab 排序切换（对齐 Kotlin：按回复时间 / 按发帖时间）──
+  const handleSortChange = useCallback((sort: ForumSortType) => {
+    if (sort === forumSortType) return;
+    hapticForScene('toggle');
+    useForumStore.getState().setForumSortType(sort);
+    // 清空当前列表并重新加载（setForumSortType 已清 latestThreads）
+    doLoadRef.current(1, false);
+  }, [forumSortType]);
+
   // ── Header right buttons ──
   const handleShareForum = useCallback(async () => {
     await Share.share({
@@ -485,6 +556,19 @@ export default function ForumPage() {
     hapticForScene('action-success');
     Alert.alert('已复制', '吧链接已复制到剪贴板');
   }, [name]);
+
+  // 三点菜单：原生 ActionSheet 底部弹窗（替代无响应的 SwiftUI Menu）
+  const handleMorePress = useCallback(() => {
+    hapticForScene('press');
+    Alert.alert(`${name}吧`, undefined, [
+      { text: '分享', onPress: () => { handleShareForum(); } },
+      { text: '复制链接', onPress: () => { handleCopyForumLink(); } },
+      ...(isLoggedIn && currentForum?.isLike
+        ? [{ text: '取消关注', style: 'destructive' as const, onPress: () => { setUnfollowConfirmVisible(true); } }]
+        : []),
+      { text: '取消', style: 'cancel' as const },
+    ]);
+  }, [name, isLoggedIn, currentForum?.isLike, handleShareForum, handleCopyForumLink]);
 
   const handleUnfollowConfirm = useCallback(async () => {
     if (!currentForum) return;
@@ -504,23 +588,22 @@ export default function ForumPage() {
           <SymbolView name="checkmark.seal" size={20} tintColor={colors.primary} />
         </Pressable>
       )}
-      <Link href={`/forum/${encodeURIComponent(name)}/search?forumId=${currentForum?.forumId || ''}`} asChild>
-        <Pressable style={styles.headerButton} hitSlop={8}>
-          <SymbolView name="magnifyingglass" size={20} tintColor={colors.primary} />
+      {/* 搜索 + 三点：包在同一个药丸容器内，黑白图标，不超出屏幕 */}
+      <View style={[styles.headerPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)' }]}>
+        <Link href={`/forum/${encodeURIComponent(name)}/search?forumId=${currentForum?.forumId || ''}`} asChild>
+          <Pressable style={styles.headerPillButton} hitSlop={8}>
+            <SymbolView name="magnifyingglass" size={17} tintColor={colors.primary} />
+          </Pressable>
+        </Link>
+        {/* 三点菜单：SwiftUI Menu 嵌入 RN 树在 iOS 26 上点击无响应（RNGH
+            触摸不转发），改用原生 ActionSheet 底部弹窗 */}
+        <Pressable onPress={handleMorePress} style={styles.headerPillButton} hitSlop={8}>
+          <SymbolView name="ellipsis" size={17} tintColor={colors.primary} />
         </Pressable>
-      </Link>
-      <ThemedHost matchContents style={{ alignSelf: 'center' }}>
-        <Menu label="" systemImage="ellipsis" modifiers={[labelStyle('iconOnly'), buttonStyle('plain')]}>
-          <SWButton label="分享" systemImage="square.and.arrow.up" onPress={handleShareForum} />
-          <SWButton label="复制链接" systemImage="link" onPress={handleCopyForumLink} />
-          {isLoggedIn && currentForum?.isLike && (
-            <SWButton label="取消关注" systemImage="person.badge.minus" role="destructive" onPress={() => setUnfollowConfirmVisible(true)} />
-          )}
-        </Menu>
-      </ThemedHost>
+      </View>
       </View>
     );
-  }, [isLoggedIn, handleSign, name, currentForum?.forumId, currentForum?.isLike, colors.primary, handleShareForum, handleCopyForumLink]);
+  }, [isLoggedIn, handleSign, name, currentForum?.forumId, currentForum?.isLike, colors.primary, isDark, handleShareForum, handleCopyForumLink]);
 
   // ── FAB ──
   const animateFab = useCallback(() => {
@@ -534,8 +617,7 @@ export default function ForumPage() {
   const handleFabPress = useCallback(() => {
     hapticForScene('press');
     animateFab();
-    // 'post' (发帖) was removed together with the /compose feature — the FAB
-    // now falls back to refresh for that preference.
+    // 发帖入口已移除（无 /compose 功能），FAB 只提供浏览类操作。
     switch (forumFabFunction) {
       case 'back_to_top':
         flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -543,7 +625,6 @@ export default function ForumPage() {
       case 'hide':
         setFabVisible((v) => !v);
         break;
-      case 'post':
       case 'refresh':
       default:
         handleRefresh();
@@ -722,6 +803,32 @@ export default function ForumPage() {
           </Picker>
         </ThemedHost>
 
+        {/* 最新 tab 排序切换（原生 ActionSheet，与三点菜单同理——
+            SwiftUI Menu 嵌 RN 树在 iOS 26 上点击无响应） */}
+        {currentTab === 1 && (
+          <View style={styles.sortRow}>
+            <Pressable
+              style={styles.sortBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="帖子排序方式"
+              onPress={() => {
+                hapticForScene('press');
+                Alert.alert('帖子排序', undefined, [
+                  { text: '按回复时间', onPress: () => handleSortChange(ForumSortType.REPLY_TIME) },
+                  { text: '按发帖时间', onPress: () => handleSortChange(ForumSortType.SEND_TIME) },
+                  { text: '取消', style: 'cancel' as const },
+                ]);
+              }}
+            >
+              <SymbolView name="arrow.up.arrow.down" size={14} weight="semibold" tintColor={colors.primary} />
+              <Text style={[styles.sortBtnText, { color: colors.primary }]}>
+                {forumSortType === ForumSortType.SEND_TIME ? '按发帖时间' : '按回复时间'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Good classify indicator + filter button */}
         {currentTab === 2 && (
           <View style={styles.classifyRow}>
@@ -831,7 +938,7 @@ export default function ForumPage() {
         keyExtractor={threadKeyExtractor}
         numColumns={numColumns}
         estimatedItemSize={numColumns === 2 ? 290 : 160}
-        maintainVisibleContentPosition={{ autoscrollToTopThreshold: 100, minIndexForVisible: 0 }}
+        maintainVisibleContentPosition={{ autoscrollToTopThreshold: 100 }}
         renderItem={renderItem}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={listEmpty}
@@ -842,6 +949,8 @@ export default function ForumPage() {
         ListFooterComponent={listFooter}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.3}
+        onScroll={handleFabScroll}
+        scrollEventThrottle={16}
         drawDistance={300}
         maxItemsInRecyclePool={24}
         decelerationRate="normal"
@@ -875,7 +984,7 @@ export default function ForumPage() {
                   ? 'eye.slash'
                   : 'arrow.clockwise'
             }
-            size={22}
+            size={18}
             tintColor="#FFFFFF"
             weight="semibold"
           />
@@ -934,7 +1043,7 @@ export default function ForumPage() {
 // ────────────────────────────────────────────────────────────
 
 const ForumThreadCard = React.memo(function ForumThreadCard({
-  item, colors, grid = false, onLike,
+  item, colors, grid = false, onImagePress, onLike,
 }: {
   item: ThreadInfo; colors: any; grid?: boolean;
   onImagePress: (images: string[], index: number) => void;
@@ -982,13 +1091,27 @@ const ForumThreadCard = React.memo(function ForumThreadCard({
           {showHero ? (
             /* == 有图：全幅图片 + 底部渐变遮罩 + 白色文字叠加 == */
             <View style={styles.heroContent}>
-              <Image
-                source={{ uri: item.mediaList![0].src }}
+              {/* 点击图片直接打开大图查看器（不进入帖子） */}
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onImagePress(
+                    (item.mediaList ?? []).map((m) => m.src).filter(Boolean) as string[],
+                    0,
+                  );
+                }}
                 style={StyleSheet.absoluteFill}
-                contentFit="cover"
-                transition={200}
-                recyclingKey={item.mediaList![0].src}
-              />
+                accessibilityRole="imagebutton"
+                accessibilityLabel={`查看帖子图片，共${mediaCount}张`}
+              >
+                <Image
+                  source={{ uri: item.mediaList![0].src }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  transition={200}
+                  recyclingKey={item.mediaList![0].src}
+                />
+              </Pressable>
 
               <LinearGradient
                 colors={['transparent', 'rgba(0,0,0,0.7)']}
@@ -1015,6 +1138,7 @@ const ForumThreadCard = React.memo(function ForumThreadCard({
                   {'  ·  '}
                   {formatCount(item.replyNum)}回复
                   {mediaCount > 1 ? `  ·  ${mediaCount}图` : ''}
+                  {item.lastTime ? `  ·  ${relativeTime(item.lastTime)}` : ''}
                 </Text>
               </View>
             </View>
@@ -1040,7 +1164,8 @@ const ForumThreadCard = React.memo(function ForumThreadCard({
                     )}
                   </View>
                   <Text style={[styles.cardTime, { color: colors.textTertiary }]}>
-                    {relativeTime(item.lastTime)}
+                    {item.createTime ? `发帖 ${relativeTime(item.createTime)}` : relativeTime(item.lastTime)}
+                    {item.lastTime && item.createTime ? ` · 回复 ${relativeTime(item.lastTime)}` : ''}
                   </Text>
                 </View>
               </View>
@@ -1091,28 +1216,28 @@ const ForumThreadCard = React.memo(function ForumThreadCard({
                   ) : null}
                 </View>
               )}
-
-              {/* -- Action bar: share | like -- */}
-              <View style={[styles.actionBar, { borderTopColor: colors.divider }]}>
-                <Pressable style={styles.actionBtn} onPress={() => onLike?.(item)}>
-                  <SymbolView
-                    name={item.hasAgree ? 'heart.fill' : 'heart'}
-                    size={14}
-                    tintColor={item.hasAgree ? '#FF3B30' : colors.textTertiary}
-                  />
-                  <Text style={[styles.actionText, { color: item.hasAgree ? '#FF3B30' : colors.textTertiary }]}>
-                    {item.zanNum && item.zanNum > 0 ? formatCount(item.zanNum) : '赞'}
-                  </Text>
-                </Pressable>
-                <Pressable style={styles.actionBtn} onPress={handleShare}>
-                  <SymbolView name="arrowshape.turn.up.right" size={14} tintColor={colors.textTertiary} />
-                  <Text style={[styles.actionText, { color: colors.textTertiary }]}>
-                    {item.shareNum && item.shareNum > 0 ? formatCount(item.shareNum) : '分享'}
-                  </Text>
-                </Pressable>
-              </View>
             </View>
           )}
+
+          {/* -- Action bar: share | like（两种卡片共用；有图卡片在图片下方） -- */}
+          <View style={[styles.actionBar, { borderTopColor: colors.divider }]}>
+            <Pressable style={styles.actionBtn} onPress={() => onLike?.(item)}>
+              <SymbolView
+                name={item.hasAgree ? 'heart.fill' : 'heart'}
+                size={16}
+                tintColor={item.hasAgree ? '#FF3B30' : colors.textTertiary}
+              />
+              <Text style={[styles.actionText, { color: item.hasAgree ? '#FF3B30' : colors.textTertiary }]}>
+                {item.zanNum && item.zanNum > 0 ? formatCount(item.zanNum) : '赞'}
+              </Text>
+            </Pressable>
+            <Pressable style={styles.actionBtn} onPress={handleShare}>
+              <SymbolView name="arrowshape.turn.up.right" size={16} tintColor={colors.textTertiary} />
+              <Text style={[styles.actionText, { color: colors.textTertiary }]}>
+                {item.shareNum && item.shareNum > 0 ? formatCount(item.shareNum) : '分享'}
+              </Text>
+            </Pressable>
+          </View>
         </View>
         </Animated.View>
       </Pressable>
@@ -1265,6 +1390,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     marginBottom: Spacing.xs,
   },
+  // ── 最新 tab 排序切换行 ──
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+    marginBottom: Spacing.xs,
+  },
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: 10,
+    borderRadius: Radius.chip,
+  },
+  sortBtnText: { fontSize: 13, fontWeight: '600' },
   classifyIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1313,7 +1454,10 @@ const styles = StyleSheet.create({
     height: 240,
   },
   textContent: {
-    padding: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    // 底部收窄：actionBar 紧随文字，避免"文字与操作栏之间大片空白"
+    paddingBottom: Spacing.sm,
   },
   threadTitle: { fontSize: 18, fontWeight: '700', lineHeight: 26, marginBottom: Spacing.sm, letterSpacing: -0.2 },
   threadAbstract: { fontSize: 15, lineHeight: 22, marginBottom: Spacing.md, letterSpacing: 0, opacity: 0.85 },
@@ -1396,11 +1540,12 @@ const styles = StyleSheet.create({
   actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 10,
+    // 上下等距内边距 + 足够高，操作栏看起来饱满（之前只有 paddingTop 太矮）
+    paddingVertical: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  actionText: { fontSize: 13, fontWeight: '500' },
+  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  actionText: { fontSize: 14, fontWeight: '500' },
 
   // ── Card author row ──
   cardAuthorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
@@ -1416,13 +1561,21 @@ const styles = StyleSheet.create({
   // 避免全面屏 Home Indicator 遮挡。静态样式只保留 right。
   fabContainer: { position: 'absolute', right: Spacing.xl, zIndex: 100 },
   fab: {
-    width: 52, height: 52, borderRadius: Radius.capsule,
+    width: 44, height: 44, borderRadius: Radius.capsule,
     justifyContent: 'center', alignItems: 'center',
   },
 
   // ── Header buttons ──
   headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   headerButton: { padding: Spacing.sm },
+  headerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 4,
+    gap: 2,
+  },
+  headerPillButton: { padding: 6 },
 
   // ── Good classify picker (native bottom sheet) ──
   classifySheetScroll: {

@@ -1,22 +1,14 @@
 /**
- * Profile Tab (我的) — SwiftUI 原生实现
+ * Profile Tab (我的) — 官方 @expo/ui FieldGroup 原生 Form 实现
  *
- * 使用 @expo/ui/swift-ui 的 Form + Section + Label + Button
- * 获得与 iOS 系统设置/通讯录一致的分组列表体验：
- * - 用户卡片区域：VStack + 头像 + 统计
- * - 功能菜单：Form + Section + Label(systemImage) 彩色图标
- * - 登录按钮：buttonStyle('glassProminent') 液态玻璃
- * - 签到：Button + buttonStyle('bordered')
+ * iOS 上 FieldGroup = SwiftUI Form（iOS 26 液态玻璃分组材质），
+ * ListItem = 原生行（leading 色块图标 / 标题 / 副标题 / trailing 开关或 chevron）。
+ * 用户卡片为 RN 布局（头像+统计），叠在淡色渐变上让液态玻璃有可模糊内容。
+ * 全局背景白色（theme/colors.ts 浅色 background 已改 #FFFFFF）。
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Form, Section, Button, Text, Label, VStack,
-  RNHostView,
-} from '@expo/ui/swift-ui';
-import {
-  foregroundStyle, buttonStyle, buttonBorderShape, frame, refreshable,
-} from '@expo/ui/swift-ui/modifiers';
+import { FieldGroup, ListItem } from '@expo/ui';
 import {
   DeviceEventEmitter,
   Pressable,
@@ -24,16 +16,17 @@ import {
   Text as RNText,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { Avatar } from '@/components/ui/Avatar';
-import { Button as UIButton } from '@/components/ui/Button';
-import { ThemedHost } from '@/components/ui/ThemedHost';
+import { GlassView } from '@/components/ui/GlassView';
+import { SymbolView } from '@/components/ui/SymbolView';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Spacing } from '@/theme';
+import { Radius, Spacing } from '@/theme';
 import { typographyStyles } from '@/theme/typography';
 import { useAuthStore } from '@/stores/authStore';
 import { useSignStore } from '@/stores/signStore';
@@ -42,6 +35,15 @@ import { formatCount } from '@/utils';
 import type { UserProfile } from '@/types';
 
 const TAB_RESELECT_EVENT = 'tieba:tab-reselect';
+
+/** 行前色块图标：RN 圆角色块 + SymbolView（ListItem 的 leading 自动 matchContents） */
+function RowIcon({ icon, tint }: { icon: string; tint: string }) {
+  return (
+    <View style={[styles.rowIconBadge, { backgroundColor: tint }]}>
+      <SymbolView name={icon} size={15} weight="semibold" tintColor="#FFFFFF" />
+    </View>
+  );
+}
 
 export default function ProfileScreen() {
   const { colors } = useThemeColors();
@@ -54,24 +56,15 @@ export default function ProfileScreen() {
   const currentUid = account?.uid;
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  // 个人资料拉取状态：与全局 auth isLoading（冷启动鉴权）相互独立。
-  // 失败时降级为本地缓存账号字段，不整页报错。
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   const loadProfile = useCallback(async () => {
     if (!isLoggedIn || !currentUid) return;
-    setProfileLoading(true);
-    setProfileError(null);
     try {
       const result = await fetchProfile(currentUid);
       setUserProfile(result);
     } catch {
-      // 失败降级：保留 account 缓存字段展示，仅提示刷新失败
-      setProfileError('个人资料刷新失败，下拉可重试');
-    } finally {
-      setProfileLoading(false);
+      // 失败降级：保留 account 缓存字段展示
     }
   }, [isLoggedIn, currentUid]);
 
@@ -96,214 +89,172 @@ export default function ProfileScreen() {
     router.push(route as any);
   }, [router]);
 
-  const openServiceCenter = useCallback(() => {
-    hapticForScene('press');
-    WebBrowser.openBrowserAsync('https://tieba.baidu.com/mo/').catch(() => {});
-  }, []);
-
   // ── 加载中 ──
   if (isLoading) {
     return (
-      <ThemedHost style={{ flex: 1 }}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <SkeletonList variant="row" count={8} style={styles.profileSkeleton} />
-      </ThemedHost>
+      </View>
     );
   }
 
   const stats = userProfile?.statue;
-  // 失败降级：拉取失败时回退到本地 account 缓存字段，避免统计区显示全 0
   const concernForums = stats?.concernForumsNum ?? account?.concernNum ?? 0;
   const fansCount = userProfile?.user?.fansNum ?? account?.fansNum ?? 0;
   const postsCount = stats?.postsNum ?? account?.postNum ?? 0;
 
-  return (
-    <ThemedHost style={{ flex: 1 }}>
-      <VStack spacing={0} modifiers={[frame({ maxWidth: 9999 })]}>
-        <RNHostView matchContents>
-          <View style={[styles.userCard, { backgroundColor: colors.card, paddingTop: insets.top + 18 }]}>
-            <Pressable
-              onPress={() => {
-                if (isLoggedIn && account?.uid) {
-                  navigateTo(`/user/${account.uid}`);
-                } else {
-                  navigateTo('/login');
-                }
-              }}
-              style={styles.userCardPressable}
-              accessibilityRole="button"
-              accessibilityLabel={isLoggedIn ? '个人主页' : '登录'}
-            >
-              {isLoggedIn ? (
-                <>
-                  <Avatar
-                    source={account?.portrait || undefined}
-                    initials={(account?.nameShow || account?.name || '吧')?.charAt(0)}
-                    size={76}
-                  />
-                  <RNText style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
-                    {account?.nameShow || account?.name || '贴吧用户'}
-                  </RNText>
-                  {profileLoading && !userProfile ? (
-                    <View style={styles.profileSkeleton}>
-                      <SkeletonList variant="row" count={2} />
-                    </View>
-                  ) : (
-                    <>
-                      {profileError && !userProfile ? (
-                        <Pressable
-                          onPress={() => void loadProfile()}
-                          accessibilityRole="button"
-                          accessibilityLabel="重试刷新个人资料"
-                        >
-                          <RNText style={[styles.userErrorText, { color: colors.textSecondary }]}>
-                            个人资料加载失败 · 点按重试
-                          </RNText>
-                        </Pressable>
-                      ) : null}
-                      {userProfile?.user.levelName || account?.levelName ? (
-                        <RNText style={[styles.userLevel, { color: colors.primary }]}>
-                          {userProfile?.user.levelName || account?.levelName}
-                        </RNText>
-                      ) : null}
-                      {userProfile?.user?.intro ? (
-                        <RNText style={[styles.userIntro, { color: colors.textSecondary }]} numberOfLines={2}>
-                          {userProfile.user.intro}
-                        </RNText>
-                      ) : null}
-                      <View style={styles.statsRow}>
-                        <View style={styles.statItem}>
-                          <RNText style={[styles.statValue, { color: colors.text }]}>
-                            {formatCount(concernForums)}
-                          </RNText>
-                          <RNText style={[styles.statLabel, { color: colors.textSecondary }]}>关注</RNText>
-                        </View>
-                        <View style={styles.statItem}>
-                          <RNText style={[styles.statValue, { color: colors.text }]}>
-                            {formatCount(fansCount)}
-                          </RNText>
-                          <RNText style={[styles.statLabel, { color: colors.textSecondary }]}>粉丝</RNText>
-                        </View>
-                        <View style={styles.statItem}>
-                          <RNText style={[styles.statValue, { color: colors.text }]}>
-                            {formatCount(postsCount)}
-                          </RNText>
-                          <RNText style={[styles.statLabel, { color: colors.textSecondary }]}>帖子</RNText>
-                        </View>
-                      </View>
-                    </>
-                  )}
-                </>
-              ) : (
-                <>
-                  <RNText style={[styles.userTitle, { color: colors.text }]}>你还未登录</RNText>
-                  <RNText style={[styles.userSubtitle, { color: colors.textSecondary }]}>
-                    登录后查看个人信息、签到、收藏
-                  </RNText>
-                  <UIButton
-                    variant="glass"
-                    title="登录百度账号"
-                    icon="person.crop.circle.badge.checkmark"
-                    onPress={() => navigateTo('/login')}
-                    style={styles.loginButton}
-                  />
-                </>
-              )}
-            </Pressable>
-          </View>
-        </RNHostView>
-
-        <Form modifiers={[refreshable(async () => { await loadProfile(); hapticForScene('toggle'); })]}>
-        {/* ── 签到（已登录） ── */}
-        {isLoggedIn && (
-          <Section>
-            <Button
-              onPress={handleSign}
-              modifiers={[
-                buttonStyle('bordered'),
-                buttonBorderShape('roundedRectangle', 10),
-                // §3.4: Label 的 color prop 已废弃（iOS 26 图标不着色），
-                // 改由父 Button 的 foregroundStyle 驱动图标着色
-                foregroundStyle('#34C759'),
-              ]}
-            >
-              <Label
-                title={isSigning ? '签到中...' : '一键签到'}
-                systemImage={isSigning ? 'checkmark.circle.fill' : 'checkmark.circle'}
-              />
-            </Button>
-          </Section>
+  // ── 用户卡片（纯 RN 布局，直接置于 GlassView RN 容器内，无需 RNHostView 桥） ──
+  const userCard = (
+    <Pressable
+      onPress={
+        isLoggedIn && account?.uid
+          ? () => navigateTo(`/user/${account.uid}`)
+          : undefined
+      }
+      // 未登录时 onPress 置空：仅由下方「登录百度账号」按钮触发跳转，
+      // 避免点卡片与点按钮同时 push /login 弹出两个登录窗口。
+      disabled={!isLoggedIn}
+      style={styles.userCardPressable}
+        accessibilityRole="button"
+        accessibilityLabel={isLoggedIn ? '个人主页' : '登录'}
+      >
+        {isLoggedIn ? (
+          <>
+            <Avatar
+              source={account?.portrait || undefined}
+              initials={(account?.nameShow || account?.name || '吧')?.charAt(0)}
+              size={76}
+            />
+            <RNText style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
+              {account?.nameShow || account?.name || '贴吧用户'}
+            </RNText>
+            {userProfile?.user.levelName || account?.levelName ? (
+              <RNText style={[styles.userLevel, { color: colors.primary }]}>
+                {userProfile?.user.levelName || account?.levelName}
+              </RNText>
+            ) : null}
+            {userProfile?.user?.intro ? (
+              <RNText style={[styles.userIntro, { color: colors.textSecondary }]} numberOfLines={2}>
+                {userProfile.user.intro}
+              </RNText>
+            ) : null}
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <RNText style={[styles.statValue, { color: colors.text }]}>{formatCount(concernForums)}</RNText>
+                <RNText style={[styles.statLabel, { color: colors.textSecondary }]}>关注</RNText>
+              </View>
+              <View style={styles.statItem}>
+                <RNText style={[styles.statValue, { color: colors.text }]}>{formatCount(fansCount)}</RNText>
+                <RNText style={[styles.statLabel, { color: colors.textSecondary }]}>粉丝</RNText>
+              </View>
+              <View style={styles.statItem}>
+                <RNText style={[styles.statValue, { color: colors.text }]}>{formatCount(postsCount)}</RNText>
+                <RNText style={[styles.statLabel, { color: colors.textSecondary }]}>帖子</RNText>
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
+            <RNText style={[styles.userTitle, { color: colors.text }]}>你还未登录</RNText>
+            <RNText style={[styles.userSubtitle, { color: colors.textSecondary }]}>
+              登录后查看个人信息、签到、收藏
+            </RNText>
+            <View style={styles.loginButtonWrap}>
+              <Pressable
+                onPress={() => navigateTo('/login')}
+                accessibilityRole="button"
+                accessibilityLabel="登录百度账号"
+                style={({ pressed }) => [styles.loginButton, { opacity: pressed ? 0.8 : 1 }]}
+              >
+                <GlassView borderRadius={Radius.input}>
+                  <View style={styles.loginButtonInner}>
+                    <SymbolView name="person.crop.circle.badge.checkmark" size={16} weight="semibold" tintColor={colors.primary} />
+                    <RNText style={[styles.loginButtonText, { color: colors.primary }]}>登录百度账号</RNText>
+                  </View>
+                </GlassView>
+              </Pressable>
+            </View>
+          </>
         )}
+      </Pressable>
+  );
 
-        {/* ── 我的内容 ── */}
-        {/* §3.4 verified: No deprecated 'color' prop on Label; icon tint driven by parent Button foregroundStyle instead */}
-        <Section title="我的内容">
-          {isLoggedIn ? (
-            <>
-              <Button onPress={() => navigateTo(`/user/${account?.uid}`)} modifiers={[foregroundStyle('#5856D6')]}>
-                <Label title="个人主页" systemImage="person" />
-              </Button>
-              <Button onPress={() => navigateTo(`/user/${account?.uid}/posts`)} modifiers={[foregroundStyle('#FF9500')]}>
-                <Label title="我的帖子" systemImage="doc.text" />
-              </Button>
-              <Button onPress={() => navigateTo(`/user/${account?.uid}/forums`)} modifiers={[foregroundStyle('#34C759')]}>
-                <Label title="关注的吧" systemImage="square.grid.2x2" />
-              </Button>
-            </>
-          ) : null}
-          <Button onPress={() => navigateTo('/history')} modifiers={[foregroundStyle('#FF9500')]}>
-            <Label title="浏览历史" systemImage="clock" />
-          </Button>
-          <Button onPress={() => navigateTo('/threadstore')} modifiers={[foregroundStyle('#FF3B30')]}>
-            <Label title="我的收藏" systemImage="bookmark" />
-          </Button>
-        </Section>
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* 顶部液态玻璃用户卡片：玻璃叠在淡蓝渐变上才有可模糊内容（纯白底磨砂玻璃不可见） */}
+      <View style={[styles.heroWrap, { paddingTop: insets.top + Spacing.md }]}>
+        <GlassView borderRadius={Radius.card} glassEffectStyle="regular">
+          <LinearGradient
+            colors={['rgba(37,99,235,0.10)', 'rgba(37,99,235,0.03)', 'rgba(37,99,235,0.10)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          {userCard}
+        </GlassView>
+      </View>
 
-        {/* ── 设置 ── */}
-        <Section title="设置">
-          <Button onPress={openServiceCenter} modifiers={[foregroundStyle('#4477E0')]}>
-            <Label title="服务中心" systemImage="questionmark.circle" />
-          </Button>
-          <Button onPress={() => navigateTo('/settings')} modifiers={[foregroundStyle('#8E8E93')]}>
-            <Label title="设置" systemImage="gearshape" />
-          </Button>
-          {isLoggedIn && (
-            <Button onPress={() => navigateTo('/settings/account')} modifiers={[foregroundStyle('#4477E0')]}>
-              <Label title="账号管理" systemImage="person.crop.circle" />
-            </Button>
-          )}
-          <Button onPress={() => navigateTo('/settings/about')} modifiers={[foregroundStyle('#5AC8FA')]}>
-            <Label title="关于 TiebaLite" systemImage="info.circle" />
-          </Button>
-        </Section>
-        </Form>
-      </VStack>
-    </ThemedHost>
+      {/* FieldGroup = SwiftUI Form：必须经 ThemedHost（Host 桥）嵌入 RN 树，
+          否则 Form 不撑开高度导致下方列表全部消失 */}
+      <ThemedHost style={{ flex: 1 }}>
+        <FieldGroup>
+          {/* ── 账号组：签到 / 登录入口 ── */}
+          <FieldGroup.Section>
+            {isLoggedIn ? (
+              <ListItem
+                leading={<RowIcon icon={isSigning ? 'checkmark.circle.fill' : 'checkmark.circle'} tint="#34C759" />}
+                onPress={handleSign}
+              >
+                {isSigning ? '签到中...' : '一键签到'}
+              </ListItem>
+            ) : null}
+          </FieldGroup.Section>
+
+          {/* ── 我的内容 ── */}
+          <FieldGroup.Section title="我的内容">
+            {isLoggedIn ? (
+              <>
+                <ListItem leading={<RowIcon icon="person" tint="#5856D6" />} onPress={() => navigateTo(`/user/${account?.uid}`)}>个人主页</ListItem>
+                <ListItem leading={<RowIcon icon="doc.text" tint="#FF9500" />} onPress={() => navigateTo(`/user/${account?.uid}/posts`)}>我的帖子</ListItem>
+                <ListItem leading={<RowIcon icon="square.grid.2x2" tint="#34C759" />} onPress={() => navigateTo(`/user/${account?.uid}/forums`)}>关注的吧</ListItem>
+              </>
+            ) : null}
+            <ListItem leading={<RowIcon icon="clock" tint="#FF9500" />} onPress={() => navigateTo('/history')}>浏览历史</ListItem>
+            <ListItem leading={<RowIcon icon="bookmark" tint="#FF3B30" />} onPress={() => navigateTo('/threadstore')}>我的收藏</ListItem>
+          </FieldGroup.Section>
+
+          {/* ── 设置 ── */}
+          <FieldGroup.Section title="设置">
+            <ListItem leading={<RowIcon icon="gearshape" tint="#8E8E93" />} onPress={() => navigateTo('/settings')}>设置</ListItem>
+            {isLoggedIn && (
+              <ListItem leading={<RowIcon icon="person.crop.circle" tint="#4477E0" />} onPress={() => navigateTo('/settings/account')}>账号管理</ListItem>
+            )}
+            <ListItem leading={<RowIcon icon="info.circle" tint="#5AC8FA" />} onPress={() => navigateTo('/settings/about')}>关于 TiebaLite</ListItem>
+          </FieldGroup.Section>
+        </FieldGroup>
+      </ThemedHost>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   profileSkeleton: {
     paddingHorizontal: Spacing.lg,
     paddingTop: 24,
     alignSelf: 'stretch',
   },
-  userErrorText: {
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  userCard: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md,
-    borderRadius: 14,
-    paddingVertical: 18,
+  heroWrap: {
     paddingHorizontal: Spacing.lg,
-    alignItems: 'center',
+    paddingBottom: Spacing.sm,
   },
   userCardPressable: {
     alignItems: 'center',
     alignSelf: 'stretch',
     gap: Spacing.sm,
+    padding: Spacing.lg,
   },
   userName: {
     ...typographyStyles.title2,
@@ -326,8 +277,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  loginButton: {
+  loginButtonWrap: {
     marginTop: Spacing.sm,
+  },
+  loginButton: {
+    borderRadius: Radius.input,
+  },
+  loginButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+  },
+  loginButtonText: {
+    ...typographyStyles.calloutBold,
   },
   statsRow: {
     flexDirection: 'row',
@@ -344,5 +309,12 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     ...typographyStyles.caption1,
+  },
+  rowIconBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

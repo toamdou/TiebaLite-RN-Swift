@@ -127,18 +127,23 @@ export function getLevelColor(level: number): string {
 /**
  * Convert tieba portrait ID to full avatar URL.
  * Mirrors Kotlin: StringUtil.getAvatarUrl()
- * Portrait IDs like "tb.1.xxx" need prefix "https://tb.himg.baidu.com/sys/portrait/item/"
+ * Portrait IDs like "tb.1.xxx" need prefix "https://himg.bdimg.com/sys/portrait/item/"
+ *
+ * ⚠️ 域名必须用 himg.bdimg.com：tb.himg.baidu.com 在当前网络环境返回 HTTP 000
+ * （连不上），实测 himg.bdimg.com 对带/不带 ?t= 后缀的 portrait 均返回 200。
  */
 export function getAvatarUrl(portrait?: string | null): string {
   if (!portrait) return '';
-  if (portrait.startsWith('http://') || portrait.startsWith('https://')) return portrait;
+  if (portrait.startsWith('https://')) return portrait;
+  // 服务端偶发下发 http:// 图床 URL：iOS ATS 禁止明文请求（Info.plist
+  // NSAllowsArbitraryLoads=false 且图床域名不在例外表），升级为 https 避免
+  // 头像/图片全部加载失败。
+  if (portrait.startsWith('http://')) {
+    return portrait.replace(/^http:\/\//i, 'https://');
+  }
   // 本地 URI（头像上传后即时预览等）：直接透传，避免被拼成图床坏 URL。
   if (portrait.startsWith('file://') || portrait.startsWith('ph://')) return portrait;
-  // Baidu portrait CDN serves HTTPS; always use it so the app stays on the
-  // TLS surface (the old plaintext ATS exception for tb.himg.baidu.com was
-  // removed). Plain http:// inputs are left untouched here and handled by the
-  // consumer / link-opener layer.
-  return `https://tb.himg.baidu.com/sys/portrait/item/${portrait}`;
+  return `https://himg.bdimg.com/sys/portrait/item/${portrait}`;
 }
 
 /**

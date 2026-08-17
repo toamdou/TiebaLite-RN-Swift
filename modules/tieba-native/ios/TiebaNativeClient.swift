@@ -48,7 +48,8 @@ enum TiebaSigner {
 
   static func signParams(_ params: [String: String], secret: String = secret) -> String {
     let sorted = params.sorted { $0.key < $1.key }
-    let raw = sorted.map { "\($0.key)=\($0.value)" }.joined(separator: "&")
+    // Kotlin SortAndSignInterceptor: joined with NO separator (joinToString(""))
+    let raw = sorted.map { "\($0.key)=\($0.value)" }.joined()
     return md5Hex(raw + secret).lowercased()
   }
 

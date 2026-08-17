@@ -193,6 +193,9 @@ function LoggedInHome() {
   const startSign = useSignStore((s) => s.startSign);
   const isSigning = useSignStore((s) => s.isSigning);
   const showHistoryForum = useAppPreference('homePageShowHistoryForum', false);
+  const homeForumLayout = useAppPreference('homeForumLayout', 'single');
+  const homeForumSort = useAppPreference('homeForumSort', 'name');
+  const gridLayout = homeForumLayout === 'double';
 
   const [searchQuery] = useState('');
   const [recentForums, setRecentForums] = useState<ForumHistoryItem[]>([]);
@@ -207,10 +210,20 @@ function LoggedInHome() {
   }, [followedForums.length]);
 
   const filteredForums = useMemo(() => {
-    if (!searchQuery.trim()) return followedForums;
-    const q = searchQuery.trim().toLowerCase();
-    return followedForums.filter((f) => f.forumName.toLowerCase().includes(q));
-  }, [followedForums, searchQuery]);
+    let list = followedForums;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter((f) => f.forumName.toLowerCase().includes(q));
+    }
+    // 排序：按吧名（拼音/字符序）或按等级（高→低）
+    const sorted = [...list];
+    if (homeForumSort === 'level') {
+      sorted.sort((a, b) => (b.levelId ?? 0) - (a.levelId ?? 0));
+    } else {
+      sorted.sort((a, b) => a.forumName.localeCompare(b.forumName, 'zh-Hans-CN'));
+    }
+    return sorted;
+  }, [followedForums, searchQuery, homeForumSort]);
 
   const handleLoadFollowedForums = useCallback(async () => {
     try {
@@ -294,38 +307,67 @@ function LoggedInHome() {
           }}
         >
           <PressScale onPress={() => handleForumPress(item)}>
-            <View
-              style={[styles.forumRow, { backgroundColor: colors.card }]}
-            >
-              <Avatar
-                source={item.avatar || undefined}
-                initials={(item.forumName || '吧')?.charAt(0)}
-                size={38}
-              />
-              <View style={styles.forumRowText}>
-                <RNText style={[styles.forumRowName, { color: colors.text }]} numberOfLines={1}>
+            {gridLayout ? (
+              /* ── 双列：近似正方形的圆角卡片 ── */
+              <View style={[styles.forumGridCard, { backgroundColor: colors.card }]}>
+                <View style={styles.forumGridTop}>
+                  <Avatar
+                    source={item.avatar || undefined}
+                    initials={(item.forumName || '吧')?.charAt(0)}
+                    size={44}
+                  />
+                  {item.isSign && (
+                    <SymbolView name="checkmark.circle.fill" size={16} tintColor={colors.success} />
+                  )}
+                </View>
+                <RNText style={[styles.forumGridName, { color: colors.text }]} numberOfLines={1}>
                   {item.forumName}吧
                 </RNText>
-                {item.memberCount > 0 && (
-                  <RNText style={[styles.forumRowMeta, { color: colors.textTertiary }]}>
-                    {formatCount(item.memberCount)} 关注
+                <View style={styles.forumGridMetaRow}>
+                  {item.levelId > 0 && (
+                    <RNText style={[styles.forumGridLevel, { color: getLevelColor(item.levelId) }]}>
+                      Lv.{item.levelId}
+                    </RNText>
+                  )}
+                  <RNText style={[styles.forumGridMeta, { color: colors.textTertiary }]} numberOfLines={1}>
+                    {item.memberCount > 0 ? `${formatCount(item.memberCount)}关注` : ''}
                   </RNText>
-                )}
+                </View>
               </View>
-              <View style={styles.forumRowBadge}>
-                {item.levelId > 0 && (
-                  <RNText style={[styles.forumRowLevel, { color: getLevelColor(item.levelId) }]}>
-                    Lv.{item.levelId}
+            ) : (
+              <View
+                style={[styles.forumRow, { backgroundColor: colors.card }]}
+              >
+                <Avatar
+                  source={item.avatar || undefined}
+                  initials={(item.forumName || '吧')?.charAt(0)}
+                  size={38}
+                />
+                <View style={styles.forumRowText}>
+                  <RNText style={[styles.forumRowName, { color: colors.text }]} numberOfLines={1}>
+                    {item.forumName}吧
                   </RNText>
-                )}
-                {item.isSign && <SymbolView name="checkmark.circle.fill" size={14} tintColor={colors.success} />}
+                  {item.memberCount > 0 && (
+                    <RNText style={[styles.forumRowMeta, { color: colors.textTertiary }]}>
+                      {formatCount(item.memberCount)} 关注
+                    </RNText>
+                  )}
+                </View>
+                <View style={styles.forumRowBadge}>
+                  {item.levelId > 0 && (
+                    <RNText style={[styles.forumRowLevel, { color: getLevelColor(item.levelId) }]}>
+                      Lv.{item.levelId}
+                    </RNText>
+                  )}
+                  {item.isSign && <SymbolView name="checkmark.circle.fill" size={14} tintColor={colors.success} />}
+                </View>
               </View>
-            </View>
+            )}
           </PressScale>
         </MenuView>
       </EntranceRow>
     ),
-    [colors, handleForumPress, handleUnfollowConfirm],
+    [colors, handleForumPress, handleUnfollowConfirm, gridLayout],
   );
 
   return (
@@ -399,18 +441,23 @@ function LoggedInHome() {
             retryLabel="重试"
           />
         ) : filteredForums.length === 0 ? (
-          <ContentUnavailableView
-            systemImage={searchQuery ? 'magnifyingglass' : 'tray'}
-            title={searchQuery ? '无匹配结果' : '暂无关注的贴吧'}
-            description={searchQuery ? `没有找到包含"${searchQuery}"的吧` : '去发现页探索感兴趣的贴吧吧'}
-          />
+          <View style={styles.forumEmptyWrap}>
+            <ThemedHost matchContents>
+              <ContentUnavailableView
+                systemImage={searchQuery ? 'magnifyingglass' : 'tray'}
+                title={searchQuery ? '无匹配结果' : '暂无关注的贴吧'}
+                description={searchQuery ? `没有找到包含"${searchQuery}"的吧` : '去发现页探索感兴趣的贴吧吧'}
+              />
+            </ThemedHost>
+          </View>
         ) : (
           <FlashList
             data={filteredForums}
             keyExtractor={forumKeyExtractor}
             renderItem={renderForumItem}
+            numColumns={gridLayout ? 2 : 1}
+            columnWrapperStyle={gridLayout ? styles.forumGridRow : undefined}
             contentContainerStyle={styles.forumListContent}
-            estimatedItemSize={96}
             refreshControl={
               <RefreshControl
                 refreshing={isLoadingForums && filteredForums.length > 0}
@@ -469,7 +516,7 @@ function SearchBarPill({ onPress }: { onPress: () => void }) {
               不再叠加 clear 液态玻璃 + 手写 rgba 底 */}
           <GlassView
             style={StyleSheet.absoluteFill}
-            theme={isDark ? 'dark' : 'light'}
+            colorScheme={isDark ? 'dark' : 'light'}
           />
           <View style={searchStyles.pillInner}>
             <SymbolView name="magnifyingglass" size={15} tintColor={colors.textTertiary} style={{ marginRight: Spacing.sm }} />
@@ -500,6 +547,12 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sm,
     paddingBottom: 24,
   },
+  forumEmptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.xl,
+  },
   forumRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -514,6 +567,33 @@ const styles = StyleSheet.create({
   forumRowMeta: { ...typographyStyles.caption1 },
   forumRowBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   forumRowLevel: { ...typographyStyles.caption1Bold },
+
+  // ── 双列方形卡片（iOS 设置风格圆角卡片） ──
+  forumGridRow: { gap: Spacing.sm },
+  forumGridCard: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: Radius.card,
+    padding: 14,
+    marginBottom: Spacing.sm,
+    gap: 8,
+  },
+  forumGridTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  forumGridName: {
+    ...typographyStyles.subheadBold,
+    marginTop: 'auto',
+  },
+  forumGridMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  forumGridLevel: { ...typographyStyles.caption1Bold },
+  forumGridMeta: { ...typographyStyles.caption1, flexShrink: 1 },
 });
 
 const searchStyles = StyleSheet.create({

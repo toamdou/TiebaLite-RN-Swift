@@ -1,12 +1,9 @@
 // ============================================================
 // TiebaLite RN — Protobuf Helpers (aligned with Kotlin Wire)
 //
-// Uses the native TiebaNative codec with a pre-compiled JSON descriptor
-// generated from Kotlin's .proto files (protobufjs is only a build-time
-// generator dependency).
+// 编码在 JS 侧用 protobufjs（预编译的 protos.json descriptor），
+// 解码仍在 native TiebaNative codec（protoClient 内）。
 // ============================================================
-
-import { TiebaNative } from '../../../modules/tieba-native/src/TiebaNative';
 
 // -----------------------------------------------------------
 // Init — lazily load descriptor on first use
@@ -15,17 +12,25 @@ import { TiebaNative } from '../../../modules/tieba-native/src/TiebaNative';
 // synchronously at module import time, which penalized app startup even when
 // no protobuf call was made yet. We now defer it until the first encode.
 
+// ⚠️ 编码在 JS 侧用 protobufjs 完成，不再走 native 编码器：
+// native 编码器会把嵌套 message 平铺（FrsPageRequest.data.common 被压成
+// 顶层字段），导致 frsPage/pbPage/profile 的请求结构错乱、服务器返回
+// 210009 系统错误。热榜恰好因字段 id 巧合不受影响。protobufjs 编码输出
+// 已验证与服务器兼容（嵌套正确、error=0）。解码仍走 native（正常）。
+import protobuf from 'protobufjs';
+
 type TypeRef = { fullName: string };
 
-let nativeReady = false;
+let protoRoot: protobuf.Root | null = null;
 
-/** Pass the descriptor to the native codec once, then keep it native-side. */
-function ensureNativeReady(): void {
-  if (nativeReady) return;
-  TiebaNative.protoInitialize(
-    JSON.stringify(require('./protos.json') as Record<string, unknown>),
-  );
-  nativeReady = true;
+/** 惰性加载 protobuf descriptor（首次编码时才解析 111KB JSON） */
+function getProtoRoot(): protobuf.Root {
+  if (!protoRoot) {
+    protoRoot = protobuf.Root.fromJSON(
+      require('./protos.json') as unknown as protobuf.INamespace,
+    );
+  }
+  return protoRoot;
 }
 
 /**
@@ -73,8 +78,14 @@ const PbFloorRequest = lazyType('tieba.pbFloor.PbFloorRequest');
  */
 
 function encodeProtobuf(type: TypeRef, data: Record<string, unknown>): string {
-  ensureNativeReady();
-  return TiebaNative.protoEncode(type.fullName, data);
+  // JS 端 protobufjs 编码（native 编码器嵌套平铺 bug 的绕过方案，见文件头注释）
+  const messageType = getProtoRoot().lookupType(type.fullName);
+  const err = messageType.verify(data);
+  if (err) throw new Error(`protobuf verify ${type.fullName}: ${err}`);
+  const bytes = messageType.encode(messageType.create(data)).finish();
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return globalThis.btoa(binary);
 }
 
 // -----------------------------------------------------------
@@ -203,7 +214,11 @@ export function encodeFrsPageRequest(
   return encodeProtobuf(FrsPageRequest(), {
     data: {
       common,
-      kw: encodeURIComponent(opts.kw), // Kotlin: forumName.urlEncode()
+      // ⚠️ kw 必须 URL 编码（对齐 Kotlin 原版 frsPage 的 forumName.urlEncode()）。
+      // 服务器靠 kw 定位吧，原始中文会被当成未知吧名 → 回退推荐/综合流 →
+      // 吧页混入别的吧的帖子。之前"原始中文"结论是 native 编码器平铺 bug
+      // 时代的误判（当时怎么编码都 210009）；protobufjs 编码下必须 urlEncode。
+      kw: encodeURIComponent(opts.kw),
       pn: opts.pn,
       rn: 90,
       rnNeed: 30,
@@ -399,6 +414,7 @@ export interface DecodedPbPageResponse {
     userList?: Record<string, any>[];
     forum?: Record<string, any>;
     anti?: { tbs?: string; ifPost?: number; forbidFlag?: number; forbidInfo?: string };
+    firstFloorPost?: Record<string, any>;
   };
 }
 
@@ -611,10 +627,9 @@ const GeneralTabListRequest = lazyType('tieba.generalTabList.GeneralTabListReque
 export interface DecodedGeneralTabListResponse {
   error?: { error_code?: number; error_msg?: string };
   data?: {
-    tabList?: Record<string, any>[];
-    threadList?: Record<string, any>[];
+    generalList?: Record<string, any>[];
+    hasMore?: number;
     userList?: Record<string, any>[];
-    page?: Record<string, any>;
     [key: string]: any;
   };
 }
@@ -623,24 +638,33 @@ export function encodeGeneralTabListRequest(
   common: ProtoCommonRequest,
   opts: {
     forumId: number | string;
+    tabId?: number;
     tabType?: number;
     pn?: number;
     rn?: number;
     sortType?: number;
     tabName?: string;
-    tabCode?: string;
+    isGeneralTab?: number;
+    lastThreadId?: number;
+    isDefaultNavtab?: number;
   },
 ): string {
   return encodeProtobuf(GeneralTabListRequest(), {
     data: {
       common,
+      tabId: opts.tabId ?? 0,
       forumId: Number(opts.forumId),
-      tabType: opts.tabType ?? 0,
       pn: opts.pn ?? 1,
       rn: opts.rn ?? 30,
-      sortType: opts.sortType ?? 0,
+      scrW: 1170,
+      scrH: 2532,
+      scrDip: 3,
+      lastThreadId: opts.lastThreadId ?? 0,
+      isDefaultNavtab: opts.isDefaultNavtab ?? 0,
       tabName: opts.tabName ?? '',
-      tabCode: opts.tabCode ?? '',
+      isGeneralTab: opts.isGeneralTab ?? 1,
+      sortType: opts.sortType ?? 0,
+      tabType: opts.tabType ?? 0,
     },
   });
 }
@@ -728,7 +752,7 @@ export function encodePersonalizedRequest(
     needForumlist?: number;
     newNetType?: number;
     newInstall?: number;
-    requestTime?: number;
+    requestTimes?: number;
     invokeSource?: string;
     scrDip?: number;
     scrH?: number;
@@ -749,7 +773,7 @@ export function encodePersonalizedRequest(
       needForumlist: opts.needForumlist ?? 0,
       newNetType: opts.newNetType ?? 0,
       newInstall: opts.newInstall ?? 0,
-      requestTime: opts.requestTime ?? 0,
+      requestTimes: opts.requestTimes ?? 0,
       invokeSource: opts.invokeSource ?? '',
       scrDip: opts.scrDip ?? 3,
       scrH: opts.scrH ?? 2532,
@@ -767,24 +791,25 @@ const UserLikeRequest = lazyType('tieba.userLike.UserLikeRequest');
 export interface DecodedUserLikeResponse {
   error?: { error_code?: number; error_msg?: string };
   data?: {
-    threadList?: Record<string, any>[];
-    userList?: Record<string, any>[];
+    threadInfo?: Record<string, any>[];
     pageTag?: string;
     hasMore?: number;
+    requestUnix?: number | string;
     [key: string]: any;
   };
 }
 
 export function encodeUserLikeRequest(
   common: ProtoCommonRequest,
-  opts: { loadType?: number; pageTag?: string; lastRequestUnix?: number },
+  opts: { loadType?: number; pageTag?: string; lastRequestUnix?: number; followType?: number },
 ): string {
   return encodeProtobuf(UserLikeRequest(), {
     data: {
       common,
-      loadType: opts.loadType ?? 0,
       pageTag: opts.pageTag ?? '',
       lastRequestUnix: opts.lastRequestUnix ?? 0,
+      followType: opts.followType ?? 1,
+      loadType: opts.loadType ?? 0,
     },
   });
 }

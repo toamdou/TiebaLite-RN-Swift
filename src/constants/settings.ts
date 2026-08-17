@@ -8,7 +8,6 @@ export const DEFAULT_SORT_OPTIONS = [
 ];
 
 export const FORUM_FAB_OPTIONS = [
-  { label: '发贴', value: 'post' },
   { label: '刷新', value: 'refresh' },
   { label: '回到顶部', value: 'back_to_top' },
   { label: '隐藏', value: 'hide' },

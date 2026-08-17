@@ -54,7 +54,7 @@ final class TiebaLiveActivityManager {
       staleDate: nil,
       relevanceScore: 0
     )
-    await activity.end(content, dismissalPolicy: Self.policy(dismissalPolicy))
+    await activity.end(content, dismissalPolicy: dismissalPolicy == "immediate" ? .immediate : .default)
     activities.removeValue(forKey: activityId)
   }
 
@@ -64,9 +64,9 @@ final class TiebaLiveActivityManager {
       staleDate: nil,
       relevanceScore: 0
     )
-    let policy = Self.policy(dismissalPolicy)
+    let isImmediate = dismissalPolicy == "immediate"
     for activity in Activity<LiveActivityKitAttributes>.activities {
-      await activity.end(content, dismissalPolicy: policy)
+      await activity.end(content, dismissalPolicy: isImmediate ? .immediate : .default)
     }
     activities.removeAll()
   }
@@ -90,9 +90,6 @@ final class TiebaLiveActivityManager {
     )
   }
 
-  private static func policy(_ raw: String) -> Activity.DismissalPolicy {
-    raw == "immediate" ? .immediate : .default
-  }
 }
 
 enum TiebaLiveActivityError: LocalizedError {

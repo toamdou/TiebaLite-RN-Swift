@@ -3,7 +3,7 @@
  */
 
 import { getBduss, getStoken, getUid, getZid } from './authState';
-import { getClientId, getCuid, getDeviceModel } from './config';
+import { getCuid, getDeviceModel } from './config';
 
 export interface CookieOptions {
   includeAuth?: boolean;

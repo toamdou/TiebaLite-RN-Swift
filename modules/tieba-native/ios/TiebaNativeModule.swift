@@ -331,7 +331,7 @@ public final class TiebaNativeModule: Module {
         view.material = material
       }
       Prop("tintColor") { (view, color: UIColor?) in
-        view.tintColor = color
+        view.glassTintColor = color
       }
       Prop("cornerRadius") { (view, radius: Double) in
         view.cornerRadius = radius

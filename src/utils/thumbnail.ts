@@ -33,13 +33,18 @@ export function thumbnailUrl(url: string, width: number): string {
   // 仅重写贴吧图床 URL
   if (!TIEBA_CDN_RE.test(url)) return url;
 
+  // iOS ATS 禁止明文 http 图床请求（Info.plist NSAllowsArbitraryLoads=false），
+  // 先升级为 https 再处理尺寸段；协议相对 URL（//imgsrc.baidu.com/...）同样
+  // 补全为 https:（expo-image 不识别 // 开头）。
+  const httpsUrl = url.replace(/^http:\/\//i, 'https://').replace(/^\/\//, 'https://');
+
   // 剥离已有尺寸段，避免嵌套：w%3D580、w%3D580%3Bq%3D90、w=580、query 参数
-  const clean = url
+  const clean = httpsUrl
     .replace(/w%3d\d+(?:%3bq%3d\d+|;q=\d+)?/gi, '')
     .replace(/[?&](?:w|width)=\d+/g, '');
 
-  // 非 /forum/ 路径（头像、表情等）无法按此规则缩放，原样返回
-  if (!/\/forum\//i.test(clean)) return url;
+  // 非 /forum/ 路径（头像、表情等）无法按此规则缩放，返回升级后的 URL
+  if (!/\/forum\//i.test(clean)) return httpsUrl;
 
   // 在第一个 /forum/ 后注入尺寸段；pic/item 与原 sign= 两种路径都适用
   return clean.replace(/\/forum\//i, `/forum/w%3D${width}%3Bq%3D90/`);

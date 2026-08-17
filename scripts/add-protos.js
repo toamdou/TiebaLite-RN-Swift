@@ -38,11 +38,23 @@ tieba.getBawuInfo = ns('getBawuInfo', {
 });
 
 // 2. getLevelInfo (cmd=301005)
+// 字段号对齐官方 tbclient.protobuf GetLevelInfo/DataReq.proto + GetLevelInfoResIdl.proto：
+//   DataReq { uint64 forum_id=1; CommonReq common=2; }
+//   GetLevelInfoResIdl { DataRes data=1; Error error=2; }
+// LevelInfo 内联定义（protos_src/LevelInfo.proto，protos.json 基底未包含该类型；
+// 缺失会导致 protobufjs Root.fromJSON resolveAll 抛异常，所有 proto 编码崩溃）。
 tieba.getLevelInfo = ns('getLevelInfo', {
+  LevelInfo: {
+    fields: {
+      id: { type: 'int32', id: 1 },
+      name: { type: 'string', id: 2 },
+      score: { type: 'int32', id: 3 },
+    },
+  },
   GetLevelInfoRequestData: {
     fields: {
-      common: { type: 'CommonRequest', id: 1 },
-      forumId: { type: 'uint64', id: 2, protoName: 'forum_id' },
+      forumId: { type: 'uint64', id: 1, protoName: 'forum_id' },
+      common: { type: 'CommonRequest', id: 2 },
     },
   },
   GetLevelInfoRequest: {
@@ -50,18 +62,24 @@ tieba.getLevelInfo = ns('getLevelInfo', {
   },
   GetLevelInfoResponseData: {
     fields: {
-      levelInfo: { type: 'string', id: 1, protoName: 'level_info' },
+      levelInfo: { rule: 'repeated', type: 'LevelInfo', id: 1, protoName: 'level_info' },
+      isLike: { type: 'int32', id: 2, protoName: 'is_like' },
+      userLevel: { type: 'int32', id: 3, protoName: 'user_level' },
+      levelName: { type: 'string', id: 4, protoName: 'level_name' },
     },
   },
   GetLevelInfoResponse: {
     fields: {
-      error: { type: 'Error', id: 1 },
-      data: { type: 'GetLevelInfoResponseData', id: 2 },
+      data: { type: 'GetLevelInfoResponseData', id: 1 },
+      error: { type: 'Error', id: 2 },
     },
   },
 });
 
 // 3. getMemberInfo (cmd=301004)
+// 字段号对齐官方 GetMemberInfo/DataReq.proto + GetMemberInfoResIdl.proto：
+//   DataReq { uint64 forum_id=1; CommonReq common=2; }
+//   GetMemberInfoResIdl { DataRes data=1; Error error=2; }
 tieba.getMemberInfo = ns('getMemberInfo', {
   ForumMember: {
     fields: {
@@ -74,8 +92,8 @@ tieba.getMemberInfo = ns('getMemberInfo', {
   },
   GetMemberInfoRequestData: {
     fields: {
-      common: { type: 'CommonRequest', id: 1 },
-      forumId: { type: 'uint64', id: 2, protoName: 'forum_id' },
+      forumId: { type: 'uint64', id: 1, protoName: 'forum_id' },
+      common: { type: 'CommonRequest', id: 2 },
     },
   },
   GetMemberInfoRequest: {
@@ -88,18 +106,24 @@ tieba.getMemberInfo = ns('getMemberInfo', {
   },
   GetMemberInfoResponse: {
     fields: {
-      error: { type: 'Error', id: 1 },
-      data: { type: 'GetMemberInfoResponseData', id: 2 },
+      data: { type: 'GetMemberInfoResponseData', id: 1 },
+      error: { type: 'Error', id: 2 },
     },
   },
 });
 
 // 4. forumRuleDetail (cmd=309690)
+// 字段号对齐官方 ForumRuleDetail/DataReq.proto：
+//   DataReq { int64 forum_id=1; CommonReq common=2; int64 default_rule_version=3;
+//             int64 customize_rule_version=4; int64 is_edit=5; }
 tieba.forumRuleDetail = ns('forumRuleDetail', {
   ForumRuleDetailRequestData: {
     fields: {
-      common: { type: 'CommonRequest', id: 1 },
-      forumId: { type: 'uint64', id: 2, protoName: 'forum_id' },
+      forumId: { type: 'int64', id: 1, protoName: 'forum_id' },
+      common: { type: 'CommonRequest', id: 2 },
+      defaultRuleVersion: { type: 'int64', id: 3, protoName: 'default_rule_version' },
+      customizeRuleVersion: { type: 'int64', id: 4, protoName: 'customize_rule_version' },
+      isEdit: { type: 'int64', id: 5, protoName: 'is_edit' },
     },
   },
   ForumRuleDetailRequest: {
@@ -122,17 +146,29 @@ tieba.forumRuleDetail = ns('forumRuleDetail', {
 });
 
 // 5. generalTabList (cmd=309622)
+// 字段号对齐官方 GeneralTabList/DataReq.proto + DataRes.proto：
+//   DataReq { common=1; tab_id=2; forum_id=3; pn=4; rn=5; scr_w=6; scr_h=7;
+//             scr_dip=8; last_thread_id=9; is_default_navtab=10; tab_name=11;
+//             is_general_tab=12; sort_type=13; tab_type=14; ... }
+//   DataRes { repeated ThreadInfo general_list=1; int32 has_more=2;
+//             repeated User user_list=3; ...; PageData page_data=14; }
 tieba.generalTabList = ns('generalTabList', {
   GeneralTabListRequestData: {
     fields: {
       common: { type: 'CommonRequest', id: 1 },
-      forumId: { type: 'int64', id: 2, protoName: 'forum_id' },
-      tabType: { type: 'int32', id: 3, protoName: 'tab_type' },
+      tabId: { type: 'int32', id: 2, protoName: 'tab_id' },
+      forumId: { type: 'int64', id: 3, protoName: 'forum_id' },
       pn: { type: 'int32', id: 4 },
       rn: { type: 'int32', id: 5 },
-      sortType: { type: 'int32', id: 6, protoName: 'sort_type' },
-      tabName: { type: 'string', id: 7, protoName: 'tab_name' },
-      tabCode: { type: 'string', id: 8, protoName: 'tab_code' },
+      scrW: { type: 'int32', id: 6, protoName: 'scr_w' },
+      scrH: { type: 'int32', id: 7, protoName: 'scr_h' },
+      scrDip: { type: 'int32', id: 8, protoName: 'scr_dip' },
+      lastThreadId: { type: 'int64', id: 9, protoName: 'last_thread_id' },
+      isDefaultNavtab: { type: 'int32', id: 10, protoName: 'is_default_navtab' },
+      tabName: { type: 'string', id: 11, protoName: 'tab_name' },
+      isGeneralTab: { type: 'int32', id: 12, protoName: 'is_general_tab' },
+      sortType: { type: 'int32', id: 13, protoName: 'sort_type' },
+      tabType: { type: 'int32', id: 14, protoName: 'tab_type' },
     },
   },
   GeneralTabListRequest: {
@@ -140,10 +176,10 @@ tieba.generalTabList = ns('generalTabList', {
   },
   GeneralTabListResponseData: {
     fields: {
-      tabList: { rule: 'repeated', type: 'FrsTabInfo', id: 1, protoName: 'tab_list' },
-      threadList: { rule: 'repeated', type: 'ThreadInfo', id: 2, protoName: 'thread_list' },
+      generalList: { rule: 'repeated', type: 'ThreadInfo', id: 1, protoName: 'general_list' },
+      hasMore: { type: 'int32', id: 2, protoName: 'has_more' },
       userList: { rule: 'repeated', type: 'User', id: 3, protoName: 'user_list' },
-      page: { type: 'Page', id: 4 },
+      sortType: { type: 'int32', id: 7, protoName: 'sort_type' },
     },
   },
   GeneralTabListResponse: {
@@ -260,26 +296,32 @@ tieba.forumRecommend = ns('forumRecommend', {
 });
 
 // 9. personalized (cmd=309264)
+// 字段号对齐官方 Personalized/DataReq.proto + DataRes.proto：
+//   DataReq { common=1; tag_code=2; need_tags=3; load_type=4; page_thread_count=5;
+//             pn=6; sug_count=7; scr_w=8; scr_h=9; scr_dip=10; q_type=11; ...
+//             need_forumlist=22; new_net_type=23; pre_ad_thread_count=26;
+//             new_install=27; request_times=28; invoke_source=29; ... }
+//   DataRes { repeated ThreadInfo thread_list=2; ... }
 tieba.personalized = ns('personalized', {
   PersonalizedRequestData: {
     fields: {
       common: { type: 'CommonRequest', id: 1 },
-      loadType: { type: 'int32', id: 2, protoName: 'load_type' },
-      pn: { type: 'int32', id: 3 },
-      needTags: { type: 'int32', id: 4, protoName: 'need_tags' },
-      pageThreadCount: { type: 'int32', id: 5, protoName: 'page_thread_count' },
-      preAdThreadCount: { type: 'int32', id: 6, protoName: 'pre_ad_thread_count' },
-      sugCount: { type: 'int32', id: 7, protoName: 'sug_count' },
-      tagCode: { type: 'int32', id: 8, protoName: 'tag_code' },
-      qType: { type: 'int32', id: 9, protoName: 'q_type' },
-      needForumlist: { type: 'int32', id: 10, protoName: 'need_forumlist' },
-      newNetType: { type: 'int32', id: 11, protoName: 'new_net_type' },
-      newInstall: { type: 'int32', id: 12, protoName: 'new_install' },
-      requestTime: { type: 'int64', id: 13, protoName: 'request_time' },
-      invokeSource: { type: 'string', id: 14, protoName: 'invoke_source' },
-      scrDip: { type: 'double', id: 15, protoName: 'scr_dip' },
-      scrH: { type: 'uint32', id: 16, protoName: 'scr_h' },
-      scrW: { type: 'uint32', id: 17, protoName: 'scr_w' },
+      tagCode: { type: 'uint32', id: 2, protoName: 'tag_code' },
+      needTags: { type: 'uint32', id: 3, protoName: 'need_tags' },
+      loadType: { type: 'uint32', id: 4, protoName: 'load_type' },
+      pageThreadCount: { type: 'uint32', id: 5, protoName: 'page_thread_count' },
+      pn: { type: 'uint32', id: 6 },
+      sugCount: { type: 'uint32', id: 7, protoName: 'sug_count' },
+      scrW: { type: 'int32', id: 8, protoName: 'scr_w' },
+      scrH: { type: 'int32', id: 9, protoName: 'scr_h' },
+      scrDip: { type: 'double', id: 10, protoName: 'scr_dip' },
+      qType: { type: 'int32', id: 11, protoName: 'q_type' },
+      needForumlist: { type: 'uint32', id: 22, protoName: 'need_forumlist' },
+      newNetType: { type: 'uint32', id: 23, protoName: 'new_net_type' },
+      preAdThreadCount: { type: 'int32', id: 26, protoName: 'pre_ad_thread_count' },
+      newInstall: { type: 'int32', id: 27, protoName: 'new_install' },
+      requestTimes: { type: 'int32', id: 28, protoName: 'request_times' },
+      invokeSource: { type: 'string', id: 29, protoName: 'invoke_source' },
     },
   },
   PersonalizedRequest: {
@@ -287,9 +329,24 @@ tieba.personalized = ns('personalized', {
   },
   PersonalizedResponseData: {
     fields: {
-      threadList: { rule: 'repeated', type: 'ThreadInfo', id: 1, protoName: 'thread_list' },
-      userList: { rule: 'repeated', type: 'User', id: 2, protoName: 'user_list' },
-      page: { type: 'Page', id: 3 },
+      threadList: { rule: 'repeated', type: 'ThreadInfo', id: 2, protoName: 'thread_list' },
+      threadPersonalized: { rule: 'repeated', type: 'ThreadPersonalized', id: 7, protoName: 'thread_personalized' },
+    },
+  },
+  ThreadPersonalized: {
+    fields: {
+      tid: { type: 'uint64', id: 1 },
+      weight: { type: 'string', id: 2 },
+      source: { type: 'string', id: 3 },
+      dislikeResource: { rule: 'repeated', type: 'DislikeReason', id: 5, protoName: 'dislikeResource' },
+      extra: { type: 'string', id: 6 },
+    },
+  },
+  DislikeReason: {
+    fields: {
+      dislikeReason: { type: 'string', id: 1 },
+      dislikeId: { type: 'uint32', id: 2 },
+      extra: { type: 'string', id: 3 },
     },
   },
   PersonalizedResponse: {
@@ -301,24 +358,49 @@ tieba.personalized = ns('personalized', {
 });
 
 // 10. userLike (cmd=309474)
+// 字段号对齐官方 Userlike/DataReq.proto + DataRes.proto：
+//   DataReq { common=1; page_tag=2; last_req_unix=3; follow_type=4; load_type=5; ... }
+//   DataRes { repeated ConcernData thread_info=1; string page_tag=2;
+//             repeated UserList user_list=3; int32 has_more=4; ... uint64 req_unix=10; }
+//   ConcernData { ThreadInfo thread_list=1; PostData post_data=2; int32 recom_type=3;
+//                 int32 source=4; repeated User recom_user_list=5; }
 tieba.userLike = ns('userLike', {
   UserLikeRequestData: {
     fields: {
       common: { type: 'CommonRequest', id: 1 },
-      loadType: { type: 'int32', id: 2, protoName: 'load_type' },
-      pageTag: { type: 'string', id: 3, protoName: 'page_tag' },
-      lastRequestUnix: { type: 'int64', id: 4, protoName: 'last_request_unix' },
+      pageTag: { type: 'string', id: 2, protoName: 'page_tag' },
+      lastRequestUnix: { type: 'uint64', id: 3, protoName: 'last_req_unix' },
+      followType: { type: 'int32', id: 4, protoName: 'follow_type' },
+      loadType: { type: 'int32', id: 5, protoName: 'load_type' },
     },
   },
   UserLikeRequest: {
     fields: { data: { type: 'UserLikeRequestData', id: 1 } },
   },
+  ConcernData: {
+    fields: {
+      threadList: { type: 'ThreadInfo', id: 1, protoName: 'thread_list' },
+      postData: { type: 'ConcernPostData', id: 2, protoName: 'post_data' },
+      recommendType: { type: 'int32', id: 3, protoName: 'recom_type' },
+      source: { type: 'int32', id: 4 },
+      recommendUserList: { rule: 'repeated', type: 'User', id: 5, protoName: 'recom_user_list' },
+    },
+  },
+  ConcernPostData: {
+    fields: {
+      id: { type: 'uint64', id: 1 },
+      content: { rule: 'repeated', type: 'PbContent', id: 2 },
+      postTitle: { type: 'string', id: 3, protoName: 'post_title' },
+      author: { type: 'User', id: 4 },
+      time: { type: 'uint64', id: 5 },
+    },
+  },
   UserLikeResponseData: {
     fields: {
-      threadList: { rule: 'repeated', type: 'ThreadInfo', id: 1, protoName: 'thread_list' },
-      userList: { rule: 'repeated', type: 'User', id: 2, protoName: 'user_list' },
-      pageTag: { type: 'string', id: 3, protoName: 'page_tag' },
+      threadInfo: { rule: 'repeated', type: 'ConcernData', id: 1, protoName: 'thread_info' },
+      pageTag: { type: 'string', id: 2, protoName: 'page_tag' },
       hasMore: { type: 'int32', id: 4, protoName: 'has_more' },
+      requestUnix: { type: 'uint64', id: 10, protoName: 'req_unix' },
     },
   },
   UserLikeResponse: {
@@ -330,21 +412,36 @@ tieba.userLike = ns('userLike', {
 });
 
 // 11. userPost (cmd=303002)
+// 字段号对齐官方 UserPost/DataReq.proto + DataRes.proto：
+//   DataReq { uid=1; rn=2; offset=3; is_thread=4; need_content=5; forum_id=6;
+//             begin_time=7; end_time=8; subtype=9; ...; pn=26; common=27;
+//             scr_w=29; scr_h=30; scr_dip=31; q_type=32; is_view_card=33; ... }
+//   DataRes { repeated PostInfoList post_list=1; ... }
 tieba.userPost = ns('userPost', {
   UserPostRequestData: {
     fields: {
-      common: { type: 'CommonRequest', id: 1 },
-      uid: { type: 'uint64', id: 2 },
-      rn: { type: 'int32', id: 3 },
-      isThread: { type: 'int32', id: 4, protoName: 'is_thread' },
-      needContent: { type: 'int32', id: 5, protoName: 'need_content' },
-      pn: { type: 'int32', id: 6 },
-      scrW: { type: 'int32', id: 7, protoName: 'scr_w' },
-      scrH: { type: 'int32', id: 8, protoName: 'scr_h' },
-      scrDip: { type: 'double', id: 9, protoName: 'scr_dip' },
-      qType: { type: 'int32', id: 10, protoName: 'q_type' },
-      isViewCard: { type: 'int32', id: 11, protoName: 'is_view_card' },
-      subtype: { type: 'int32', id: 12 },
+      uid: { type: 'int64', id: 1 },
+      rn: { type: 'uint32', id: 2 },
+      offset: { type: 'uint32', id: 3 },
+      isThread: { type: 'uint32', id: 4, protoName: 'is_thread' },
+      needContent: { type: 'uint32', id: 5, protoName: 'need_content' },
+      forumId: { type: 'uint64', id: 6, protoName: 'forum_id' },
+      beginTime: { type: 'uint32', id: 7, protoName: 'begin_time' },
+      endTime: { type: 'uint32', id: 8, protoName: 'end_time' },
+      subtype: { type: 'uint32', id: 9 },
+      moduleName: { type: 'string', id: 13, protoName: 'module_name' },
+      stType: { type: 'uint32', id: 14, protoName: 'st_type' },
+      userId: { type: 'int64', id: 19, protoName: 'user_id' },
+      userName: { type: 'string', id: 20, protoName: 'user_name' },
+      portrait: { type: 'string', id: 22 },
+      pn: { type: 'uint32', id: 26 },
+      common: { type: 'CommonRequest', id: 27 },
+      isTwzhibo: { type: 'uint32', id: 28, protoName: 'is_twzhibo' },
+      scrW: { type: 'int32', id: 29, protoName: 'scr_w' },
+      scrH: { type: 'int32', id: 30, protoName: 'scr_h' },
+      scrDip: { type: 'double', id: 31, protoName: 'scr_dip' },
+      qType: { type: 'int32', id: 32, protoName: 'q_type' },
+      isViewCard: { type: 'int32', id: 33, protoName: 'is_view_card' },
     },
   },
   UserPostRequest: {
@@ -428,18 +525,46 @@ tieba.threadList = ns('threadList', {
 });
 
 // 14. getForumDetail (cmd=303021)
+// 字段号对齐官方 GetForumDetail/DataReq.proto + GetForumDetailResIdl.proto：
+//   DataReq { int64 forum_id=1; CommonReq common=2; int32 is_newfrs=4; }
+//   DataRes { RecommendForumInfo forum_info=1; repeated SimpleThreadInfo thread_list=2; ... }
 tieba.getForumDetail = ns('getForumDetail', {
   GetForumDetailRequestData: {
     fields: {
       forumId: { type: 'int64', id: 1, protoName: 'forum_id' },
       common: { type: 'CommonRequest', id: 2 },
+      isNewfrs: { type: 'int32', id: 4, protoName: 'is_newfrs' },
     },
   },
   GetForumDetailRequest: {
     fields: { data: { type: 'GetForumDetailRequestData', id: 1 } },
   },
   GetForumDetailResponseData: {
-    fields: {},
+    fields: {
+      forumInfo: { type: 'RecommendForumInfo', id: 1, protoName: 'forum_info' },
+      threadList: { rule: 'repeated', type: 'SimpleThreadInfo', id: 2, protoName: 'thread_list' },
+    },
+  },
+  RecommendForumInfo: {
+    fields: {
+      avatar: { type: 'string', id: 1 },
+      forumId: { type: 'uint64', id: 2, protoName: 'forum_id' },
+      forumName: { type: 'string', id: 3, protoName: 'forum_name' },
+      isLike: { type: 'uint32', id: 4, protoName: 'is_like' },
+      memberCount: { type: 'uint32', id: 5, protoName: 'member_count' },
+      threadCount: { type: 'uint32', id: 6, protoName: 'thread_count' },
+      slogan: { type: 'string', id: 7 },
+    },
+  },
+  SimpleThreadInfo: {
+    fields: {
+      tid: { type: 'uint64', id: 1 },
+      title: { type: 'string', id: 2 },
+      replyNum: { type: 'int32', id: 3, protoName: 'reply_num' },
+      lastTimeInt: { type: 'int32', id: 4, protoName: 'last_time_int' },
+      _abstract: { rule: 'repeated', type: 'Abstract', id: 5 },
+      threadType: { type: 'uint64', id: 7, protoName: 'thread_type' },
+    },
   },
   GetForumDetailResponse: {
     fields: {

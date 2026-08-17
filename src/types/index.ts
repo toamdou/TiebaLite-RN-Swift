@@ -265,6 +265,8 @@ export interface TopicInfo {
   discussNum: number;
   isHot: boolean;
   isNew: boolean;
+  /** 话题封面图（topicPic 映射而来），无图时为空串 */
+  imageUrl?: string;
 }
 
 /** Hot topic list item with optional rank and image */
@@ -513,19 +515,7 @@ export interface BlockedUser {
 }
 
 // ---------- Theme ----------
-export type ThemeName =
-  | 'tieba'
-  | 'blue'
-  | 'black'
-  | 'pink'
-  | 'red'
-  | 'purple'
-  | 'dark'
-  | 'blue_dark'
-  | 'grey_dark'
-  | 'amoled_dark'
-  | 'translucent'
-  | 'custom';
+export type ThemeName = 'tieba';
 
 export interface ThemeColors {
   theme: ThemeName;
@@ -557,7 +547,6 @@ export interface ThemeColors {
 
 // ---------- App Preferences ----------
 export interface AppPreferences {
-  theme: ThemeName;
   fontScale: number;
   autoSign: boolean;
   autoSignTime: string; // HH:mm
@@ -566,14 +555,6 @@ export interface AppPreferences {
   defaultStartTab: 'home' | 'explore' | 'notifications' | 'user' | 'profile';
   defaultSortType: string;
   forumFabFunction: string;
-  /** Light-mode theme name used by ThemeContext. */
-  lightTheme: ThemeName;
-  /** Dark-mode theme name used by ThemeContext. */
-  darkTheme: ThemeName;
-  /** Manual dark-mode override (used when followSystemDarkMode is false). */
-  darkMode: boolean;
-  /** Follow the iOS system appearance. */
-  followSystemDarkMode: boolean;
   toolbarPrimaryColor: boolean;
   statusBarFontDark: boolean;
   showBothUsername: boolean;
@@ -582,6 +563,10 @@ export interface AppPreferences {
   showShortcutInThread: boolean;
   hideReply: boolean;
   forumSingleColumn: boolean;
+  /** 首页关注吧布局：single=一行一个，double=一行两个 */
+  homeForumLayout: 'single' | 'double';
+  /** 首页关注吧排序：name=吧名，level=等级 */
+  homeForumSort: 'name' | 'level';
   blockVideo: boolean;
   hideMedia: boolean;
   showFollowedOnly: boolean;
@@ -590,21 +575,11 @@ export interface AppPreferences {
   imageWatermark: 'none' | 'username' | 'forum_name';
   imageDarkenWhenNight: boolean;
   useBuiltInBrowser: boolean;
-  useCustomTabs: boolean;
-  liftUpBottomBar: boolean;
-  statusBarDarker: boolean;
-  translucentAlpha: number;
-  translucentBlur: number;
-  translucentBackgroundPath: string;
-  customPrimaryColor: string;
-  translucentPrimaryColor: string;
-  ignoreBatteryOptimizationsDialog: boolean;
   slowSignMode: boolean;
   failAutoStop: boolean;
   useOfficialSign: boolean;
   /** Whether one-click sign progress is shown as an iOS Live Activity. */
   liveActivitySignEnabled: boolean;
-  experimentalFeatures: boolean;
   homePageShowHistoryForum: boolean;
   exploreAutoRefresh: boolean;
   hapticFeedback: boolean;

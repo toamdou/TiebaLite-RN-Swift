@@ -32,6 +32,14 @@ export const LEGACY_PREFERENCE_KEYS = [
   '@tiebalite:pref_hideExplore',
 ] as const;
 
+/**
+ * 主题选择系统已移除：界面固定浅色/深色并跟随系统外观。
+ * 旧的 @tiebalite:* 主题键不再迁移，仅在此清理残留存储。
+ */
+export async function migrateLegacyPreferences(): Promise<void> {
+  await AsyncStorage.multiRemove([...LEGACY_PREFERENCE_KEYS]);
+}
+
 export type AppPreferenceKey = keyof AppPreferences;
 
 const PREFERENCE_KEYS = Object.keys(DEFAULT_PREFERENCES) as AppPreferenceKey[];
@@ -196,47 +204,3 @@ export const usePreferencesStore = create<PreferencesState>()(
     },
   ),
 );
-
-/**
- * Merge legacy `@tiebalite:*` preference keys into the unified store once.
- */
-export async function migrateLegacyPreferences(): Promise<void> {
-  const entries = await AsyncStorage.multiGet([...LEGACY_PREFERENCE_KEYS]);
-  const stored = new Map(entries.map(([key, value]) => [key, value]));
-  const legacyTheme = stored.get('@tiebalite:theme');
-  const lightTheme = stored.get('@tiebalite:lightTheme');
-  const darkTheme = stored.get('@tiebalite:darkTheme');
-  const darkMode = stored.get('@tiebalite:darkMode');
-  const followSystem = stored.get('@tiebalite:followSystemDarkMode');
-  const primary = stored.get('@tiebalite:customPrimaryColor');
-  const alpha = stored.get('@tiebalite:translucentAlpha');
-
-  if (
-    !legacyTheme && !lightTheme && !darkTheme &&
-    darkMode === null && followSystem === null && primary === null && alpha === null
-  ) {
-    return;
-  }
-
-  const current = usePreferencesStore.getState().preferences;
-  const merged: Partial<AppPreferences> = { ...current };
-  if (legacyTheme && !lightTheme && !darkTheme) {
-    const theme = legacyTheme as AppPreferences['theme'];
-    merged.theme = theme;
-    if (['tieba', 'blue', 'black', 'pink', 'red', 'purple', 'translucent', 'custom'].includes(theme)) {
-      merged.lightTheme = theme;
-    } else {
-      merged.darkTheme = theme;
-    }
-  } else {
-    if (lightTheme) merged.lightTheme = lightTheme as AppPreferences['lightTheme'];
-    if (darkTheme) merged.darkTheme = darkTheme as AppPreferences['darkTheme'];
-  }
-  if (darkMode !== null) merged.darkMode = darkMode === 'true';
-  if (followSystem !== null) merged.followSystemDarkMode = followSystem === 'true';
-  if (primary) merged.customPrimaryColor = primary;
-  if (alpha) merged.translucentAlpha = Number(alpha) || DEFAULT_PREFERENCES.translucentAlpha;
-
-  usePreferencesStore.getState().setPreferences(merged);
-  await AsyncStorage.multiRemove([...LEGACY_PREFERENCE_KEYS]);
-}

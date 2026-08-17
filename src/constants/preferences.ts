@@ -6,7 +6,6 @@ import type { AppPreferences } from '@/types';
  * share it without creating a circular import.
  */
 export const DEFAULT_PREFERENCES: AppPreferences = {
-  theme: 'tieba',
   fontScale: 1.0,
   autoSign: false,
   autoSignTime: '08:00',
@@ -14,11 +13,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   incognitoMode: false,
   defaultStartTab: 'home', // Not consumed by tab startup yet; UI marks it as no-op.
   defaultSortType: '0',
-  forumFabFunction: 'post',
-  lightTheme: 'tieba',
-  darkTheme: 'dark',
-  darkMode: false,
-  followSystemDarkMode: true,
+  forumFabFunction: 'refresh',
   toolbarPrimaryColor: false,
   statusBarFontDark: false,
   showBothUsername: false,
@@ -26,7 +21,9 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   collectDescSort: false,
   showShortcutInThread: true,
   hideReply: false,
-  forumSingleColumn: false, // Not consumed by forum layout yet.
+  forumSingleColumn: true, // 默认单列布局（设置里可切换双列）
+  homeForumLayout: 'single', // 首页关注吧默认一行一个
+  homeForumSort: 'name', // 默认按吧名排序
   blockVideo: false,
   hideMedia: false,
   showFollowedOnly: false, // Not consumed by feed pages yet.
@@ -35,20 +32,10 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   imageWatermark: 'none',
   imageDarkenWhenNight: true,
   useBuiltInBrowser: true,
-  useCustomTabs: true, // No UI or consumer yet.
-  liftUpBottomBar: false, // No UI or consumer yet.
-  statusBarDarker: false, // No UI or consumer yet.
-  translucentAlpha: 0.85,
-  translucentBlur: 10,
-  translucentBackgroundPath: '',
-  customPrimaryColor: '#4477E0',
-  translucentPrimaryColor: '#FFFFFF',
-  ignoreBatteryOptimizationsDialog: false,
   slowSignMode: false,
   failAutoStop: true,
   useOfficialSign: true,
   liveActivitySignEnabled: true,
-  experimentalFeatures: false,
   homePageShowHistoryForum: true,
   exploreAutoRefresh: true,
   hapticFeedback: true,

@@ -201,7 +201,9 @@ export default function EditProfilePage() {
                       />
                       {uploading && (
                         <View style={styles.uploadProgress}>
-                          <ProgressView modifiers={[progressViewStyle('circular')]} />
+                          <ThemedHost matchContents>
+                            <ProgressView modifiers={[progressViewStyle('circular')]} />
+                          </ThemedHost>
                         </View>
                       )}
                     </View>
@@ -282,7 +284,9 @@ export default function EditProfilePage() {
             </View>
             {pickerLoading ? (
               <View style={styles.modalLoading}>
-                <ProgressView modifiers={[progressViewStyle('circular')]} />
+                <ThemedHost matchContents>
+                  <ProgressView modifiers={[progressViewStyle('circular')]} />
+                </ThemedHost>
               </View>
             ) : (
               <ScrollView contentContainerStyle={styles.grid}>

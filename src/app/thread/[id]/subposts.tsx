@@ -40,7 +40,7 @@ import { pbFloor, agree, checkReportPost, delPost } from '@/services/api/endpoin
 import { usePagedList } from '@/hooks/usePagedList';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { LoadMoreFooter } from '@/components/ui/LoadMoreFooter';
-import { SkeletonList } from '../../../../components/ui/Skeleton';
+import { SkeletonList } from '../../../components/ui/Skeleton';
 import { TiebaRichText } from '../../../../modules/tieba-native/src/TiebaRichText';
 import { contentToRichTextRuns } from '@/utils/richTextRuns';
 import ImageViewer from '@/components/ImageViewer';

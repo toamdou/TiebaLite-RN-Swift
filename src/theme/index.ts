@@ -5,8 +5,6 @@
 // Colors
 export {
   getThemeColors,
-  toLegacyThemeColors,
-  translucentPalette,
 } from './colors';
 export type { SemanticColors } from './colors';
 
@@ -48,5 +46,5 @@ export type { HapticsScene } from './hapticsMap';
 export { LIST_ENTER, SHEET_PRESENT, SHEET_DISMISS, ICON_POP } from './motion';
 
 // Theme Context
-export { ThemeProvider, useThemeContext, useAppTheme } from './ThemeContext';
+export { ThemeProvider, useThemeContext, useAppTheme, useThemeColors } from './ThemeContext';
 export { default as ThemeContext } from './ThemeContext';

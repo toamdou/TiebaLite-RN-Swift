@@ -53,12 +53,15 @@ function useBreathing(reduceMotion: boolean) {
       opacity.value = 0.9;
       return;
     }
+    // 呼吸动画改为有限循环（3 次）：withRepeat(-1) 会让 reanimated 的
+    // display link 永不停歇地空转（每帧回调 + 空队列 flush），空载时
+    // 主线程 100%、帧率锁 60。3 次呼吸后动画自然结束，display link 关闭。
     opacity.value = withRepeat(
       withSequence(
         withTiming(0.45, { duration: 500 }),
         withTiming(0.9, { duration: 500 }),
       ),
-      -1,
+      3,
     );
     return () => cancelAnimation(opacity);
   }, [reduceMotion, opacity]);

@@ -28,7 +28,6 @@ import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { typographyStyles } from '@/theme/typography';
 import { useAuthStore } from '@/stores/authStore';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBlockFilter } from '@/hooks/useBlockFilter';
 import { useAppPreference } from '@/hooks/useAppPreference';
 import { useImageViewer } from '@/hooks/useImageViewer';
@@ -398,7 +397,6 @@ const NativeThreadCell = memo(function NativeThreadCell({
 
 // ── 主页面 ──
 export default function ExploreScreen() {
-  const insets = useSafeAreaInsets();
   const [activeSegment, setActiveSegment] = useState<ExploreSegment>('personalized');
   // 记录最后一次选中的信息流分段（推荐/关注）。切到热榜时 FeedContent 保持
   // 挂载（display 隐藏），用此值兜底 segment，避免切回时因 prop 变化重拉数据。
@@ -414,18 +412,19 @@ export default function ExploreScreen() {
   return (
     <ThemedHost style={{ flex: 1 }}>
       <VStack spacing={0}>
-        {/* 分段选择器：顶部安全区（对齐 notifications.tsx）+ token 间距 */}
-        <View style={[styles.pickerWrap, { paddingTop: insets.top }]}>
-          <Picker
-            selection={activeSegment}
-            onSelectionChange={handleSegmentChange as any}
-            modifiers={[pickerStyle('segmented'), padding({ horizontal: Spacing.lg, top: Spacing.sm })]}
-          >
-            {SEGMENTS.map((s) => (
-              <Text key={s.value} modifiers={[tag(s.value)]}>{s.label}</Text>
-            ))}
-          </Picker>
-        </View>
+        {/* 分段选择器：直接置于 SwiftUI VStack（swift-ui 组件不可嵌 RN UIView，
+            否则触发 SwiftUIVirtualViewObjCDev 断言崩溃）。
+            ⚠️ 不用 insets.top 做 padding：首次渲染 insets 为 0、随后变 47，
+            会导致分段栏从顶端突然下移出大片空白。原生 tab 已处理安全区。 */}
+        <Picker
+          selection={activeSegment}
+          onSelectionChange={handleSegmentChange as any}
+          modifiers={[pickerStyle('segmented'), padding({ horizontal: Spacing.lg, top: Spacing.sm })]}
+        >
+          {SEGMENTS.map((s) => (
+            <Text key={s.value} modifiers={[tag(s.value)]}>{s.label}</Text>
+          ))}
+        </Picker>
 
         {/* 内容区：Feed 与热榜常驻挂载，display 隐藏切换 —— 热榜切回推荐
             不再卸载 FeedContent，数据与滚动位置得以保留；热榜数据同样驻留。 */}
@@ -712,12 +711,18 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
 
   // 空态
   if (items.length === 0) {
+    // swift-ui 组件不能直接挂 RN View 下（会触发 SwiftUIVirtualView 断言红屏），
+    // 必须经 Host 桥嵌入；外层容器 flex:1 + 居中，使空态位于页面中央。
     return (
-      <ContentUnavailableView
-        systemImage="tray"
-        title="暂无内容"
-        description={segment === 'personalized' ? '去关注一些贴吧获取推荐' : '暂无关注动态'}
-      />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ThemedHost matchContents>
+          <ContentUnavailableView
+            systemImage="tray"
+            title="暂无内容"
+            description={segment === 'personalized' ? '去关注一些贴吧获取推荐' : '暂无关注动态'}
+          />
+        </ThemedHost>
+      </View>
     );
   }
 

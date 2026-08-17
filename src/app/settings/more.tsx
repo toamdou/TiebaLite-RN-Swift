@@ -239,11 +239,8 @@ export default function MoreSettingsPage() {
 
         <Section
           title="更多"
-          footer="系统应用设置可管理通知、权限与后台任务。"
+          footer={<Text>系统应用设置可管理通知、权限与后台任务。</Text>}
         >
-          <Button onPress={() => navigateTo('/settings/experimental')}>
-            <Label title="实验功能" systemImage="flask" modifiers={[foregroundStyle('#FF9500')]} />
-          </Button>
           <Button onPress={() => navigateTo('/settings/about')}>
             <Label title="关于" systemImage="info.circle" modifiers={[foregroundStyle('#8E8E93')]} />
           </Button>

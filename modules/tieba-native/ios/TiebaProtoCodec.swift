@@ -693,7 +693,7 @@ final class TiebaProtoProjector {
     // ---- response data messages ----
     "tieba.hotThreadList.HotThreadListResponseData": ["topicList", "threadInfo", "hotThreadTabInfo"],
     "tieba.topicList.TopicListResponseData": ["topicBang", "topicManual", "mediaTopic", "tabList", "frsTabTopic", "topicList"],
-    "tieba.pbPage.PbPageResponseData": ["thread", "postList", "userList", "page", "forum"],
+    "tieba.pbPage.PbPageResponseData": ["thread", "postList", "userList", "page", "forum", "anti", "firstFloorPost"],
     "tieba.pbFloor.PbFloorResponseData": ["subpostList", "page", "thread", "forum"],
     "tieba.personalized.PersonalizedResponseData": ["threadList", "userList", "page"],
     "tieba.userLike.UserLikeResponseData": ["threadList", "userList", "pageTag", "hasMore"],

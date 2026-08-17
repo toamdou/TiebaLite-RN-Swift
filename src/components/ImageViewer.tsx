@@ -90,11 +90,14 @@ const ZoomableImage = memo(function ZoomableImage({
   uri,
   onSingleTap,
   onZoomChange,
+  onLongPress,
   active,
 }: {
   uri: string;
   onSingleTap: () => void;
   onZoomChange?: (zoomed: boolean) => void;
+  /** 长按图片：回传长按点坐标（相对全屏图片容器 ≈ 屏幕坐标） */
+  onLongPress?: (x: number, y: number) => void;
   active: boolean;
 }) {
   const [isZoomed, setIsZoomed] = useState(false);
@@ -198,10 +201,20 @@ const ZoomableImage = memo(function ZoomableImage({
       }
     });
 
+  // 长按：回传触点坐标（e.x/e.y 相对全屏手势容器，即屏幕坐标），
+  // 供上层在长按位置弹出保存按钮。
+  const longPress = Gesture.LongPress()
+    .onEnd((e, success) => {
+      if (success && onLongPress) {
+        runOnJS(onLongPress)(e.x, e.y);
+      }
+    });
+
   const composedGesture = Gesture.Simultaneous(
     pinch,
     pan,
     Gesture.Exclusive(doubleTap, singleTap),
+    longPress,
   );
 
   // 内存策略：仅当前页（active）解码原图（高优先级、带磁盘缓存上限），
@@ -293,6 +306,8 @@ export default function ImageViewer({
   const [showUI, setShowUI] = useState(true);
   const [downloadProgress, setDownloadProgress] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
+  // 长按保存菜单：记录长按点坐标，按钮随位置弹出
+  const [saveMenu, setSaveMenu] = useState<{ x: number; y: number } | null>(null);
   const insets = useSafeAreaInsets();
   const pagerRef = useRef<PagerView>(null);
   const thumbnailRef = useRef<ScrollView>(null);
@@ -449,7 +464,14 @@ export default function ImageViewer({
     });
 
   const toggleUI = useCallback(() => {
+    // 单击图片：收起长按菜单 + 切换顶/底栏显隐
+    setSaveMenu(null);
     setShowUI((prev) => !prev);
+  }, []);
+
+  const handleLongPress = useCallback((x: number, y: number) => {
+    hapticForScene('press');
+    setSaveMenu({ x, y });
   }, []);
 
   const handleClose = useCallback(() => {
@@ -521,6 +543,12 @@ export default function ImageViewer({
     }
   }, [images, currentIndex, getWatermarkText, imageWatermarkEnabled, forumName]);
 
+  // 长按菜单保存：复用顶栏保存逻辑，保存后收起菜单
+  const handleSaveMenuPress = useCallback(() => {
+    setSaveMenu(null);
+    handleSaveToGallery();
+  }, [handleSaveToGallery]);
+
   if (images.length === 0) return null;
 
   return (
@@ -552,6 +580,7 @@ export default function ImageViewer({
                   uri={page.uri}
                   onSingleTap={toggleUI}
                   onZoomChange={setIsZoomed}
+                  onLongPress={handleLongPress}
                   active={page.active}
                 />
                 {watermarkText ? (
@@ -567,6 +596,26 @@ export default function ImageViewer({
             ))}
           </PagerView>
         </Animated.View>
+
+        {/* 长按保存按钮：定位在长按点附近（clamp 到屏幕内） */}
+        {saveMenu && (
+          <Pressable
+            onPress={handleSaveMenuPress}
+            style={[
+              styles.saveMenuButton,
+              {
+                left: Math.min(Math.max(saveMenu.x - 68, 16), SCREEN_WIDTH - 152),
+                top: Math.min(Math.max(saveMenu.y - 30, 76), SCREEN_HEIGHT - 96),
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="保存图片到相册"
+          >
+            <GlassView theme="dark" style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(28,28,30,0.88)' }]} />
+            <SymbolView name="square.and.arrow.down" size={17} weight="semibold" tintColor="#FFFFFF" />
+            <Text style={styles.saveMenuText}>保存到相册</Text>
+          </Pressable>
+        )}
 
         {/* Top Bar */}
         <Animated.View
@@ -692,6 +741,22 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+  },
+  saveMenuButton: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 24,
+    overflow: 'hidden',
+    zIndex: 30,
+  },
+  saveMenuText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
   topBar: {
     position: 'absolute',

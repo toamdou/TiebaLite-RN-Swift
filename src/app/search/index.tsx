@@ -26,7 +26,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { hapticForScene } from '@/theme/hapticsMap';
-import { Picker, Text as SWText } from '@expo/ui/swift-ui';
+import { Picker, Text as SWText, HStack } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { ThemedHost } from '@/components/ui/ThemedHost';
@@ -90,11 +90,13 @@ function FirstBatchStagger({
     opacity: progress.value,
     transform: [{ translateY: interpolate(progress.value, [0, 1], [12, 0]) }],
   }));
-  return <Animated.View style={animStyle}>{children}</Animated.View>;
+  // 必须撑满父容器：无 flex 时 FlashList 高度坍缩为 0，结果数据已返回却看不到
+  return <Animated.View style={[animStyle, styles.staggerFill]}>{children}</Animated.View>;
 }
 
 // ── 主页面 ──
 export default function SearchPage() {
+  if (__DEV__) console.log('[search-page] mounted');
   const router = useRouter();
   const { colors } = useThemeColors();
   const [inputText, setInputText] = useState('');
@@ -242,7 +244,18 @@ export default function SearchPage() {
       }
     } catch (e: any) {
       if (seq !== searchSeqRef.current) return;
-      setError(e?.message || '搜索失败');
+      if (__DEV__) console.warn('[search] doSearch catch tab=', tab, 'err=', e?.message, 'code=', e?.code);
+      // 网络类错误给出明确的中文提示，其他错误保留原始信息
+      const msg = String(e?.message ?? '');
+      const isNetwork =
+        e?.code === 'ERR_NETWORK' ||
+        e?.code === 'ECONNABORTED' ||
+        e?.code === 'ERR_CANCELED' ||
+        msg.includes('Network Error') ||
+        msg.includes('timeout') ||
+        msg.includes('canceled') ||
+        msg.includes('aborted');
+      setError(isNetwork ? '网络环境较差，请检查网络后重试' : (msg || '搜索失败'));
     } finally {
       if (seq !== searchSeqRef.current) return;
       setLoadingMore(false);
@@ -340,34 +353,34 @@ export default function SearchPage() {
 
   return (
     <ThemedHost style={{ flex: 1 }}>
-      <Stack.Screen options={{ title: '搜索', headerSearchBarOptions: searchBarOptions }} />
+      <Stack.Screen options={{ title: searchedKeyword || '搜索', headerSearchBarOptions: searchBarOptions }} />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* ── Tab 栏（搜索后显示，SwiftUI segmented） ── */}
+        {/* ── Tab 栏（搜索后显示，SwiftUI segmented）+ 贴子排序（原生 menu，同栏右侧） ── */}
         {hasSearched && (
           <View style={styles.tabBar}>
-            <Picker
-              selection={activeTab}
-              onSelectionChange={handleTabChange as any}
-              modifiers={[pickerStyle('segmented')]}
-            >
-              {TABS.map((tab) => (
-                <SWText key={tab.key} modifiers={[tag(tab.key)]}>{tab.label}</SWText>
-              ))}
-            </Picker>
-          </View>
-        )}
-
-        {/* ── 贴子排序（搜索后显示，原生 menu Picker） ── */}
-        {hasSearched && activeTab === 'thread' && (
-          <View style={styles.sortHost}>
-            <Picker
-              selection={sortOrder}
-              onSelectionChange={handleSortChange as any}
-              modifiers={[pickerStyle('menu')]}
-            >
-              <SWText modifiers={[tag(String(SearchThreadOrder.NEW_FIRST))]}>按时间</SWText>
-              <SWText modifiers={[tag(String(SearchThreadOrder.RELEVANT))]}>按相关性</SWText>
-            </Picker>
+            <ThemedHost matchContents>
+              <HStack spacing={8}>
+                <Picker
+                  selection={activeTab}
+                  onSelectionChange={handleTabChange as any}
+                  modifiers={[pickerStyle('segmented')]}
+                >
+                  {TABS.map((tab) => (
+                    <SWText key={tab.key} modifiers={[tag(tab.key)]}>{tab.label}</SWText>
+                  ))}
+                </Picker>
+                {activeTab === 'thread' && (
+                  <Picker
+                    selection={sortOrder}
+                    onSelectionChange={handleSortChange as any}
+                    modifiers={[pickerStyle('menu')]}
+                  >
+                    <SWText modifiers={[tag(String(SearchThreadOrder.NEW_FIRST))]}>按时间</SWText>
+                    <SWText modifiers={[tag(String(SearchThreadOrder.RELEVANT))]}>按相关性</SWText>
+                  </Picker>
+                )}
+              </HStack>
+            </ThemedHost>
           </View>
         )}
 
@@ -463,10 +476,10 @@ export default function SearchPage() {
             </View>
           ) : error ? (
             <View style={styles.centerWrap}>
-              <SymbolView name="wifi.exclamationmark" size={36} tintColor={colors.textDisabled} />
+              <SymbolView name="wifi.exclamationmark" size={36} tintColor={colors.textSecondary} />
               <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>{error}</Text>
               <Pressable onPress={() => doSearch(searchedKeyword, activeTab)} style={[styles.retryBtn, { backgroundColor: colors.primary }]}>
-                <Text style={[styles.retryText, { color: colors.textOnPrimary }]}>重试</Text>
+                <Text style={[styles.retryText, { color: colors.textOnPrimary }]}>刷新重试</Text>
               </Pressable>
             </View>
           ) : activeTab === 'thread' ? (
@@ -509,17 +522,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  // ── Tab 栏（SwiftUI segmented） ──
+  // ── 结果列表动画容器：必须撑满，否则 FlashList 高度为 0 ──
+  staggerFill: {
+    flex: 1,
+  },
+  // ── Tab 栏（SwiftUI segmented + 排序 menu） ──
   tabBar: {
     paddingHorizontal: Spacing.lg,
     paddingTop: 10,
     paddingBottom: 6,
-  },
-  // ── 贴子排序 ──
-  sortHost: {
-    alignItems: 'flex-start',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: 2,
   },
   // ── 主体 ──
   body: {

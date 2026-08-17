@@ -1,58 +1,35 @@
 /**
- * Settings Page (设置) — SwiftUI Form native implementation.
+ * Settings Page (设置) — 官方 @expo/ui FieldGroup 原生 Form 实现
+ *
+ * FieldGroup（iOS = SwiftUI Form，iOS 26 液态玻璃分组材质）+ ListItem
+ * （原生行：leading 色块图标 / 标题 / 副标题 / trailing 开关或 chevron），
+ * 分隔线、行高、分组全部由原生渲染。全局背景白色。
  */
 
 import { useCallback } from 'react';
-import {
-  Form, Section, Toggle, Button, Text, Label,
-} from '@expo/ui/swift-ui';
-import {
-  foregroundStyle,
-} from '@expo/ui/swift-ui/modifiers';
+import { FieldGroup, ListItem, Switch } from '@expo/ui';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { hapticForScene } from '@/theme/hapticsMap';
-import { useThemeColors, useThemeActions } from '@/theme/ThemeContext';
+import { useThemeColors } from '@/theme/ThemeContext';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { SymbolView } from '@/components/ui/SymbolView';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 
-// §设计系统：导航行图标着色映射——图标色收进单个常量，
-// 每行按 systemImage 取色，避免散落硬编码色值。
-const NAV_ICON_TINTS: Record<string, string> = {
-  paintpalette: '#AF52DE',
-  'paintbrush.pointed': '#FF2D55',
-  'slider.horizontal.3': '#8E8E93',
-  'person.circle': '#4477E0',
-  'hand.raised': '#FF9500',
-  number: '#FF9500',
-  'checkmark.circle': '#34C759',
-  'ellipsis.circle': '#8E8E93',
-  flask: '#FF9500',
-};
+/** 行前色块图标：RN 圆角色块 + SymbolView（ListItem 的 leading 自动 matchContents） */
+function RowIcon({ icon, tint }: { icon: string; tint: string }) {
+  return (
+    <View style={[styles.rowIconBadge, { backgroundColor: tint }]}>
+      <SymbolView name={icon} size={15} weight="semibold" tintColor="#FFFFFF" />
+    </View>
+  );
+}
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { isDark } = useThemeColors();
-  const { followSystemDarkMode } = useThemeColors();
-  const { setDarkMode, setFollowSystemDarkMode } = useThemeActions();
+  const { colors } = useThemeColors();
   const setPreference = usePreferencesStore((s) => s.setPreference);
   const hapticFeedback = usePreferencesStore((s) => s.preferences.hapticFeedback);
-
-  const handleFollowSystem = useCallback((follow: boolean) => {
-    hapticForScene('toggle');
-    setFollowSystemDarkMode(follow);
-  }, [setFollowSystemDarkMode]);
-
-  const handleHapticFeedback = useCallback((enabled: boolean) => {
-    setPreference('hapticFeedback', enabled);
-    if (enabled) {
-      hapticForScene('toggle');
-    }
-  }, [setPreference]);
-
-  const handleDarkMode = useCallback((enabled: boolean) => {
-    hapticForScene('toggle');
-    setDarkMode(enabled);
-  }, [setDarkMode]);
 
   const navigateTo = useCallback((route: string) => {
     hapticForScene('press');
@@ -60,73 +37,102 @@ export default function SettingsPage() {
   }, [router]);
 
   return (
-    <ThemedHost style={{ flex: 1 }}>
-      <Form>
-        <Section title="外观">
-          <Toggle
-            label="跟随系统深色模式"
-            isOn={followSystemDarkMode}
-            onIsOnChange={handleFollowSystem}
-          />
-          <Toggle
-            label="深色模式"
-            isOn={isDark}
-            onIsOnChange={handleDarkMode}
-          />
-          <Button onPress={() => navigateTo('/settings/theme')}>
-            <Label title="主题设置" systemImage="paintpalette" modifiers={[foregroundStyle(NAV_ICON_TINTS.paintpalette)]} />
-          </Button>
-          <Button onPress={() => navigateTo('/settings/custom')}>
-            <Label title="自定义主题" systemImage="paintbrush.pointed" modifiers={[foregroundStyle(NAV_ICON_TINTS['paintbrush.pointed'])]} />
-          </Button>
-        </Section>
-
-        <Section title="通用">
-          <Toggle
-            isOn={hapticFeedback}
-            onIsOnChange={handleHapticFeedback}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* FieldGroup = SwiftUI Form：必须经 ThemedHost（Host 桥）嵌入 RN 树，
+          否则 Form 不撑开高度导致列表消失 */}
+      <ThemedHost style={{ flex: 1 }}>
+        <FieldGroup>
+        {/* ── 外观 ── */}
+        <FieldGroup.Section title="外观">
+          <ListItem
+            leading={<RowIcon icon="textformat.size" tint="#AF52DE" />}
+            supportingText="阅读字号、工具栏选项"
+            onPress={() => navigateTo('/settings/theme')}
           >
-            <Text>震动反馈</Text>
-            <Text>点击、长按、成功/失败等操作反馈</Text>
-          </Toggle>
-        </Section>
+            显示设置
+          </ListItem>
+        </FieldGroup.Section>
 
-        {/* 首页/浏览/贴子/内容 的偏好开关已收敛到「使用习惯」页（habit.tsx），
-            设置首页只保留入口行，避免两处重复 Toggle */}
-        <Section
-          title="使用习惯"
-          footer="首页、浏览、贴子、内容等偏好开关统一在「使用习惯」页管理"
-        >
-          <Button onPress={() => navigateTo('/settings/habit')}>
-            <Label title="使用习惯" systemImage="slider.horizontal.3" modifiers={[foregroundStyle(NAV_ICON_TINTS['slider.horizontal.3'])]} />
-          </Button>
-        </Section>
+        {/* ── 通用 ── */}
+        <FieldGroup.Section title="通用">
+          <ListItem
+            leading={<RowIcon icon="iphone.radiowaves.left.and.right" tint="#8E8E93" />}
+            supportingText="点击、长按、成功/失败等操作反馈"
+            trailing={
+              <Switch
+                value={hapticFeedback}
+                onValueChange={(v) => {
+                  setPreference('hapticFeedback', v);
+                  if (v) hapticForScene('toggle');
+                }}
+              />
+            }
+          >
+            震动反馈
+          </ListItem>
+        </FieldGroup.Section>
 
-        <Section title="账号">
-          <Button onPress={() => navigateTo('/settings/account')}>
-            <Label title="账号管理" systemImage="person.circle" modifiers={[foregroundStyle(NAV_ICON_TINTS['person.circle'])]} />
-          </Button>
-          <Button onPress={() => navigateTo('/settings/block')}>
-            <Label title="屏蔽设置" systemImage="hand.raised" modifiers={[foregroundStyle(NAV_ICON_TINTS['hand.raised'])]} />
-          </Button>
-        </Section>
+        {/* ── 使用习惯 ── */}
+        <FieldGroup.Section title="使用习惯">
+          <ListItem
+            leading={<RowIcon icon="slider.horizontal.3" tint="#8E8E93" />}
+            supportingText="首页、浏览、贴子、内容等偏好"
+            onPress={() => navigateTo('/settings/habit')}
+          >
+            使用习惯
+          </ListItem>
+        </FieldGroup.Section>
 
-        <Section title="功能">
-          <Button onPress={() => navigateTo('/topic/list')}>
-            <Label title="话题列表" systemImage="number" modifiers={[foregroundStyle(NAV_ICON_TINTS.number)]} />
-          </Button>
-          <Button onPress={() => navigateTo('/settings/oksign')}>
-            <Label title="一键签到" systemImage="checkmark.circle" modifiers={[foregroundStyle(NAV_ICON_TINTS['checkmark.circle'])]} />
-          </Button>
-          <Button onPress={() => navigateTo('/settings/more')}>
-            <Label title="更多设置" systemImage="ellipsis.circle" modifiers={[foregroundStyle(NAV_ICON_TINTS['ellipsis.circle'])]} />
-          </Button>
-          {/* 实验功能固定入口（原「连点 7 次」隐藏入口已移除） */}
-          <Button onPress={() => navigateTo('/settings/experimental')}>
-            <Label title="实验功能" systemImage="flask" modifiers={[foregroundStyle(NAV_ICON_TINTS.flask)]} />
-          </Button>
-        </Section>
-      </Form>
-    </ThemedHost>
+        {/* ── 账号 ── */}
+        <FieldGroup.Section title="账号">
+          <ListItem
+            leading={<RowIcon icon="person.circle" tint="#4477E0" />}
+            supportingText="登录账号、退出登录"
+            onPress={() => navigateTo('/settings/account')}
+          >
+            账号管理
+          </ListItem>
+          <ListItem
+            leading={<RowIcon icon="hand.raised" tint="#FF9500" />}
+            supportingText="屏蔽词、屏蔽用户、云端黑名单"
+            onPress={() => navigateTo('/settings/block')}
+          >
+            屏蔽设置
+          </ListItem>
+        </FieldGroup.Section>
+
+        {/* ── 功能 ── */}
+        <FieldGroup.Section title="功能">
+          <ListItem
+            leading={<RowIcon icon="checkmark.circle" tint="#34C759" />}
+            supportingText="自动签到关注的贴吧"
+            onPress={() => navigateTo('/settings/oksign')}
+          >
+            一键签到
+          </ListItem>
+          <ListItem
+            leading={<RowIcon icon="ellipsis.circle" tint="#8E8E93" />}
+            supportingText="数据管理、外部链接、系统设置"
+            onPress={() => navigateTo('/settings/more')}
+          >
+            更多设置
+          </ListItem>
+        </FieldGroup.Section>
+        </FieldGroup>
+      </ThemedHost>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  rowIconBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

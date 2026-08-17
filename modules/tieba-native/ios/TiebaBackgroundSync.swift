@@ -226,18 +226,18 @@ final class TiebaBackgroundSync {
 
   func registerNotificationPoll(minutes: Double) throws {
     defaults.set(minutes, forKey: intervalKey)
-    guard BGTaskScheduler.shared.supportsBackgroundTasks else { return }
     let request = BGAppRefreshTaskRequest(identifier: Self.notificationTaskIdentifier)
     request.earliestBeginDate = Date(timeIntervalSinceNow: minutes * 60)
+    // `submit` fails silently on unsupported systems (e.g. Simulator), which is fine.
     try? BGTaskScheduler.shared.submit(request)
   }
 
   func registerAutoSign(hour: Int, minute: Int) throws {
     defaults.set("\(hour):\(minute)", forKey: autoSignTimeKey)
-    guard BGTaskScheduler.shared.supportsBackgroundTasks else { return }
     let request = BGProcessingTaskRequest(identifier: Self.autoSignTaskIdentifier)
     request.requiresNetworkConnectivity = true
     request.earliestBeginDate = nextAutoSignDate(hour: hour, minute: minute)
+    // `submit` fails silently on unsupported systems (e.g. Simulator), which is fine.
     try? BGTaskScheduler.shared.submit(request)
   }
 
@@ -265,7 +265,7 @@ final class TiebaBackgroundSync {
   func handle(_ task: BGTask) {
     var completed = false
     task.expirationHandler = {
-      finish(task, completed: &completed, success: false)
+      self.finish(task, completed: &completed, success: false)
     }
     Task {
       do {

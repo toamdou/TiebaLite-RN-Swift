@@ -6,7 +6,7 @@
     "@expo/ui": "~57.0.9",
     "@preeternal/react-native-cookie-manager": "^6.4.0",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@shopify/flash-list": "2.0.2",
+    "@shopify/flash-list": "^2.3.2",
     "@tanstack/react-query": "^5.101.0",
     "axios": "^1.17.0",
     "expo": "~57.0.11",
@@ -53,7 +53,7 @@
   },
   "scripts": {
     "start": "expo start",
-    "ios": "expo start --ios",
+    "ios": "expo run:ios",
     "lint": "expo lint"
   },
   "private": true

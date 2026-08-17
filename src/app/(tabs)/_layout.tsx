@@ -157,13 +157,22 @@ export default function TabLayout() {
           {/* §4.3: BottomAccessory — sign-in progress. State selectors live in
               TabLayout (outside the accessory) because two accessory instances
               render simultaneously and must stay in sync. */}
-          <NativeTabs.BottomAccessory>
-            <SignProgressAccessory
-              isSigning={isSigning}
-              tintColor={colors.primary}
-              textColor={colors.textSecondary}
-            />
-          </NativeTabs.BottomAccessory>
+          {/* §4.3: BottomAccessory — sign-in progress. State selectors live in
+              TabLayout (outside the accessory) because two accessory instances
+              render simultaneously and must stay in sync.
+              仅签到中渲染：BottomAccessory 只要存在（即使子内容为 null）也会在
+              tab bar 上方渲染空白毛玻璃容器（expo-router 的
+              useBottomAccessoryFunctionFromBottomAccessories 无条件返回渲染函数），
+              未签到时会出现一条空毛玻璃栏。 */}
+          {isSigning && (
+            <NativeTabs.BottomAccessory>
+              <SignProgressAccessory
+                isSigning={isSigning}
+                tintColor={colors.primary}
+                textColor={colors.textSecondary}
+              />
+            </NativeTabs.BottomAccessory>
+          )}
       </NativeTabs>
     </ThemeProvider>
   );

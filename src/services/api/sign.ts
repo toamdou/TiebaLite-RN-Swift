@@ -229,8 +229,9 @@ export function signParams(
   // Sort alphabetically by key
   entries.sort(([a], [b]) => a.localeCompare(b));
 
-  // Build query string: key1=value1&key2=value2...
-  const queryString = entries.map(([k, v]) => `${k}=${v}`).join('&');
+  // Kotlin SortAndSignInterceptor 对 FormBody/query 用 sorted().joinToString("")
+  // （无分隔符）；旧实现用 '&' 连接导致所有 JSON/form 请求签名错误。
+  const queryString = entries.map(([k, v]) => `${k}=${v}`).join('');
 
   // Append secret and hash
   const signInput = queryString + secret;

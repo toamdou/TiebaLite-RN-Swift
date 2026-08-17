@@ -5,7 +5,6 @@ import { StatusBar } from 'expo-status-bar';
 import { enableFreeze } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import * as SystemUI from 'expo-system-ui';
@@ -15,8 +14,6 @@ import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-c
 
 import { ThemeProvider, useThemeColors } from '@/theme/ThemeContext';
 import { getThemeColors } from '@/theme/colors';
-import { usePreferencesStore } from '@/stores/preferencesStore';
-import { LIGHT_THEME_OPTIONS, DARK_THEME_OPTIONS } from '@/constants/app';
 
 import { useAuthStore } from '@/stores/authStore';
 import { migrateLegacyPreferences } from '@/stores/preferencesStore';
@@ -58,22 +55,11 @@ Notifications.setNotificationHandler({
   },
 });
 
-SplashScreen.preventAutoHideAsync().catch(() => {});
-
 // expo-system-ui: 在组件树之外设置根视图背景色（避免启动白屏闪烁）。
-// 启动阶段没有 React Context，这里同步镜像 ThemeContext 的主题解析逻辑，
-// 用当前偏好 + 系统外观算出启动背景色 —— 暗色用户不会再看到 #F2F2F7 白底。
-// 运行时的主题变化仍由 RootLayoutInner 的 effect 同步（见下）。
+// 主题选择系统已移除：启动背景色只由系统外观决定（浅色白 / 深色黑）。
 function resolveStartupBackgroundColor(): string {
-  const prefs = usePreferencesStore.getState().preferences;
   const systemIsDark = Appearance.getColorScheme() === 'dark';
-  const isDark = prefs.followSystemDarkMode ? systemIsDark : prefs.darkMode;
-  const lightThemes = new Set(LIGHT_THEME_OPTIONS.map((t) => t.key));
-  const darkThemes = new Set(DARK_THEME_OPTIONS.map((t) => t.key));
-  const lightTheme = lightThemes.has(prefs.lightTheme) ? prefs.lightTheme : 'tieba';
-  const darkTheme = darkThemes.has(prefs.darkTheme) ? prefs.darkTheme : 'dark';
-  const effectiveTheme = isDark ? darkTheme : lightTheme;
-  return getThemeColors(effectiveTheme, prefs.customPrimaryColor, isDark).background;
+  return getThemeColors(systemIsDark).background;
 }
 SystemUI.setBackgroundColorAsync(resolveStartupBackgroundColor()).catch(() => {});
 
@@ -154,19 +140,19 @@ const SCREENS: readonly ScreenDef[] = [
   { name: 'topic/[id]',            title: '话题' },
   { name: 'topic/list',            title: '热门话题' },
   { name: 'settings/index',        title: '设置' },
-  { name: 'settings/theme',        title: '个性化' },
+  { name: 'settings/theme',        title: '显示' },
   { name: 'settings/account',      title: '账号管理' },
   { name: 'settings/block',        title: '屏蔽设置' },
-  { name: 'settings/custom',       title: '自定义主题' },
   { name: 'settings/habit',        title: '使用习惯' },
   { name: 'settings/oksign',       title: '一键签到设置' },
   { name: 'settings/more',         title: '更多设置' },
-  { name: 'settings/experimental', title: '实验性功能' },
   { name: 'settings/about',        title: '关于' },
 ];
 
 function RootLayoutInner() {
   const { colors, isDark } = useThemeColors();
+  // 版本标记：确认 app 实际加载的 bundle 是否最新（reload 后应能看到）
+  if (__DEV__) console.log('[tiebalite] bundle-version=2026-08-15-sortfix-23');
   const checkAuth = useAuthStore((s) => s.checkAuth);
   const router = useRouter();
   const toolbarPrimaryColor = useAppPreference('toolbarPrimaryColor', false);
@@ -213,18 +199,17 @@ function RootLayoutInner() {
   }), [headerTint, colors.background, isDark]);
 
   useEffect(() => {
-    let cancelled = false;
     async function init() {
+      // Splash 不再由 JS 手动隐藏：expo-splash-screen 原生层在 RN 首帧
+      // 挂载（RCTContentDidAppearNotification）时自动淡出，storage/auth
+      // 初始化在这里后台继续跑，UI 侧用各页已有的 isLoading 加载态兜底，
+      // 让"点击图标 → 看到主页"尽可能快。
       try {
         await ensureUnifiedStorageReady();
         getClientId();
         await Promise.all([migrateLegacyPreferences(), checkAuth()]);
         void ensureAutoSignScheduled().catch(() => {});
-      } catch {} finally {
-        if (!cancelled) {
-          try { await SplashScreen.hideAsync(); } catch {}
-        }
-      }
+      } catch {}
       const state = useAuthStore.getState();
       if (state.isLoggedIn) {
         try {
@@ -259,7 +244,6 @@ function RootLayoutInner() {
       }
     }
     init();
-    return () => { cancelled = true; };
   }, [checkAuth]);
 
   const handleDeepLink = useCallback((url: string | null) => {
@@ -311,7 +295,16 @@ function RootLayoutInner() {
       <StatusBar style={toolbarPrimaryColor ? (isDark ? 'light' : (statusBarFontDark ? 'dark' : 'light')) : isDark ? 'light' : 'dark'} />
       <Stack screenOptions={screenOpts}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
-        <Stack.Screen name="login" options={{ title: '登录', presentation: 'formSheet' as const, headerBackVisible: false, sheetGrabberVisible: true, contentStyle: { backgroundColor: colors.background } }} />
+        <Stack.Screen name="login" options={{ title: '登录', presentation: 'formSheet' as const, headerBackVisible: false, sheetGrabberVisible: true,
+          // 登录 sheet 双 detent：初始 0.65（约 2/3 屏，露出背景看到系统缩放
+          // 效果，又不至于太小难输入），可上拖到全屏 1.0。
+          // ⚠️ sheetAllowedDetents 数组必须是数字比例（0-1），不能用
+          // ['medium','large'] 字符串数组——RNScreens 的排序检查按字典序
+          // 比较字符串（'m'>'l'），会抛
+          // "[RNScreens] The detent array is not sorted in ascending order!"。
+          sheetAllowedDetents: [0.65, 1] as any,
+          sheetInitialDetentIndex: 0,
+          contentStyle: { backgroundColor: colors.background } }} />
         <Stack.Screen
           name="forum/[name]"
           options={{

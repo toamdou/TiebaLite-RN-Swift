@@ -127,18 +127,19 @@ export async function getMemberInfo(forumId: string): Promise<any> {
   return decoded.data ?? decoded;
 }
 
-// Kotlin protobuf: POST /c/f/frs/generalTabList?cmd=309480
+// Kotlin protobuf: POST /c/f/frs/generalTabList?cmd=309622
 export async function generalTabList(forumId: string, opts?: {
-  tabType?: number; pn?: number; rn?: number; sortType?: number; tabName?: string; tabCode?: string;
+  tabType?: number; pn?: number; rn?: number; sortType?: number; tabName?: string; tabId?: number; isGeneralTab?: number;
 }, signal?: AbortSignal): Promise<any> {
   const decoded = await protoGeneralTabList({
     forumId,
+    tabId: opts?.tabId,
     tabType: opts?.tabType,
     pn: opts?.pn ?? 1,
     rn: opts?.rn ?? 20,
     sortType: opts?.sortType,
     tabName: opts?.tabName,
-    tabCode: opts?.tabCode,
+    isGeneralTab: opts?.isGeneralTab,
   }, signal);
   assertProtoSuccess(decoded);
   return decoded.data ?? decoded;

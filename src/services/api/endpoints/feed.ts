@@ -22,8 +22,10 @@ export async function personalized(loadType: LoadType = LoadType.REFRESH, page: 
     const decoded = await protoPersonalized({ loadType: Number(loadType), pn: page }, signal);
     assertProtoSuccess(decoded);
     const data = decoded.data;
-    const items = mapThreadItems(data?.threadList ?? [], data?.userList ?? []);
-    const hasMore = (data?.page?.hasMore ?? 0) === 1;
+    const threadList = data?.threadList ?? [];
+    const items = mapThreadItems(threadList, []);
+    // 官方 Personalized/DataRes 无 has_more/page 字段；Kotlin 原版按"拉到空列表为止"分页。
+    const hasMore = threadList.length > 0;
     return { items, hasMore };
   } catch (e) {
     if (__DEV__) console.warn('[personalized] proto failed, fallback:', e);
@@ -49,10 +51,14 @@ export async function userLike(
       loadType: Number(loadType),
       pageTag: pageTag ?? '',
       lastRequestUnix: lastRequestUnix ?? 0,
+      followType: 1,
     }, signal);
     assertProtoSuccess(decoded);
     const data = decoded.data;
-    const items = mapThreadItems(data?.threadList ?? [], data?.userList ?? []);
+    // 官方 Userlike/DataRes.thread_info(1) 是 ConcernData 数组，每项内嵌 thread_list(1)。
+    const concernList = data?.threadInfo ?? [];
+    const threadList = concernList.map((c: any) => c?.threadList ?? c?.thread_list).filter(Boolean);
+    const items = mapThreadItems(threadList, []);
     return {
       items,
       pageTag: data?.pageTag ?? '',
@@ -137,12 +143,6 @@ export async function hotThreadList(tabCode: string = 'all'): Promise<HotPageDat
   assertProtoSuccess(decoded);
   const data = decoded.data;
   if (!data) throw new TiebaApiError('Empty response', -1, -1);
-  if (__DEV__) {
-    console.log('[hotThreadList] raw lengths:', 'topicList=', (data.topicList ?? []).length, 'threadInfo=', (data.threadInfo ?? []).length, 'hotThreadTabInfo=', (data.hotThreadTabInfo ?? []).length);
-    if ((data.threadInfo ?? []).length > 0) {
-      console.log('[hotThreadList] first thread sample:', JSON.stringify(data.threadInfo![0]).slice(0, 300));
-    }
-  }
   return {
     topics: (data.topicList ?? []).map(mapHotTopic),
     tabs: (data.hotThreadTabInfo ?? []).map(mapHotTab),
@@ -158,13 +158,16 @@ function mapTopicInfo(t: any): TopicInfo {
     discussNum: Number(t.discussNum ?? t.discuss_num ?? 0),
     isHot: (t.topicTag ?? t.topic_tag ?? t.tag) === 2,
     isNew: (t.topicTag ?? t.topic_tag ?? t.tag) === 1,
+    // topicPic 未映射导致热门话题列表永远显示占位符（图片加载不了）
+    imageUrl: String(t.topicPic ?? t.topic_pic ?? t.pic ?? ''),
   };
 }
 
 export async function topicList(): Promise<TopicInfo[]> {
   const decoded = await protoTopicList();
   assertProtoSuccess(decoded);
-  return (decoded.data?.topicList ?? decoded.data?.topic_list ?? []).map(mapTopicInfo);
+  const data = decoded.data as any;
+  return (data?.topicList ?? data?.topic_list ?? []).map(mapTopicInfo);
 }
 
 
