@@ -7,7 +7,7 @@
  * - 搜索后：分段 tab（贴/吧/人，SwiftUI segmented）+ 排序（原生 menu）+ 对应结果列表
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,16 +18,9 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import type { SearchBarCommands } from 'react-native-screens';
-import Animated, {
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withTiming,
-} from 'react-native-reanimated';
 import { hapticForScene } from '@/theme/hapticsMap';
-import { Picker, Text as SWText } from '@expo/ui/swift-ui';
-import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
+import { Picker, Text as SWText, VStack, RNHostView } from '@expo/ui/swift-ui';
+import { pickerStyle, tag, padding, frame } from '@expo/ui/swift-ui/modifiers';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { SkeletonList } from '@/components/ui/Skeleton';
@@ -37,8 +30,7 @@ import {
   SearchUserList,
 } from '@/components/search/SearchResultList';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { Radius, DURATION, EASE_OUT, Spacing, typographyStyles } from '@/theme';
-import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { Radius, Spacing, typographyStyles } from '@/theme';
 import { searchThread, searchForum, searchUser, searchSuggestions } from '@/services/api/endpoints';
 import { relativeTime } from '@/utils';
 import {
@@ -62,36 +54,6 @@ const TABS: { key: SearchTab; label: string }[] = [
   { key: 'forum', label: '吧' },
   { key: 'user', label: '人' },
 ];
-
-// ---------- 首屏级联入场（仅首次搜索结果批次执行，Reduce Motion 跳过） ----------
-function FirstBatchStagger({
-  index,
-  children,
-}: {
-  index: number;
-  children: ReactNode;
-}) {
-  const { reduceMotion } = useReducedMotion();
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    if (reduceMotion) {
-      progress.value = 1;
-      return;
-    }
-    progress.value = withDelay(
-      index * DURATION.stagger,
-      withTiming(1, { duration: DURATION.enter, easing: EASE_OUT }),
-    );
-    return () => {
-      progress.value = 0;
-    };
-  }, [index, reduceMotion, progress]);
-  const animStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [{ translateY: interpolate(progress.value, [0, 1], [12, 0]) }],
-  }));
-  return <Animated.View style={animStyle}>{children}</Animated.View>;
-}
 
 // ── 主页面 ──
 export default function SearchPage() {
@@ -309,6 +271,17 @@ export default function SearchPage() {
     doSearch(kw, activeTab);
   }, [resetSuggestions, doSearch, activeTab, saveToHistory]);
 
+  // 结果卡跳转：稳定回调（列表 renderItem 依赖标识，内联写法会让每个 cell 的 memo 失效）
+  const handleThreadPress = useCallback((item: SearchThreadResult) => {
+    router.push(`/thread/${item.id}`);
+  }, [router]);
+  const handleForumPress = useCallback((item: SearchForumResult) => {
+    router.push(`/forum/${encodeURIComponent(item.forumName)}`);
+  }, [router]);
+  const handleUserPress = useCallback((item: SearchUserResult) => {
+    router.push(`/user/${item.uid}`);
+  }, [router]);
+
   // 原生搜索栏取消语义：有输入时清空并收起键盘（恢复搜索前状态），无输入时返回。
   const handleCancelPress = useCallback(() => {
     const hasText = inputTextRef.current.trim().length > 0;
@@ -341,27 +314,22 @@ export default function SearchPage() {
   return (
     <ThemedHost style={{ flex: 1 }}>
       <Stack.Screen options={{ title: '搜索', headerSearchBarOptions: searchBarOptions }} />
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* ── Tab 栏（搜索后显示，SwiftUI segmented）。
-            ⚠️ @expo/ui SwiftUI 组件必须是 Host 的直接子节点：若中间隔 RN
-            <View>，SwiftUI 视图会挂在标准 UIView 下抛
-            "being mounted inside a standard UIView" RedBox。故用
-            ThemedHost matchContents 直接包 Picker（间距由外层 View 承担）。 ── */}
+      {/* 分段 tab 必须是外层 Host 的直接后代才能渲染（动态页同因：SwiftUI Picker
+          嵌进 RN 小容器时空白）；内容区经 RNHostView 挂进 SwiftUI VStack。 */}
+      <VStack spacing={0} modifiers={[frame({ maxWidth: 10000, maxHeight: 10000 })]}>
         {hasSearched && (
-          <View style={styles.tabBar}>
-            <ThemedHost matchContents>
-              <Picker
-                selection={activeTab}
-                onSelectionChange={handleTabChange as any}
-                modifiers={[pickerStyle('segmented')]}
-              >
-                {TABS.map((tab) => (
-                  <SWText key={tab.key} modifiers={[tag(tab.key)]}>{tab.label}</SWText>
-                ))}
-              </Picker>
-            </ThemedHost>
-          </View>
+          <Picker
+            selection={activeTab}
+            onSelectionChange={(v) => handleTabChange(v as SearchTab)}
+            modifiers={[pickerStyle('segmented'), padding({ horizontal: Spacing.lg, top: 10, bottom: 6 })]}
+          >
+            {TABS.map((t) => (
+              <SWText key={t.key} modifiers={[tag(t.key)]}>{t.label}</SWText>
+            ))}
+          </Picker>
         )}
+        <RNHostView>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
 
         {/* ── 贴子排序（搜索后显示，原生 menu Picker，同 Host 直子规则） ── */}
         {hasSearched && activeTab === 'thread' && (
@@ -478,36 +446,32 @@ export default function SearchPage() {
               </Pressable>
             </View>
           ) : activeTab === 'thread' ? (
-            <FirstBatchStagger index={0}>
-              <SearchThreadList
-                items={threads}
-                colors={colors}
-                onPressItem={(item) => router.push(`/thread/${item.id}`)}
-                onEndReached={loadMoreThreads}
-                hasMore={threadHasMore}
-                loadingMore={loadingMore}
-              />
-            </FirstBatchStagger>
+            <SearchThreadList
+              items={threads}
+              colors={colors}
+              onPressItem={handleThreadPress}
+              onEndReached={loadMoreThreads}
+              hasMore={threadHasMore}
+              loadingMore={loadingMore}
+            />
           ) : activeTab === 'forum' ? (
-            <FirstBatchStagger index={0}>
-              <SearchForumList
-                items={forums}
-                colors={colors}
-                onPressItem={(item) => router.push(`/forum/${encodeURIComponent(item.forumName)}`)}
-              />
-            </FirstBatchStagger>
+            <SearchForumList
+              items={forums}
+              colors={colors}
+              onPressItem={handleForumPress}
+            />
           ) : (
-            <FirstBatchStagger index={0}>
-              <SearchUserList
-                items={users}
-                colors={colors}
-                onPressItem={(item) => router.push(`/user/${item.uid}`)}
-              />
-            </FirstBatchStagger>
+            <SearchUserList
+              items={users}
+              colors={colors}
+              onPressItem={handleUserPress}
+            />
           )}
         </View>
       )}
       </View>
+        </RNHostView>
+      </VStack>
     </ThemedHost>
   );
 }
@@ -516,12 +480,6 @@ export default function SearchPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  // ── Tab 栏（SwiftUI segmented） ──
-  tabBar: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: 10,
-    paddingBottom: 6,
   },
   // ── 贴子排序 ──
   sortHost: {

@@ -19,14 +19,10 @@ import { Button } from './Button';
 export interface EmptyStateProps {
   /** SF Symbol name for the placeholder icon */
   icon?: string;
-  /** Icon tint color (kept for API compatibility) */
-  iconColor?: string;
   /** Main title text */
   title: string;
   /** Descriptive subtitle text */
   description?: string;
-  /** @deprecated Use `description` instead */
-  subtitle?: string;
   /** Action button label (shows button if provided) */
   actionLabel?: string;
   /** Action button callback */
@@ -44,14 +40,13 @@ export function EmptyState({
   icon = 'tray',
   title,
   description,
-  subtitle,
   actionLabel,
   onAction,
   actionHref,
   style,
   accessibilityLabel,
 }: EmptyStateProps) {
-  const subtext = description ?? subtitle;
+  const subtext = description;
 
   return (
     <View

@@ -210,14 +210,6 @@ export function mapProtoPosts(rawPosts: any[], threadId: string, userList: any[]
   // Build user lookup map (mirrors Kotlin PbPageRepository: userList.first { user.id == post.author_id })
   const userMap = buildUserMap(userList, (u) => u.id ?? '');
 
-  if (__DEV__) {
-    console.log(`[mapProtoPosts] rawPosts.length=${rawPosts?.length ?? 0} userList.length=${userList.length}`);
-    if (rawPosts?.[0]) {
-      const p0 = rawPosts[0];
-      console.log(`[mapProtoPosts] post[0] id=${p0.id} floor=${p0.floor} contentLen=${p0.content?.length ?? 0}`);
-      console.log(`[mapProtoPosts] post[0].content[0..1]=${JSON.stringify((p0.content ?? []).slice(0, 2))}`);
-    }
-  }
   return rawPosts.map((p: any) => {
     // Lookup author: embedded in post, or from userList by authorId
     // ⚠️ p.author 可能是空对象 {}（proto3 解码产物），`??` 不会回退到
@@ -274,7 +266,8 @@ export function mapProtoPosts(rawPosts: any[], threadId: string, userList: any[]
       isAgree: (p.agree?.hasAgree ?? 0) === 1,
       // 踩状态从 proto 映射（proto 无 has_disagree 字段时保持 false，服务端下发则取真实值）
       isDisagree: (p.agree?.hasDisagree ?? p.agree?.has_disagree ?? p.isDisagree ?? p.is_disagree ?? 0) === 1,
-      ipLocation: p.ipAddress ?? p.ip ?? '',
+      // 主楼/楼层 IP 属地：Post 无 ip 字段，属地挂在 author(User.ip) 上
+      ipLocation: p.author?.ip ?? p.ipAddress ?? p.ip ?? '',
     };
   });
 }

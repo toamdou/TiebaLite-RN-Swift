@@ -44,3 +44,6 @@ yarn-error.*
 
 # mimosa scan/hook state
 .mimosa/
+
+# j-space ledger
+.jspace/

@@ -55,7 +55,7 @@ export function SearchThreadList({
       <SearchThreadCard
         item={item}
         colors={colors}
-        onPress={() => onPressItem(item)}
+        onPressItem={onPressItem}
       />
     ),
     [colors, onPressItem],
@@ -116,7 +116,7 @@ export function SearchForumList({
       <SearchForumCard
         item={item}
         colors={colors}
-        onPress={() => onPressItem(item)}
+        onPressItem={onPressItem}
       />
     ),
     [colors, onPressItem],
@@ -160,7 +160,7 @@ export function SearchUserList({
       <SearchUserCard
         item={item}
         colors={colors}
-        onPress={() => onPressItem(item)}
+        onPressItem={onPressItem}
       />
     ),
     [colors, onPressItem],
@@ -216,7 +216,7 @@ export function SearchPostList({
       <SearchPostCard
         item={item}
         colors={colors}
-        onPress={() => onPressItem(item)}
+        onPressItem={onPressItem}
       />
     ),
     [colors, onPressItem],

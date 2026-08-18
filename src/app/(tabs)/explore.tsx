@@ -14,9 +14,9 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   VStack, HStack, Button, Text, Label,
   ContentUnavailableView, Spacer,
-  RNHostView, BottomSheet, Group,
+  RNHostView, BottomSheet, Group, Picker,
 } from '@expo/ui/swift-ui';
-import { font, padding, buttonStyle, buttonBorderShape, presentationDetents, presentationDragIndicator } from '@expo/ui/swift-ui/modifiers';
+import { font, padding, buttonStyle, buttonBorderShape, presentationDetents, presentationDragIndicator, pickerStyle, tag, frame } from '@expo/ui/swift-ui/modifiers';
 import {
   View, Pressable, StyleSheet, Text as RNText, ActivityIndicator, Share, Alert,
   ScrollView as RNScrollView, DeviceEventEmitter, RefreshControl,
@@ -25,6 +25,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { hapticForScene } from '@/theme/hapticsMap';
+import { updateTabBarAutoHide } from '@/hooks/useTabBarAutoHide';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { typographyStyles } from '@/theme/typography';
 import { useAuthStore } from '@/stores/authStore';
@@ -34,7 +35,7 @@ import { useImageViewer } from '@/hooks/useImageViewer';
 import { BlockManager } from '@/utils/BlockManager';
 import { Avatar } from '@/components/ui/Avatar';
 import { SymbolView } from '@/components/ui/SymbolView';
-import { formatCount, relativeTime, buildThreadUrl } from '@/utils';
+import { formatCount, buildThreadUrl } from '@/utils';
 import { LoadType } from '@/types';
 import type { FeedItem, ForumInfo, HotTopic, HotTabInfo, HotThreadInfo, ThreadInfo } from '@/types';
 import {
@@ -44,12 +45,13 @@ import {
   submitDislike,
   mapProtoThread,
   agree,
+  checkReportPost,
 } from '@/services/api/endpoints';
 import { usePagedList } from '@/hooks/usePagedList';
+import { HOT_RANK_COLORS, TOPIC_CHIP_COLORS } from '@/constants/rank';
 import FeedCard from '@/components/FeedCard';
 import TweetCard, { type TweetCardMenuAction } from '@/components/feed/TweetCard';
-import FeedTabBar from '@/components/feed/FeedTabBar';
-import { FeedCell } from '../../../modules/tieba-native/src/TiebaFeedCell';
+import { ScrollObserver } from '../../../modules/tieba-native/src/TiebaScrollObserver';
 import * as Clipboard from 'expo-clipboard';
 import ImageViewer from '@/components/ImageViewer';
 import { LoadMoreFooter } from '@/components/ui/LoadMoreFooter';
@@ -61,7 +63,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import { DURATION, EASE_OUT, Shadows, Spacing, Radius, glassTokens } from '@/theme';
+import { DURATION, EASE_OUT, Radius, Shadows, Spacing } from '@/theme';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 const TAB_RESELECT_EVENT = 'tieba:tab-reselect';
@@ -139,14 +141,15 @@ const SEGMENTS: { label: string; value: ExploreSegment }[] = [
   { label: '热榜', value: 'hot' },
 ];
 
-// ── 热榜前三名排名色（与 topic/list.tsx 共用） ──
-export const HOT_RANK_COLORS = ['#FF3B30', '#FF9500', '#FFCC00'] as const;
-
 // 信息流驻留上限：对齐 usePagedList 默认上限（约 200 条），控制 JS 数据驻留。
 const MAX_FEED_ITEMS = 200;
 
 // 聚焦自动刷新的数据新鲜期：5 分钟内切回 Tab 不重拉（stale-while-revalidate）。
 const FOCUS_REFRESH_STALE_MS = 5 * 60 * 1000;
+
+// 信息流帖卡「×」菜单项：模块级常量 —— 若在 renderItem 内联数组字面量，
+// 每帧新建引用会击穿 TweetCard 的 React.memo，点赞/加载更多时整屏重渲。
+const TWEET_MENU_OPTIONS: TweetCardMenuAction[] = ['dislike', 'block', 'report', 'copy-title'];
 
 // ── 动效组件（列表首屏入场 + 分段切换 crossfade） ──
 
@@ -214,186 +217,6 @@ function SegmentFade({ segment, children }: { segment: string; children: React.R
   return <Animated.View style={[styles.segmentFade, animatedStyle]}>{children}</Animated.View>;
 }
 
-// ── 原生 FeedCell 帖子卡片（wave 2：原生入场级联 + RN 薄操作栏保留全部交互） ──
-
-/** 原生 FeedCell 有图帖 Hero 高度，与 TiebaFeedCellView.swift 的 heroImageHeight=200 保持一致 */
-const NATIVE_HERO_HEIGHT = 200;
-
-/** 有图帖首图原址（视频取 poster）。原址直接交给原生 TiebaImageIO 做缩略缓存，
- *  原生 targetWidth 750 的效果优于 RN 侧传 200px 缩略图。 */
-function threadHeroImage(thread: ThreadInfo): string | undefined {
-  const hero = thread.mediaList?.[0];
-  if (!hero) return undefined;
-  return hero.type === 'video' && hero.poster ? hero.poster : hero.src || undefined;
-}
-
-/**
- * 帖子类目原生单元格复合：
- * - FeedCell（原生展示 + 原生入场级联，enterIndex=FlashList index，滚动复用不重放入场）
- * - 有图帖 Hero 区叠透明 Pressable：恢复 FeedCard 的“点图打开图片浏览器”交互
- * - 底部 RN 薄操作栏（EntranceRow 同步入场）：分享 | 点赞 | 更多（不感兴趣/屏蔽/复制标题）
- *
- * 操作栏选择理由：FeedCard 的操作栏含实际交互（点赞/分享/不感兴趣/屏蔽/copy），
- * 按 brief 采用“FeedCell 展示主体 + RN 薄操作栏叠加在底部”，原生滚动收益保留、交互不丢；
- * 回复数由 FeedCell 自带操作栏展示（纯展示）。
- */
-const NativeThreadCell = memo(function NativeThreadCell({
-  item,
-  index,
-  animateEntry,
-  onPress,
-  onShare,
-  onLike,
-  onDislike,
-  onBlockAuthor,
-  onCopyTitle,
-  onImagePress,
-}: {
-  item: FeedItem;
-  index: number;
-  animateEntry: boolean;
-  onPress: (thread: ThreadInfo) => void;
-  onShare: (thread: ThreadInfo) => void;
-  onLike: (thread: ThreadInfo) => void;
-  onDislike: (item: FeedItem) => void;
-  onBlockAuthor: (item: FeedItem) => void;
-  onCopyTitle: (thread: ThreadInfo) => void;
-  onImagePress: (images: string[], index: number) => void;
-}) {
-  const { colors, isDark } = useThemeColors();
-  const thread = item.threadInfo as ThreadInfo;
-  const heroImage = threadHeroImage(thread);
-  const heroImages = useMemo(
-    () => (thread.mediaList ?? []).map((m) => m.originSrc || m.src),
-    [thread.mediaList],
-  );
-  // 玻璃语义：优先 glassTokens.tint 主题色（iOS 26 液态玻璃卡片）
-  const cardBackground = glassTokens.tint[isDark ? 'dark' : 'light'];
-  const hasTags = thread.isTop || thread.isGood;
-
-  // 屏蔽作者：先写 BlockManager 黑名单（持久化），成功后才移除条目。
-  // 对齐 FeedCard 内部同款实现（FeedCard.tsx handleBlockAuthor）。
-  const handleBlockAuthorPress = useCallback(async () => {
-    const authorId = thread.authorId;
-    if (!authorId) return;
-    try {
-      await BlockManager.addBlockedUser({
-        id: Date.now().toString(),
-        uid: authorId,
-        username: thread.authorNameShow || thread.authorName || undefined,
-      });
-      hapticForScene('action-success');
-      onBlockAuthor(item);
-    } catch {
-      hapticForScene('action-fail');
-    }
-  }, [thread, item, onBlockAuthor]);
-
-  const handleMenuAction = useCallback(
-    (action: string) => {
-      switch (action) {
-        case 'dislike':
-          onDislike(item);
-          break;
-        case 'block':
-          handleBlockAuthorPress();
-          break;
-        case 'copy-title':
-          onCopyTitle(thread);
-          break;
-      }
-    },
-    [onDislike, onCopyTitle, item, thread, handleBlockAuthorPress],
-  );
-
-  return (
-    <View
-      style={[
-        styles.nativeThreadCardWrap,
-        {
-          backgroundColor: cardBackground,
-          borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-        },
-      ]}
-    >
-      <FeedCell
-        title={hasTags ? `${thread.isTop ? '置顶 ' : ''}${thread.isGood ? '精品 ' : ''}${thread.title}` : thread.title}
-        summary={thread.abstract || undefined}
-        author={thread.authorNameShow || thread.authorName}
-        forumName={thread.forumName}
-        replyCount={thread.replyNum}
-        timeText={thread.createTime ? relativeTime(thread.createTime) : ''}
-        imageUrl={heroImage}
-        accentColor={colors.primary}
-        textPrimary={colors.text}
-        textSecondary={colors.textSecondary}
-        cardBackground={cardBackground}
-        radius={Radius.card}
-        enterIndex={index}
-        onPress={() => onPress(thread)}
-      />
-      {/* 有图帖 Hero 区透明叠加：恢复 FeedCard 的点图打开图片浏览器交互 */}
-      {heroImages.length > 0 ? (
-        <Pressable
-          style={[styles.nativeHeroOverlay, { height: NATIVE_HERO_HEIGHT }]}
-          onPress={() => {
-            hapticForScene('press');
-            onImagePress(heroImages, 0);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="查看图片"
-        />
-      ) : null}
-      {/* RN 薄操作栏：分享 | 点赞 | 更多菜单（交互不可丢） */}
-      <EntranceRow index={index} animateEntry={animateEntry}>
-        <View style={[styles.nativeThreadActionBar, { backgroundColor: cardBackground }]}>
-          <Pressable
-            onPress={() => onShare(thread)}
-            hitSlop={4}
-            style={({ pressed }) => [styles.nativeActionItem, pressed && styles.nativeActionItemPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="分享"
-          >
-            <SymbolView name="arrowshape.turn.up.left" size={15} tintColor={colors.textTertiary} />
-            <RNText style={[styles.nativeActionText, { color: colors.textTertiary }]}>分享</RNText>
-          </Pressable>
-          <Pressable
-            onPress={() => onLike(thread)}
-            hitSlop={4}
-            style={({ pressed }) => [styles.nativeActionItem, pressed && styles.nativeActionItemPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="点赞"
-          >
-            <SymbolView name="hand.thumbsup" size={15} tintColor={colors.textTertiary} />
-            <RNText style={[styles.nativeActionText, { color: colors.textTertiary }]}>
-              {formatCount(thread.zanNum ?? 0)}
-            </RNText>
-          </Pressable>
-          <View style={styles.nativeActionSpacer} />
-          {/* 更多菜单：原生 ActionSheet（SwiftUI Menu 嵌 RN 树在 iOS 26 上点击无响应） */}
-          <Pressable
-            hitSlop={8}
-            style={({ pressed }) => [styles.nativeActionItem, pressed && styles.nativeActionItemPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="更多操作"
-            onPress={() => {
-              hapticForScene('press');
-              Alert.alert(thread.title || '帖子', undefined, [
-                { text: '不感兴趣', onPress: () => handleMenuAction('dislike') },
-                { text: '屏蔽作者', onPress: () => handleMenuAction('block') },
-                { text: '复制标题', onPress: () => handleMenuAction('copy-title') },
-                { text: '取消', style: 'cancel' as const },
-              ]);
-            }}
-          >
-            <SymbolView name="ellipsis" size={15} weight="bold" tintColor={colors.textTertiary} />
-          </Pressable>
-        </View>
-      </EntranceRow>
-    </View>
-  );
-});
-
 // ── 主页面 ──
 export default function ExploreScreen() {
   const [activeSegment, setActiveSegment] = useState<ExploreSegment>('personalized');
@@ -410,31 +233,38 @@ export default function ExploreScreen() {
 
   return (
     <ThemedHost style={{ flex: 1 }}>
-      {/* 外层容器用 RN View：三个子节点（FeedTabBar + 两个分段内容）全是 RN
-          组件，此前挂在 SwiftUI VStack 下会让 flex:1 等布局语义失效
-          （SwiftUI 栈自行决定子视图尺寸），存在 0 高度/塌陷风险。 */}
-      <View style={{ flex: 1 }}>
-        {/* 顶部标签栏：推特风格（文本标签 + 主题色胶囊下划线滑动过渡） */}
-        <FeedTabBar tabs={SEGMENTS} active={activeSegment} onChange={handleSegmentChange} />
+      {/* 外层用 SwiftUI VStack 承载：分段控件必须是 Host 的直接后代才能
+          全宽渲染（matchContents/定高容器会空白或收缩到理想宽）。列表仍走
+          RNHostView（onScroll 到不了 JS，由原生 ScrollObserver 补位）。 */}
+      <VStack spacing={0} modifiers={[frame({ maxWidth: 10000, maxHeight: 10000 })]}>
+        {/* 原生 SwiftUI 分段控制（iOS 26 液态玻璃） */}
+        <Picker
+          selection={activeSegment}
+          onSelectionChange={handleSegmentChange}
+          modifiers={[pickerStyle('segmented'), padding({ horizontal: Spacing.lg, top: 8, bottom: 8 })]}
+        >
+          {SEGMENTS.map((s) => (
+            <Text key={s.value} modifiers={[tag(s.value)]}>{s.label}</Text>
+          ))}
+        </Picker>
 
-        {/* 内容区：Feed 与热榜常驻挂载，display 隐藏切换 —— 热榜切回推荐
-            不再卸载 FeedContent，数据与滚动位置得以保留；热榜数据同样驻留。
-            ⚠️ 每个内容面板再包一层 ThemedHost：FeedContent/HotListContent
-            返回的 SwiftUI 根节点（VStack/ContentUnavailableView）必须是某个
-            Host 的直接子节点，否则挂在 RN View 下抛
-            "being mounted inside a standard UIView" RedBox（动态页未登录态
-            实测必现）。外层 RN View 只为 ×flex 布局，内层 Host 承载 SwiftUI。 */}
-        <View style={[styles.segmentContent, activeSegment === 'hot' && styles.segmentHidden]}>
-          <ThemedHost style={{ flex: 1 }}>
-            <FeedContent segment={lastFeedSegment} />
-          </ThemedHost>
-        </View>
-        <View style={[styles.segmentContent, activeSegment !== 'hot' && styles.segmentHidden]}>
-          <ThemedHost style={{ flex: 1 }}>
-            <HotListContent />
-          </ThemedHost>
-        </View>
-      </View>
+        <RNHostView>
+          <View style={{ flex: 1 }}>
+            {/* 内容区：Feed 与热榜常驻挂载，display 隐藏切换 —— 热榜切回推荐
+                不再卸载 FeedContent，数据与滚动位置得以保留；热榜数据同样驻留。 */}
+            <View style={[styles.segmentContent, activeSegment === 'hot' && styles.segmentHidden]}>
+              <ThemedHost style={{ flex: 1 }}>
+                <FeedContent segment={lastFeedSegment} />
+              </ThemedHost>
+            </View>
+            <View style={[styles.segmentContent, activeSegment !== 'hot' && styles.segmentHidden]}>
+              <ThemedHost style={{ flex: 1 }}>
+                <HotListContent />
+              </ThemedHost>
+            </View>
+          </View>
+        </RNHostView>
+      </VStack>
     </ThemedHost>
   );
 }
@@ -445,8 +275,6 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const { blockedWords, blockedUsers } = useBlockFilter();
   const exploreAutoRefresh = useAppPreference('exploreAutoRefresh', true);
-  // 卡片风格：'twitter' = 推特圆角卡片（默认）；'hero' = 原生 FeedCell 经典样式
-  const feedCardStyle = useAppPreference('feedCardStyle', 'twitter');
   const router = useRouter();
   const imageViewer = useImageViewer();
   // 不感兴趣面板状态
@@ -499,6 +327,12 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
   useEffect(() => {
     if (items.length > 0) entranceDoneRef.current = true;
   }, [items.length]);
+
+  // 列表最新数据的渲染期镜像：点赞/屏蔽等回调据此读取最新状态，避免闭包旧值。
+  const itemsRef = useRef<FeedItem[]>([]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   // 打开“不感兴趣”原因面板
   const handleDislikePress = useCallback((item: FeedItem) => {
@@ -580,15 +414,21 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
     }, [exploreAutoRefresh, segment, isLoggedIn, startLoad]),
   );
 
+  // 分段切换（推荐↔关注）只更新 paramsRef，不触发 useFocusEffect —— 需显式重拉第 1 页，
+  // 否则切换后列表仍渲染另一分段的旧数据（首帧挂载由 useFocusEffect 负责，这里跳过）。
+  const segmentedMountedRef = useRef(false);
+  useEffect(() => {
+    if (!segmentedMountedRef.current) {
+      segmentedMountedRef.current = true;
+      return;
+    }
+    startLoad(1);
+  }, [segment, startLoad]);
+
   const handleLoadMore = useCallback(() => {
     if (!hasMore || loadingMore || loading) return;
     loadMore();
   }, [hasMore, loadingMore, loading, loadMore]);
-
-  // ── 原生 FeedCell 帖子卡片交互（对齐 FeedCard 既有行为，仅换实现载体） ──
-  const handleThreadPress = useCallback((thread: ThreadInfo) => {
-    router.push(`/thread/${thread.id}`);
-  }, [router]);
 
   const handleThreadShare = useCallback(async (thread: ThreadInfo) => {
     hapticForScene('press');
@@ -608,9 +448,13 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
       router.push('/login');
       return;
     }
+    // 以列表最新状态计算 opType/计数（itemsRef 在每次渲染后同步），
+    // 快速连点不会基于闭包旧值重复计算 → UI 与请求一致收敛。
+    const cur = itemsRef.current.find((i) => i.threadInfo?.id === thread.id)?.threadInfo ?? thread;
+    const nextAgree = !cur.hasAgree;
     hapticForScene('like');
     try {
-      await agree(thread.id, thread.id, thread.hasAgree ? 0 : 1);
+      await agree(thread.id, thread.id, nextAgree ? 1 : 0);
       hapticForScene('action-success');
       // 乐观更新：点赞状态 + 计数（heart pop 动画由 TweetCard 本地播放）
       setItems((prev) => prev.map((i) =>
@@ -619,8 +463,8 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
               ...i,
               threadInfo: {
                 ...i.threadInfo,
-                hasAgree: !thread.hasAgree,
-                zanNum: Math.max(0, (thread.zanNum ?? 0) + (thread.hasAgree ? -1 : 1)),
+                hasAgree: nextAgree,
+                zanNum: Math.max(0, (i.threadInfo.zanNum ?? 0) + (nextAgree ? 1 : -1)),
               },
             }
           : i,
@@ -654,6 +498,21 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
     }
   }, [setItems]);
 
+  // 举报：拉取服务端举报页 URL，内嵌 webview 打开
+  const handleThreadReport = useCallback(async (thread: ThreadInfo) => {
+    try {
+      const url = await checkReportPost(thread.id);
+      if (url) {
+        router.push({ pathname: '/webview', params: { url, title: '举报' } });
+      } else {
+        Alert.alert('提示', '当前帖子不支持在线举报');
+      }
+    } catch {
+      hapticForScene('action-fail');
+      Alert.alert('错误', '举报失败');
+    }
+  }, [router]);
+
   const handleTweetMenuAction = useCallback((action: TweetCardMenuAction, thread: ThreadInfo) => {
     switch (action) {
       case 'dislike': {
@@ -664,22 +523,26 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
       case 'block':
         handleThreadBlockAuthor(thread);
         break;
+      case 'report':
+        void handleThreadReport(thread);
+        break;
       case 'copy-title':
         handleCopyTitle(thread);
         break;
     }
-  }, [handleDislikePress, handleThreadBlockAuthor, handleCopyTitle]);
+  }, [handleDislikePress, handleThreadBlockAuthor, handleThreadReport, handleCopyTitle]);
 
   const renderItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => {
     if (item.type === 'thread' || item.type === 'video_thread') {
-      // 推特卡片（默认）：TweetCard + 入场级联
-      if (feedCardStyle === 'twitter' && item.threadInfo) {
+      // 统一卡片：与吧内列表同款 TweetCard（forum 变体，右上角 × 菜单），
+      // 动态流扩展菜单项：不感兴趣/屏蔽作者/举报/复制标题
+      if (item.threadInfo) {
         return (
           <EntranceRow index={index} animateEntry={!entranceDoneRef.current}>
             <TweetCard
               thread={item.threadInfo}
-              variant="feed"
               timeType="create"
+              closeMenuOptions={TWEET_MENU_OPTIONS}
               onImagePress={imageViewer.handleImagePress}
               onLike={handleThreadLike}
               onShare={handleThreadShare}
@@ -688,21 +551,6 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
           </EntranceRow>
         );
       }
-      // 帖子类目：原生 FeedCell（入场级联 enterIndex）+ RN 薄操作栏（分享/点赞/更多）
-      return (
-        <NativeThreadCell
-          item={item}
-          index={index}
-          animateEntry={!entranceDoneRef.current}
-          onPress={handleThreadPress}
-          onShare={handleThreadShare}
-          onLike={handleThreadLike}
-          onDislike={handleDislikePress}
-          onBlockAuthor={handleBlockAuthor}
-          onCopyTitle={handleCopyTitle}
-          onImagePress={imageViewer.handleImagePress}
-        />
-      );
     }
     return (
       <EntranceRow index={index} animateEntry={!entranceDoneRef.current}>
@@ -714,7 +562,7 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
         />
       </EntranceRow>
     );
-  }, [feedCardStyle, imageViewer.handleImagePress, handleDislikePress, handleBlockAuthor, handleThreadPress, handleThreadShare, handleThreadLike, handleCopyTitle, handleTweetMenuAction]);
+  }, [imageViewer.handleImagePress, handleDislikePress, handleBlockAuthor, handleThreadShare, handleThreadLike, handleTweetMenuAction]);
 
   const keyExtractor = useCallback((item: FeedItem, index: number) => {
     const id = item.threadInfo?.id || item.forumInfo?.forumId || item.topicInfo?.topicId || '';
@@ -722,14 +570,14 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
   }, []);
 
   const getItemType = useCallback((item: FeedItem) => {
-    // 推特卡片按 有图/纯文字 细分回收类型（高度差异大，提升复用命中率）
-    if (feedCardStyle === 'twitter' && (item.type === 'thread' || item.type === 'video_thread')) {
+    // 帖子卡片按 有图/纯文字 细分回收类型（高度差异大，提升复用命中率）
+    if (item.type === 'thread' || item.type === 'video_thread') {
       return item.threadInfo?.mediaList && item.threadInfo.mediaList.length > 0
         ? 'tweet-media'
         : 'tweet-text';
     }
     return item.type;
-  }, [feedCardStyle]);
+  }, []);
 
   const listFooter = useMemo(
     () => (
@@ -744,9 +592,10 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
   );
 
   // 未登录关注（Kotlin 未登录时隐藏关注 tab；RN 降级为提示登录）
+  // 布局对齐关注页：VStack spacing=0 + 按钮 bottom padding 80，登录按钮悬浮居中
   if (segment === 'concern' && !isLoggedIn) {
     return (
-      <VStack alignment="center" spacing={16}>
+      <VStack spacing={0}>
         <Spacer />
         <ContentUnavailableView
           systemImage="person.crop.circle.badge.questionmark"
@@ -755,7 +604,7 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
         />
         <Button
           onPress={() => router.push('/login')}
-          modifiers={[buttonStyle('glassProminent'), buttonBorderShape('capsule')]}
+          modifiers={[buttonStyle('glassProminent'), buttonBorderShape('capsule'), padding({ bottom: 80 })]}
         >
           <Label title="登录百度账号" systemImage="person.crop.circle.badge.checkmark" />
         </Button>
@@ -817,7 +666,6 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
               renderItem={renderItem}
               keyExtractor={keyExtractor}
               getItemType={getItemType}
-              extraData={feedCardStyle}
               drawDistance={400}
               maxItemsInRecyclePool={24}
               contentContainerStyle={{ paddingVertical: 8, paddingBottom: 100 }}
@@ -834,6 +682,12 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
               }
             />
           </SegmentFade>
+          {/* 原生滚动观察器：RNHostView 下 onScroll 到不了 JS，用 KVO 补位
+              驱动底栏自动隐藏 */}
+          <ScrollObserver
+            style={styles.scrollObserver}
+            onScrollChanged={(e) => updateTabBarAutoHide(e.nativeEvent.y)}
+          />
           <ImageViewer
             images={imageViewer.imageViewerImages}
             initialIndex={imageViewer.imageViewerIndex}
@@ -1048,17 +902,7 @@ function HotListContent() {
           </View>
           <RNScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topicScrollContent}>
             {topics.slice(0, 8).map((topic, idx) => {
-              const chipColors = [
-                { bg: '#FF3B3012', rank: '#FF3B30', border: '#FF3B3030' },
-                { bg: '#FF950012', rank: '#FF9500', border: '#FF950030' },
-                { bg: '#FFCC0012', rank: '#CC9900', border: '#FFCC0030' },
-                { bg: '#34C75912', rank: '#34C759', border: '#34C75930' },
-                { bg: '#5AC8FA12', rank: '#5AC8FA', border: '#5AC8FA30' },
-                { bg: '#007AFF12', rank: '#007AFF', border: '#007AFF30' },
-                { bg: '#5856D612', rank: '#5856D6', border: '#5856D630' },
-                { bg: '#AF52DE12', rank: '#AF52DE', border: '#AF52DE30' },
-              ];
-              const c = chipColors[idx % chipColors.length];
+              const c = TOPIC_CHIP_COLORS[idx % TOPIC_CHIP_COLORS.length];
               return (
                 <Pressable
                   key={topic.topicId}
@@ -1186,6 +1030,10 @@ function HotListContent() {
             }
           />
         </SegmentFade>
+        <ScrollObserver
+          style={styles.scrollObserver}
+          onScrollChanged={(e) => updateTabBarAutoHide(e.nativeEvent.y)}
+        />
       </View>
     </RNHostView>
   );
@@ -1193,6 +1041,8 @@ function HotListContent() {
 
 // ── 样式 ──
 const styles = StyleSheet.create({
+  // 原生滚动观察器：占位 0 尺寸，不参与布局
+  scrollObserver: { width: 0, height: 0 },
   // 分段内容区：crossfade 动画容器需占满剩余空间
   segmentFade: { flex: 1 },
   // 分段内容常驻挂载容器：display 切换隐藏，切换回来不重拉数据/不丢滚动位置
@@ -1211,41 +1061,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   dislikeChipText: { fontSize: 14, fontWeight: '600', letterSpacing: 0 },
-  // ── 原生 FeedCell 帖子卡片（wave 2）──
-  nativeThreadCardWrap: {
-    marginHorizontal: Spacing.lg,
-    marginVertical: 6,
-    borderRadius: Radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-  },
-  // 有图帖 Hero 区透明叠加：点图打开图片浏览器（高度对齐原生 heroImageHeight=200）
-  nativeHeroOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-  },
-  nativeThreadActionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.15)',
-  },
-  nativeActionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 4,
-    minHeight: 28,
-    justifyContent: 'center',
-  },
-  nativeActionItemPressed: { opacity: 0.5 },
-  nativeActionText: { fontSize: 13, fontWeight: '500', letterSpacing: 0 },
-  nativeActionSpacer: { flex: 1 },
-  nativeActionMenu: { minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center' },
   // 话题横向滚动
   topicSection: { paddingTop: 16, paddingBottom: 6 },
   topicSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 12 },
@@ -1270,7 +1085,7 @@ const styles = StyleSheet.create({
   // 热帖卡片
   hotCard: {
     flexDirection: 'row', marginHorizontal: 14, marginVertical: 6,
-    padding: 16, borderRadius: 16,
+    padding: 16, borderRadius: Radius.card,
     ...Shadows.card,
   },
   hotRankBadge: {

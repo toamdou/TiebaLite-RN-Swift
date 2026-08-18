@@ -210,7 +210,7 @@ export default function ThreadMoreSheet({
     ]);
   }, [threadId, remove, runAfterClose, router]);
 
-  const groupBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(120,120,128,0.08)';
+  const groupBg = colors.groupFill;
 
   return (
     <BottomSheetComponent

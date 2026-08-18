@@ -120,7 +120,10 @@ export default function UserProfilePage() {
   const { uid } = useLocalSearchParams<{ uid: string }>();
   const insets = useSafeAreaInsets();
   const { colors } = useThemeColors();
-  const { isLoggedIn, account } = useAuthStore();
+  // 选择性订阅：仅关注 isLoggedIn/account 两个字段，避免 authStore 其它
+  // 字段（error/isLoading 等）变化时整页重渲。
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const account = useAuthStore((s) => s.account);
   const currentAccountUid = account?.uid;
 
   // Profile data
@@ -154,26 +157,36 @@ export default function UserProfilePage() {
 
   // ---------- Load profile ----------
 
-  const loadProfile = useCallback(async () => {
+  // 请求序号：uid 切换/卸载时使过期响应失效，避免旧 uid 数据覆盖新页
+  const profileSeqRef = useRef(0);
+
+  const loadProfile = useCallback(async (targetUid: string) => {
+    const seq = ++profileSeqRef.current;
     setLoadingProfile(true);
     setError(null);
     try {
-      const result = await profile(uid);
+      const result = await profile(targetUid);
       const u = result.user;
+      if (seq !== profileSeqRef.current) return;
       setUser(u);
       // Check if current user follows this user (hasConcerned = 0 means not followed)
       setIsFollowing(u.hasConcerned ? u.hasConcerned !== 0 : false);
-      setIsOwnProfile(currentAccountUid === uid);
+      setIsOwnProfile(currentAccountUid === targetUid);
     } catch (e: any) {
+      if (seq !== profileSeqRef.current) return;
       setError(e?.message || '加载失败');
     } finally {
+      if (seq !== profileSeqRef.current) return;
       setLoadingProfile(false);
     }
-  }, [uid, currentAccountUid]);
+  }, [currentAccountUid]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial profile fetch; loading state is already true on mount.
-    loadProfile();
+    loadProfile(uid);
+    return () => {
+      profileSeqRef.current += 1;
+    };
   }, [uid, loadProfile]);
 
   const handleTabChange = useCallback((value: string) => {
@@ -488,7 +501,7 @@ export default function UserProfilePage() {
       <ThemedHost style={{ flex: 1 }}>
         <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
           <Stack.Screen options={{ title: '用户' }} />
-          <ErrorState message={error} onRetry={loadProfile} />
+          <ErrorState message={error} onRetry={() => loadProfile(uid)} />
         </View>
       </ThemedHost>
     );
@@ -538,7 +551,7 @@ export default function UserProfilePage() {
                     colors={colors}
                     insets={insets}
                     header={renderHeader}
-                    onHeaderRefresh={loadProfile}
+                    onHeaderRefresh={() => loadProfile(uid)}
                   />
                 </View>
               ))}

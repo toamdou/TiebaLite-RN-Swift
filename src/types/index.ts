@@ -20,11 +20,6 @@ export enum SearchThreadFilter {
   ONLY_THREAD = 2,
 }
 
-export enum ForumGuideSortType {
-  UPDATE = 0,
-  LEVEL = 1,
-}
-
 export enum LoadType {
   REFRESH = 1,
   LOAD_MORE = 2,
@@ -247,14 +242,6 @@ export interface FeedItem {
   forumInfo?: ForumInfo;
   topicInfo?: TopicInfo;
   userInfo?: UserInfo;
-  dislikeInfo?: DislikeInfo;
-}
-
-export interface DislikeInfo {
-  dislikeId: string;
-  dislikeReason: string;
-  /** 对齐 Kotlin DislikeReason.extra（提交不感兴趣时一并上报） */
-  extra?: string;
 }
 
 // ---------- Topic ----------
@@ -277,14 +264,6 @@ export interface HotTopicListItem {
   isNew: boolean;
   imageUrl?: string;
   rank?: number;
-}
-
-export interface TopicDetail {
-  topicId: string;
-  topicName: string;
-  topicDesc: string;
-  discussNum: number;
-  threadList: ThreadInfo[];
 }
 
 // ---------- Hot Thread (Kotlin protobuf aligned) ----------
@@ -421,11 +400,6 @@ export interface SearchUserResult {
   portrait: string;
   intro: string;
   fansNum: number;
-}
-
-export interface SearchSuggestion {
-  keyword: string;
-  type: 'normal' | 'forum' | 'user';
 }
 
 export interface SearchPostResult {
@@ -581,37 +555,23 @@ export interface AppPreferences {
   collectDescSort: boolean;
   showShortcutInThread: boolean;
   hideReply: boolean;
-  forumSingleColumn: boolean;
   blockVideo: boolean;
   hideMedia: boolean;
-  showFollowedOnly: boolean;
   hideBlockedContent: boolean;
   imageWatermarkEnabled: boolean;
   imageWatermark: 'none' | 'username' | 'forum_name';
   imageDarkenWhenNight: boolean;
   useBuiltInBrowser: boolean;
-  useCustomTabs: boolean;
-  liftUpBottomBar: boolean;
-  statusBarDarker: boolean;
   translucentAlpha: number;
-  translucentBlur: number;
-  translucentBackgroundPath: string;
   customPrimaryColor: string;
-  translucentPrimaryColor: string;
-  ignoreBatteryOptimizationsDialog: boolean;
   slowSignMode: boolean;
   failAutoStop: boolean;
   useOfficialSign: boolean;
   /** Whether one-click sign progress is shown as an iOS Live Activity. */
   liveActivitySignEnabled: boolean;
-  experimentalFeatures: boolean;
   homePageShowHistoryForum: boolean;
+  /** 关注吧列表布局：true = 一行一个；false = 一行两个 */
+  forumListSingle: boolean;
   exploreAutoRefresh: boolean;
   hapticFeedback: boolean;
-  /**
-   * 信息流卡片风格：'twitter' = 推特式圆角卡片（默认）；
-   * 'hero' = 经典 Hero 玻璃卡（原生 FeedCell / ForumThreadCard 备选样式）。
-   * 响应式偏好，切换后立即生效，无需重启。
-   */
-  feedCardStyle: 'twitter' | 'hero';
 }

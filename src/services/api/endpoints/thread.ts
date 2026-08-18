@@ -68,9 +68,6 @@ export async function pbFloor(
   const curPage = pg?.currentPage ?? page;
   const totPage = pg?.totalPage ?? 0;
   const computedHasMore = totPage > 0 ? curPage < totPage : (pg?.hasMore ?? 0) === 1;
-  if (__DEV__) {
-    console.log(`[pbFloor] response: subpostList.length=${rawPosts.length}, curPage=${curPage}, totPage=${totPage}, hasMore=${computedHasMore}, rawHasMore=${pg?.hasMore}`);
-  }
   return {
     posts: rawPosts.map((item: any) => {
       // 判空内嵌 author（proto3 空对象 {} 问题，同 mapProtoThread/mapProtoPosts）

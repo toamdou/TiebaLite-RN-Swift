@@ -12,6 +12,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { htmlToText } from '@/utils/htmlSummary';
 import { formatCount, relativeTime } from '@/utils';
+import { Radius } from '@/theme';
 import type {
   SearchForumResult,
   SearchPostResult,
@@ -24,16 +25,18 @@ const isValidUid = (uid: string): boolean => /^[1-9]\d{0,18}$/.test(String(uid))
 export const SearchThreadCard = React.memo(function SearchThreadCard({
   item,
   colors,
-  onPress,
+  onPressItem,
 }: {
   item: SearchThreadResult;
   colors: any;
-  onPress?: () => void;
+  onPressItem: (item: SearchThreadResult) => void;
 }) {
+  // 卡内缓存 HTML→纯文本解析，避免列表重渲时逐卡重复字符级解析（搜索逐键输入场景）
+  const preview = React.useMemo(() => htmlToText(item.content), [item]);
   return (
     <Pressable
       style={[styles.threadCard, { backgroundColor: colors.card, borderColor: colors.separator }]}
-      onPress={onPress}
+      onPress={() => onPressItem(item)}
     >
       <View style={styles.threadHeader}>
         <Avatar
@@ -57,7 +60,7 @@ export const SearchThreadCard = React.memo(function SearchThreadCard({
       ) : null}
       {item.content ? (
         <Text style={[styles.threadContent, { color: colors.textSecondary }]} numberOfLines={2}>
-          {htmlToText(item.content)}
+          {preview}
         </Text>
       ) : null}
       <View style={styles.threadFooter}>
@@ -82,16 +85,16 @@ export const SearchThreadCard = React.memo(function SearchThreadCard({
 export const SearchForumCard = React.memo(function SearchForumCard({
   item,
   colors,
-  onPress,
+  onPressItem,
 }: {
   item: SearchForumResult;
   colors: any;
-  onPress?: () => void;
+  onPressItem: (item: SearchForumResult) => void;
 }) {
   return (
     <Pressable
       style={[styles.forumCard, { backgroundColor: colors.card, borderColor: colors.separator }]}
-      onPress={onPress}
+      onPress={() => onPressItem(item)}
     >
       <Avatar source={item.avatar} initials={item.forumName[0]} size={44} />
       <View style={styles.forumInfo}>
@@ -115,18 +118,18 @@ export const SearchForumCard = React.memo(function SearchForumCard({
 export const SearchUserCard = React.memo(function SearchUserCard({
   item,
   colors,
-  onPress,
+  onPressItem,
 }: {
   item: SearchUserResult;
   colors: any;
-  onPress?: () => void;
+  onPressItem: (item: SearchUserResult) => void;
 }) {
   return (
     <Pressable
       style={[styles.userCard, { backgroundColor: colors.card, borderColor: colors.separator }]}
       onPress={() => {
         if (!isValidUid(item.uid)) return;
-        onPress?.();
+        onPressItem(item);
       }}
     >
       <Avatar source={item.portrait} initials={(item.nameShow || item.name || '?')[0]} size={44} />
@@ -153,12 +156,13 @@ export const SearchUserCard = React.memo(function SearchUserCard({
 export const SearchPostCard = React.memo(function SearchPostCard({
   item,
   colors,
-  onPress,
+  onPressItem,
 }: {
   item: SearchPostResult;
   colors: any;
-  onPress?: () => void;
+  onPressItem: (item: SearchPostResult) => void;
 }) {
+  const preview = React.useMemo(() => htmlToText(item.content || ''), [item]);
   return (
     <Pressable
       style={({ pressed }) => [
@@ -169,13 +173,13 @@ export const SearchPostCard = React.memo(function SearchPostCard({
           transform: [{ scale: pressed ? 0.98 : 1 }],
         },
       ]}
-      onPress={onPress}
+      onPress={() => onPressItem(item)}
     >
       <Text style={[styles.postTitle, { color: colors.text }]} numberOfLines={2}>
         {item.title || '无标题'}
       </Text>
       <Text style={[styles.postPreview, { color: colors.textSecondary }]} numberOfLines={2}>
-        {htmlToText(item.content || '')}
+        {preview}
       </Text>
       <View style={styles.postFooter}>
         <Text style={[styles.postAuthor, { color: colors.textTertiary }]}>
@@ -199,7 +203,7 @@ const styles = StyleSheet.create({
   threadCard: {
     marginHorizontal: 16,
     marginTop: 12,
-    borderRadius: 14,
+    borderRadius: Radius.card,
     padding: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
@@ -235,7 +239,7 @@ const styles = StyleSheet.create({
   forumChip: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: Radius.chip,
   },
   forumChipText: {
     fontSize: 12,
@@ -256,7 +260,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 16,
     marginTop: 12,
-    borderRadius: 14,
+    borderRadius: Radius.card,
     padding: 14,
     borderWidth: StyleSheet.hairlineWidth,
     gap: 12,
@@ -288,7 +292,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 16,
     marginTop: 12,
-    borderRadius: 14,
+    borderRadius: Radius.card,
     padding: 14,
     borderWidth: StyleSheet.hairlineWidth,
     gap: 12,
@@ -312,7 +316,7 @@ const styles = StyleSheet.create({
   // In-forum post card
   postCard: {
     padding: 16,
-    borderRadius: 8,
+    borderRadius: Radius.chip,
     marginVertical: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },

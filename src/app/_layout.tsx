@@ -168,16 +168,13 @@ const SCREENS: readonly ScreenDef[] = [
   { name: 'threadstore',           title: '我的收藏' },
   { name: 'webview',               title: '' },
   { name: 'topic/[id]',            title: '话题' },
-  { name: 'topic/list',            title: '热门话题' },
   { name: 'settings/index',        title: '设置' },
   { name: 'settings/theme',        title: '个性化' },
   { name: 'settings/account',      title: '账号管理' },
   { name: 'settings/block',        title: '屏蔽设置' },
-  { name: 'settings/custom',       title: '自定义主题' },
   { name: 'settings/habit',        title: '使用习惯' },
   { name: 'settings/oksign',       title: '一键签到设置' },
   { name: 'settings/more',         title: '更多设置' },
-  { name: 'settings/experimental', title: '实验性功能' },
   { name: 'settings/about',        title: '关于' },
 ];
 
@@ -334,7 +331,9 @@ function RootLayoutInner() {
           浅色模式才尊重 statusBarFontDark 偏好——与 headerTint 的取色同源。 */}
       <StatusBar style={toolbarPrimaryColor ? (isDark ? 'light' : (statusBarFontDark ? 'dark' : 'light')) : isDark ? 'light' : 'dark'} />
       <Stack screenOptions={screenOpts}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
+        {/* (tabs) 作为根栈最底屏：long-press 返回菜单会列出栈内各屏标题
+            需要给根屏一个友好 title（否则显示原始路由名“(tabs)”）。 */}
+        <Stack.Screen name="(tabs)" options={{ title: '首页', headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
         <Stack.Screen name="login" options={{ title: '登录', presentation: 'formSheet' as const, headerBackVisible: false, sheetGrabberVisible: true, contentStyle: { backgroundColor: colors.background } }} />
         <Stack.Screen
           name="forum/[name]"

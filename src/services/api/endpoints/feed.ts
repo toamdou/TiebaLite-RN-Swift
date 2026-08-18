@@ -23,7 +23,9 @@ export async function personalized(loadType: LoadType = LoadType.REFRESH, page: 
     assertProtoSuccess(decoded);
     const data = decoded.data;
     const items = mapThreadItems(data?.threadList ?? [], data?.userList ?? []);
-    const hasMore = (data?.page?.hasMore ?? 0) === 1;
+    // PersonalizedResponseData 无 page 字段（descriptor 仅 threadList/threadPersonalized），
+    // 翻页判定以条目数对齐请求页容量（20 条/页）。
+    const hasMore = (data?.threadList?.length ?? 0) >= 20;
     return { items, hasMore };
   } catch (e) {
     if (__DEV__) console.warn('[personalized] proto failed, fallback:', e);
@@ -52,7 +54,22 @@ export async function userLike(
     }, signal);
     assertProtoSuccess(decoded);
     const data = decoded.data;
-    const items = mapThreadItems(data?.threadList ?? [], data?.userList ?? []);
+    // UserLikeResponseData 真实字段是 threadInfo（ConcernData[]，内含 threadList: ThreadInfo），
+    // 而非 threadList —— 旧代码读空字段导致关注流恒空。
+    const items = (data?.threadInfo ?? [])
+      .map((c: any): FeedItem | null => {
+        const threadRaw = c?.threadList ?? c?.thread_list ?? c;
+        if (!threadRaw || typeof threadRaw !== 'object') return null;
+        const tid = threadRaw?.id ?? threadRaw?.tid ?? threadRaw?.thread_id ?? threadRaw?.threadId;
+        if (tid == null && threadRaw?.title == null) return null;
+        const forum = threadRaw?.forum ?? c?.forum ?? {};
+        const thread = mapProtoThread(
+          { ...threadRaw, author: threadRaw?.author ?? c?.author },
+          { forum },
+        );
+        return { type: thread.isVideo ? 'video_thread' : 'thread', threadInfo: thread };
+      })
+      .filter((x: FeedItem | null): x is FeedItem => x !== null);
     return {
       items,
       pageTag: data?.pageTag ?? '',
@@ -137,12 +154,6 @@ export async function hotThreadList(tabCode: string = 'all'): Promise<HotPageDat
   assertProtoSuccess(decoded);
   const data = decoded.data;
   if (!data) throw new TiebaApiError('Empty response', -1, -1);
-  if (__DEV__) {
-    console.log('[hotThreadList] raw lengths:', 'topicList=', (data.topicList ?? []).length, 'threadInfo=', (data.threadInfo ?? []).length, 'hotThreadTabInfo=', (data.hotThreadTabInfo ?? []).length);
-    if ((data.threadInfo ?? []).length > 0) {
-      console.log('[hotThreadList] first thread sample:', JSON.stringify(data.threadInfo![0]).slice(0, 300));
-    }
-  }
   return {
     topics: (data.topicList ?? []).map(mapHotTopic),
     tabs: (data.hotThreadTabInfo ?? []).map(mapHotTab),

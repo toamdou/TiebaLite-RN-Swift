@@ -254,6 +254,7 @@ function ImageSegment({
                   cachePolicy="memory-disk" source={{ uri: imageUri }}
                   style={[styles.image, dimmed && { opacity: 0.6 }]}
                   contentFit="cover"
+                  transition={200}
                   recyclingKey={imageUri}
                 />
                 {idx === 8 && remainingCount > 0 && (
@@ -328,6 +329,7 @@ function ImageSegment({
         cachePolicy="memory-disk" source={{ uri: singleUri }}
         style={[styles.image, dimmed && { opacity: 0.6 }]}
         contentFit="cover"
+        transition={200}
         recyclingKey={singleUri}
       />
     </Pressable>
@@ -905,6 +907,8 @@ function PostContent({
   const hideMedia = useAppPreference('hideMedia', false);
   const blockVideo = useAppPreference('blockVideo', false);
   const hideBlockedContent = useAppPreference('hideBlockedContent', false);
+  // 阅读字号：显示设置 -fontScale 倍率，作用于正文 / 引用 / @ / 话题
+  const fontScale = useAppPreference('fontScale', 1.0) ?? 1;
   const { isContentBlocked: hookIsContentBlocked } = useBlockFilter();
   const isContentBlocked = hookIsContentBlocked;
   const imageDarkenWhenNight = useAppPreference('imageDarkenWhenNight', false);
@@ -919,8 +923,6 @@ function PostContent({
         ? (forumName ?? '')
         : ''
     : '';
-  // 阅读字号（设置 → 个性化 → 阅读字号），作用于正文文本段
-  const fontScale = useAppPreference('fontScale', 1) ?? 1;
 
   // Cache the regex-based emoticon split per text segment. The split is pure
   // (depends only on the segment text), so memoize it keyed on `content` to
@@ -950,9 +952,9 @@ function PostContent({
 
     // BlockTip — matches Kotlin Block.kt BlockTip composable
     // textSecondary 是 rgba() 字符串，不能直接拼 alpha 后缀（会得非法色值），
-    // 改用 isDark 显式分支的屏蔽提示底色（与 ThreadMoreSheet groupBg 同源）。
+    // 底色统一走 colors.groupFill（与 ThreadMoreSheet groupBg 同源）。
     const renderBlockTip = (k: number) => (
-      <View key={`blocked-${k}`} style={[styles.blockTip, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(120,120,128,0.08)' }]}>
+      <View key={`blocked-${k}`} style={[styles.blockTip, { backgroundColor: colors.groupFill }]}>
         <SymbolView name="eye.slash" size={12} tintColor={colors.textSecondary} />
         <Text style={[styles.blockTipText, { color: colors.textSecondary }]}>内容已屏蔽</Text>
       </View>
@@ -1125,7 +1127,6 @@ function PostContent({
   }, [
     content,
     colors,
-    isDark,
     hideMedia,
     blockVideo,
     hideBlockedContent,

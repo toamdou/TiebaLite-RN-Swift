@@ -16,6 +16,7 @@ import {
   Text,
   Pressable,
   StyleSheet,
+  Alert,
   useWindowDimensions,
   type StyleProp,
   type ViewStyle,
@@ -32,8 +33,6 @@ import { SymbolView } from '@/components/ui/SymbolView';
 import { Avatar } from '@/components/ui/Avatar';
 import { hapticForScene } from '@/theme/hapticsMap';
 import * as Clipboard from 'expo-clipboard';
-import { MenuView, type MenuAction } from '@expo/ui/community/menu';
-import { ThemedHost } from '@/components/ui/ThemedHost';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { PRESS_ENTER, PRESS_EXIT, PRESS_SCALE } from '@/theme/springs';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -46,10 +45,15 @@ import { BlockManager } from '@/utils/BlockManager';
 import { agree } from '@/services/api/endpoints';
 import type { FeedItem } from '@/types';
 
-const FEED_MENU_ACTIONS: MenuAction[] = [
-  { id: 'dislike', title: '不感兴趣', image: 'hand.thumbsdown' },
-  { id: 'block', title: '屏蔽作者', image: 'person.badge.minus' },
-  { id: 'copy-title', title: '复制标题', image: 'doc.on.doc' },
+interface FeedMenuAction {
+  id: string;
+  title: string;
+}
+
+const FEED_MENU_ACTIONS: FeedMenuAction[] = [
+  { id: 'dislike', title: '不感兴趣' },
+  { id: 'block', title: '屏蔽作者' },
+  { id: 'copy-title', title: '复制标题' },
 ];
 
 /**
@@ -60,6 +64,11 @@ const FEED_MENU_ACTIONS: MenuAction[] = [
  */
 let realGlassHolderCount = 0;
 
+/**
+ * 卡片「···」菜单：原生 ActionSheetIOS（替代每卡常驻 SwiftUI MenuView ——
+ * 与 PostCard 同因：几百条滚动的列表里每卡一个原生菜单子树是掉帧大头，
+ * 点击时才拉起系统面板，零常驻视图）。
+ */
 function CardMenuButton({
   onAction,
   tintColor,
@@ -70,17 +79,23 @@ function CardMenuButton({
   style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <ThemedHost matchContents>
-      <MenuView style={style} actions={FEED_MENU_ACTIONS} onPressAction={onAction}>
-        <Pressable
-          style={[styles.cardMenuButton, style]}
-          accessibilityRole="button"
-          accessibilityLabel="更多操作"
-        >
-          <SymbolView name="ellipsis" size={15} weight="bold" tintColor={tintColor} />
-        </Pressable>
-      </MenuView>
-    </ThemedHost>
+    <Pressable
+      style={[styles.cardMenuButton, style]}
+      accessibilityRole="button"
+      accessibilityLabel="更多操作"
+      onPress={() => {
+        hapticForScene('press');
+        Alert.alert('更多操作', undefined, [
+          ...FEED_MENU_ACTIONS.map((a) => ({
+            text: a.title,
+            onPress: () => onAction({ nativeEvent: { event: a.id } }),
+          })),
+          { text: '取消', style: 'cancel' as const },
+        ]);
+      }}
+    >
+      <SymbolView name="ellipsis" size={15} weight="bold" tintColor={tintColor} />
+    </Pressable>
   );
 }
 
@@ -363,7 +378,7 @@ const FeedCard = React.memo(function FeedCard({ item, onDislike, onBlockAuthor, 
       <>
         {/* 论坛标签 */}
         {thread.forumName ? (
-          <Pressable onPress={() => router.push(`/forum/${encodeURIComponent(thread.forumName)}`)} style={styles.forumChip}>
+          <Pressable onPress={() => router.push(`/forum/${encodeURIComponent(thread.forumName)}`)} style={[styles.forumChip, { backgroundColor: colors.chip }]}>
             <Text style={[styles.forumChipText, { color: colors.primary }]} numberOfLines={1}>
               {thread.forumName}吧
             </Text>
@@ -467,7 +482,7 @@ const FeedCard = React.memo(function FeedCard({ item, onDislike, onBlockAuthor, 
                     onPress={handlePress}
                     onPressIn={onPressIn}
                     onPressOut={onPressOut}
-                    style={[styles.heroCard, { backgroundColor: colors.card, borderWidth: 0.5, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }, Shadows.card]}
+                    style={[styles.heroCard, { backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.borderCard }, Shadows.card]}
                   >
             <Link.AppleZoom>
             {/* ── Hero 大图（可点 → 图片浏览器）── */}
@@ -522,7 +537,7 @@ const FeedCard = React.memo(function FeedCard({ item, onDislike, onBlockAuthor, 
                   onPress={handlePress}
                   onPressIn={onPressIn}
                   onPressOut={onPressOut}
-                  style={[styles.card, { backgroundColor: colors.card, borderWidth: 0.5, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }, Shadows.card]}
+                  style={[styles.card, { backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.borderCard }, Shadows.card]}
                 >
           {/* ── 头部：吧头像 + 吧名 + 时间 ── */}
           <View style={styles.header}>
@@ -874,8 +889,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0,122,255,0.1)',
+    borderRadius: Radius.chip,
     marginBottom: 6,
   },
   forumChipText: {

@@ -20,10 +20,13 @@ import {
 import { Stack, router } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import type { WebViewNavigation } from 'react-native-webview';
+import { Button, Label, VStack } from '@expo/ui/swift-ui';
+import { buttonStyle, controlSize, frame, tint } from '@expo/ui/swift-ui/modifiers';
+import { ThemedHost } from '@/components/ui/ThemedHost';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { useAppTheme } from '@/theme/ThemeContext';
-import { Radius, Spacing, typographyStyles } from '@/theme';
+import { Spacing, typographyStyles } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { getNativeCookies } from '@/services/cookies/CookieService';
 import { setAuthCredentials } from '@/services/api/interceptors';
@@ -370,18 +373,23 @@ export default function LoginPage() {
           <Text style={[styles.errorHint, { color: colors.textSecondary }]}>
             请确认页面中已成功登录百度账号
           </Text>
-          <Pressable
-            onPress={handleRetry}
-            style={[styles.retryButton, { backgroundColor: colors.primary }]}
-          >
-            <Text style={[styles.retryText, { color: colors.textOnPrimary }]}>重新加载</Text>
-          </Pressable>
-          <Pressable
-            onPress={handleClose}
-            style={[styles.retryButton, { backgroundColor: colors.surfaceSecondary, marginTop: Spacing.md }]}
-          >
-            <Text style={[styles.retryText, { color: colors.text }]}>返回</Text>
-          </Pressable>
+          {/* 系统按钮：borderedProminent 主操作 / bordered 返回（替代原手绘按压块） */}
+          <ThemedHost matchContents style={{ alignSelf: 'stretch' }}>
+            <VStack alignment="center" spacing={12}>
+              <Button
+                onPress={handleRetry}
+                modifiers={[buttonStyle('borderedProminent'), controlSize('large'), tint(colors.primary), frame({ maxWidth: 9999 })]}
+              >
+                <Label title="重新加载" systemImage="arrow.clockwise" />
+              </Button>
+              <Button
+                onPress={handleClose}
+                modifiers={[buttonStyle('bordered'), controlSize('large'), frame({ maxWidth: 9999 })]}
+              >
+                <Label title="返回" />
+              </Button>
+            </VStack>
+          </ThemedHost>
         </View>
       )}
 
@@ -481,16 +489,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     textAlign: 'center',
     lineHeight: 20,
-  },
-  retryButton: {
-    marginTop: 24,
-    paddingHorizontal: 32,
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.input,
-  },
-  retryText: {
-    color: '#FFF',
-    ...typographyStyles.calloutBold,
   },
   securityNotice: {
     flexDirection: 'row',

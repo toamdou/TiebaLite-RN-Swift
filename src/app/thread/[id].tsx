@@ -17,7 +17,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode
 import {
   View, StyleSheet, Pressable, Text,
   Alert,
-  Dimensions, Platform, ScrollView,
+  Dimensions,
   RefreshControl,
 } from 'react-native';
 import {
@@ -70,6 +70,15 @@ import type { PostInfo, ThreadInfo } from '@/types';
 /** Hard cap for retained posts in a thread to bound long-thread memory. */
 const MAX_POSTS = 400;
 
+/**
+ * 首屏入场级联窗口：入场总时长 = enter + stagger × (窗口-1)。
+ * 若直接按 posts.length 计算，几百楼的帖子总时长达数分钟，末尾楼层在
+ * 入场进度曲线里永远停在低透明度——下滑时新楼层全是"半透明淡字叠白底"
+ * （用户体感"越滑越白、字体越来越暗淡"）。限窗口后只对前 N 层做级联，
+ * 其余楼层保持不透明。
+ */
+const ENTRANCE_ROW_WINDOW = 12;
+
 const replyKeyExtractor = (item: PostInfo) => item.id;
 
 const PostSeparator = () => <View style={styles.postSep} />;
@@ -79,13 +88,6 @@ const pressedScale = ({ pressed }: { pressed: boolean }) => [
   styles.floatingBtn,
   { transform: [{ scale: pressed ? 0.88 : 1 }] },
 ];
-
-/** Debug 日志行着色：ERR 红 / OK 绿 / 其余默认 */
-function debugLineColor(log: string) {
-  if (log.includes('[ERR]')) return { color: '#FF453A' };
-  if (log.includes('[OK]')) return { color: '#30D158' };
-  return undefined;
-}
 
 // ────────────────────────────────────────────────────────────
 // Thread Header — memoized so pagination (loadMore) never
@@ -305,7 +307,6 @@ export default function ThreadPage() {
     async (page: number, params: { id: string; postId?: string; seeLz: boolean; reverse: boolean }, signal?: AbortSignal) => {
       try {
         const data = await pbPage(params.id, page, params.postId, params.seeLz, false, params.reverse ? 1 : 0, signal);
-        if (__DEV__) console.log('[thread] pbPage OK page=', page, 'posts=', data.posts.length, 'hasMore=', data.page.hasMore);
         return {
           items: data.posts,
           hasMore: data.page.hasMore,
@@ -326,7 +327,6 @@ export default function ThreadPage() {
   });
   const {
     items: posts,
-    page: currentPage,
     hasMore,
     loading,
     refreshing,
@@ -352,9 +352,6 @@ export default function ThreadPage() {
   const [isCollected, setIsCollected] = useState(false);
   const [immersive, setImmersive] = useState(false);
   const [moreSheetVisible, setMoreSheetVisible] = useState(false);
-  // ── Debug state ──
-  const [debugVisible, setDebugVisible] = useState(false);
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
   // ── SwiftUI ConfirmationDialog state (report / delete) ──
   const [confirmState, setConfirmState] = useState<{
@@ -401,12 +398,13 @@ export default function ThreadPage() {
   useEffect(() => {
     if (entranceStartedRef.current || loading || posts.length === 0) return;
     entranceStartedRef.current = true;
-    entryTotalSV.value = Math.max(posts.length, 1);
+    const window = Math.min(Math.max(posts.length, 1), ENTRANCE_ROW_WINDOW);
+    entryTotalSV.value = window;
     if (reduceMotion) {
       entranceProgress.value = 1;
     } else {
       entranceProgress.value = withTiming(1, {
-        duration: DURATION.enter + DURATION.stagger * Math.max(posts.length - 1, 0),
+        duration: DURATION.enter + DURATION.stagger * Math.max(window - 1, 0),
         easing: EASE_OUT,
       });
     }
@@ -829,7 +827,7 @@ export default function ThreadPage() {
       <Reanimated.View
         style={[
           styles.floatingBarWrapper,
-          { bottom: insets.bottom + 12 },
+          { bottom: insets.bottom + 6 },
           floatingBarStyle,
         ]}
         pointerEvents="box-none"
@@ -839,14 +837,7 @@ export default function ThreadPage() {
           borderRadius={999}
           glassEffectStyle="clear"
           tintColor={isDark ? 'rgba(28,28,30,0.15)' : 'rgba(255,255,255,0.15)'}
-          style={[
-            styles.floatingBar,
-            {
-              backgroundColor: isDark
-                ? 'rgba(28,28,30,0.55)'
-                : 'rgba(255,255,255,0.7)',
-            },
-          ]}
+          style={styles.floatingBar}
         >
           {/* §5.5: GlassContainer combines child glass views into a unified effect */}
           <GlassContainer spacing={0} style={styles.floatingBarInner}>
@@ -965,41 +956,6 @@ export default function ThreadPage() {
 
       {/* In-page toast (no global ToastProvider mounted) */}
       <Toast ref={toastRef} />
-
-      {/* Debug Panel Toggle + Panel (dev only) */}
-      {__DEV__ && (<>
-      <Pressable
-        style={[styles.debugToggle, { backgroundColor: isDark ? 'rgba(255,149,0,0.9)' : 'rgba(255,149,0,0.85)' }]}
-        onPress={() => setDebugVisible((v) => !v)}
-        onLongPress={() => setDebugLogs([])}
-      >
-        <Text style={styles.debugToggleText}>DBG</Text>
-      </Pressable>
-
-      {/* Debug Panel */}
-      {debugVisible && (
-        <View style={[styles.debugPanel, { backgroundColor: isDark ? 'rgba(0,0,0,0.92)' : 'rgba(30,30,30,0.92)', bottom: insets.bottom + 70 }]}>
-          <View style={styles.debugHeader}>
-            <Text style={styles.debugTitle}>Debug Logs (long-press DBG to clear)</Text>
-            <Pressable onPress={() => setDebugVisible(false)} hitSlop={8}>
-              <SymbolView name="xmark" size={16} tintColor="#FFFFFF" />
-            </Pressable>
-          </View>
-          <ScrollView style={styles.debugScroll} nestedScrollEnabled>
-            {debugLogs.length === 0 ? (
-              <Text style={styles.debugLine}>No logs yet. Pull to refresh.</Text>
-            ) : (
-              debugLogs.map((log, i) => (
-                <Text key={i} style={[styles.debugLine, debugLineColor(log)]}>
-                  {log}
-                </Text>
-              ))
-            )}
-            <Text style={[styles.debugLine, { color: '#8E8E93' }]}>── thread={thread?.id} posts={posts.length} page={currentPage}/{totalPages}</Text>
-          </ScrollView>
-        </View>
-      )}
-      </>)}
     </View>
   );
 }
@@ -1190,38 +1146,4 @@ const styles = StyleSheet.create({
     width: StyleSheet.hairlineWidth,
     height: 20,
   },
-
-
-  // ── Debug Panel ──
-  debugToggle: {
-    position: 'absolute',
-    top: 8,
-    right: 12,
-    width: 36,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 200,
-  },
-  debugToggleText: { color: '#FFF', fontSize: 10, fontWeight: '800' },
-  debugPanel: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    maxHeight: 220,
-    borderRadius: 12,
-    padding: 10,
-    zIndex: 200,
-  },
-  debugHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  debugTitle: { color: '#FF9500', fontSize: 11, fontWeight: '700' },
-  debugClose: { color: '#FFF', fontSize: 16, padding: 4 },
-  debugScroll: { maxHeight: 160 },
-  debugLine: { color: '#E0E0E0', fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', lineHeight: 16 },
 });

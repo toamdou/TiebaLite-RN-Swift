@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet } from 'react-native';
 import {
-  Form, Section, Button, Text, Image, HStack, Menu, RNHostView, ConfirmationDialog,
+  Form, Section, Button, Text, Image, HStack, VStack, Menu, RNHostView, ConfirmationDialog,
   Button as SWButton,
 } from '@expo/ui/swift-ui';
 import { labelStyle, buttonStyle, frame } from '@expo/ui/swift-ui/modifiers';
@@ -105,16 +105,19 @@ export default function AccountPage() {
               const isCurrent = currentAccount?.uid === item.uid;
               return (
                 <HStack key={item.uid} alignment="center" spacing={Spacing.sm}>
-                  {/* 点击整行切换账号（主键统一用 uid） */}
+                  {/* 点击整行切换账号（主键统一用 uid）。
+                      文字两行 + 勾选内联到末尾，避免三行堆叠超出表单行高被裁剪。 */}
                   <Button
                     onPress={() => handleSwitch(item)}
                     modifiers={[frame({ maxWidth: 9999, alignment: 'leading' })]}
                   >
-                    <Text>{item.nameShow || item.name || ''}</Text>
-                    <Text>{item.name ? `@${item.name}` : `UID: ${item.uid}`}</Text>
-                    {isCurrent
-                      ? <Image systemName="checkmark.circle.fill" size={16} color={colors.success} />
-                      : <></>}
+                    <HStack alignment="center" spacing={Spacing.sm}>
+                      <VStack alignment="leading" spacing={2}>
+                        <Text>{item.nameShow || item.name || ''}</Text>
+                        <Text>{item.name ? `@${item.name}` : `UID: ${item.uid}`}</Text>
+                      </VStack>
+                      {isCurrent && <Image systemName="checkmark.circle.fill" size={16} color={colors.success} />}
+                    </HStack>
                   </Button>
                   {/* 每行右侧菜单：移除账号，替代「管理」Section 重复的移除行 */}
                   <Menu

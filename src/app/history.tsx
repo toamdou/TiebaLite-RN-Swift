@@ -177,11 +177,11 @@ export default function HistoryPage() {
         ? `/thread/${item.threadId}`
         : `/forum/${encodeURIComponent(item.forumName || '')}`;
       return (
-        <View style={[styles.historyRow, { backgroundColor: colors.card }]}>
+        <View style={[styles.historyCard, { backgroundColor: colors.card }]}>
           <Link href={href as any} push asChild>
             <Pressable
               style={({ pressed }) => [
-                styles.historyItem,
+                styles.historyBody,
                 {
                   opacity: pressed ? 0.85 : 1,
                   transform: [{ scale: pressed ? 0.98 : 1 }],
@@ -199,21 +199,16 @@ export default function HistoryPage() {
                 />
               </View>
               <View style={styles.itemInfo}>
-                <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={1}>
+                <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={2}>
                   {item.title || item.forumName || '未知'}
                 </Text>
                 <Text style={[styles.itemTime, { color: colors.textTertiary }]}>
                   {timeStr}
                 </Text>
               </View>
-              <SymbolView
-                name="chevron.right"
-                size={13}
-                weight="semibold"
-                tintColor={colors.textTertiary}
-              />
             </Pressable>
           </Link>
+          {/* 卡片内聚：内容 + 右下菜单同一张卡，删除入口与内容不再割裂 */}
           <MenuView
             style={styles.historyMenu}
             actions={HISTORY_MENU_ACTIONS}
@@ -223,6 +218,7 @@ export default function HistoryPage() {
               style={styles.iconButton}
               accessibilityRole="button"
               accessibilityLabel="删除记录"
+              hitSlop={6}
             >
               <SymbolView name="ellipsis" size={15} weight="bold" tintColor={colors.textTertiary} />
             </Pressable>
@@ -368,17 +364,17 @@ const styles = StyleSheet.create({
   sectionHeader: {
     paddingTop: Spacing.lg,
     paddingBottom: 6,
+    // 与卡片列表同边距，标题行与下方卡片左缘对齐
     paddingHorizontal: Spacing.xs,
   },
   sectionTitle: typographyStyles.footnoteBold,
-  // Item
-  historyRow: {
+  // Item — 单张卡片内聚：内容区 + 菜单同一圆角卡
+  historyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Radius.input,
-    paddingRight: 6,
+    borderRadius: Radius.card,
   },
-  historyItem: {
+  historyBody: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -388,6 +384,7 @@ const styles = StyleSheet.create({
   historyMenu: {
     justifyContent: 'center',
     alignItems: 'center',
+    paddingRight: 6,
   },
   iconButton: {
     width: 34,

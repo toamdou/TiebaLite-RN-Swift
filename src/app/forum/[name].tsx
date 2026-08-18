@@ -22,13 +22,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, Stack, Link, useRouter } from 'expo-router';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Picker, Text as SWText, Menu, ConfirmationDialog, Button as SWButton } from '@expo/ui/swift-ui';
 import { pickerStyle, tag, labelStyle, buttonStyle } from '@expo/ui/swift-ui/modifiers';
 import BottomSheetComponent, { BottomSheetScrollView } from '@expo/ui/community/bottom-sheet';
-import type { BottomSheet } from '@expo/ui/community/bottom-sheet';
 import { SymbolView } from '@/components/ui/SymbolView';
 import * as Clipboard from 'expo-clipboard';
 import { hapticForScene } from '@/theme/hapticsMap';
@@ -38,6 +35,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import ImageViewer from '@/components/ImageViewer';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { useThemeColors } from '@/theme/ThemeContext';
+import { GlassView } from '@/components/ui/GlassView';
 import { DURATION, EASE_OUT, HERO, MOMENTUM, PRESS_ENTER, Radius, Shadows, Spacing } from '@/theme';
 import { typographyStyles } from '@/theme/typography';
 import { useAppPreference } from '@/hooks/useAppPreference';
@@ -48,8 +46,8 @@ import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useForumStore } from '@/stores/forumStore';
 import type { GoodClassifyItem } from '@/stores/forumStore';
 import { useAuthStore } from '@/stores/authStore';
-import { sign as signAPI, agree as apiAgree, generalTabList, mapProtoThread } from '@/services/api/endpoints';
-import { flattenStyle, relativeTime, formatCount, getAvatarUrl, getLevelColor, buildThreadUrl } from '@/utils';
+import { sign as signAPI, agree as apiAgree, generalTabList, mapProtoThread, checkReportPost } from '@/services/api/endpoints';
+import { flattenStyle, getAvatarUrl, getLevelColor, buildThreadUrl } from '@/utils';
 import { recordForumVisit } from '@/services/storage/visitHistory';
 import { ForumSortType } from '@/types';
 import type { ThreadInfo } from '@/types';
@@ -119,7 +117,7 @@ function parseGeneralThread(item: any, forumName: string, userList: any[]): Thre
 export default function ForumPage() {
   const { name } = useLocalSearchParams<{ name: string }>();
   const insets = useSafeAreaInsets();
-  const { colors } = useThemeColors();
+  const { colors, isDark } = useThemeColors();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const router = useRouter();
 
@@ -147,10 +145,6 @@ export default function ForumPage() {
   const markForumSigned = useForumStore((s) => s.markForumSigned);
 
   const incognitoMode = useAppPreference('incognitoMode', false);
-  const forumSingleColumn = useAppPreference('forumSingleColumn', false);
-  // 卡片风格：'twitter' = 推特圆角卡片（默认，强制单列）；'hero' = 经典双列 Hero 卡
-  const feedCardStyle = useAppPreference('feedCardStyle', 'twitter');
-  const numColumns = feedCardStyle === 'twitter' ? 1 : (forumSingleColumn ? 1 : 2);
 
   // 头部时间字段：热门(REPLY_TIME) 显示最后回复时间；最新(SEND_TIME) 显示发帖时间；
   // 精品按 forumSortType（默认排序偏好：按回复时间/按发贴时间）；自定义 Tab 兜底回复时间。
@@ -161,7 +155,7 @@ export default function ForumPage() {
       : forumSortType === ForumSortType.SEND_TIME ? 'create' : 'last';
 
   const customTabs = useMemo(
-    () => (Array.isArray(navTabInfo) ? navTabInfo : EMPTY_TABS),
+    () => (Array.isArray(navTabInfo) ? navTabInfo : (navTabInfo as any)?.tab ?? EMPTY_TABS),
     [navTabInfo],
   );
   const allSegments = useMemo(
@@ -180,19 +174,20 @@ export default function ForumPage() {
       const data = await generalTabList(params.fid, {
         pn: page,
         rn: 30,
-        tabCode: params.tab.tabCode,
+        // GeneralTabListRequestData 只有 tabId 字段（无 tabCode，旧代码被 protobuf 静默丢弃）
+        tabId: Number(params.tab.tabId ?? 0),
         tabName: params.tab.tabName,
         tabType: params.tab.tabType,
         sortType: params.tab.sortType,
       }, signal);
-      const rawThreads = data?.threadList ?? data?.thread_list ?? [];
+      const rawThreads = data?.generalList ?? data?.general_list ?? data?.threadList ?? [];
       const userList = data?.userList ?? data?.user_list ?? [];
       const threads: ThreadInfo[] = rawThreads.map((item: any) =>
         parseGeneralThread(item, params.forumName, userList),
       );
       return {
         items: threads,
-        hasMore: (data?.page?.hasMore ?? data?.page?.has_more ?? 0) === 1,
+        hasMore: (data?.hasMore ?? data?.has_more ?? 0) === 1,
         nextPage: page + 1,
       };
     },
@@ -227,6 +222,8 @@ export default function ForumPage() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // loadingMore 的同步镜像（见 handleLoadMore 注释）
+  const loadingMoreRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [fabVisible, setFabVisible] = useState(true);
@@ -445,15 +442,22 @@ export default function ForumPage() {
   }, [isCustomTab, customTabs, currentTab, customPagedLoad, currentForum?.forumId, name, doLoad]);
 
   const handleLoadMore = useCallback(async () => {
-    if (!forumHasMore || loadingMore) return;
+    // 同步守卫：loadingMore 经 setState 异步生效，FlashList 同帧二次 onEndReached
+    // 会拿旧闭包再跑一次 → 同一页重复追加（usePagedList 内已有同款守卫）。
+    if (!forumHasMore || loadingMore || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
-    if (isCustomTab) {
-      const tab = customTabs[currentTab - 3];
-      if (tab) await customPagedLoadMore();
-    } else {
-      await doLoad(forumPage + 1);
+    try {
+      if (isCustomTab) {
+        const tab = customTabs[currentTab - 3];
+        if (tab) await customPagedLoadMore();
+      } else {
+        await doLoad(forumPage + 1);
+      }
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
     }
-    setLoadingMore(false);
   }, [forumHasMore, loadingMore, forumPage, isCustomTab, customTabs, currentTab, customPagedLoadMore, doLoad]);
 
   // ── Follow / Unfollow (with tbs — now fixed in forumStore) ──
@@ -579,8 +583,6 @@ export default function ForumPage() {
   const handleFabPress = useCallback(() => {
     hapticForScene('press');
     animateFab();
-    // 'post' (发帖) was removed together with the /compose feature — the FAB
-    // now falls back to refresh for that preference.
     switch (forumFabFunction) {
       case 'back_to_top':
         flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -588,7 +590,6 @@ export default function ForumPage() {
       case 'hide':
         setFabVisible((v) => !v);
         break;
-      case 'post':
       case 'refresh':
       default:
         handleRefresh();
@@ -640,36 +641,65 @@ export default function ForumPage() {
     } catch {}
   }, []);
 
-  const renderItem = useCallback(({ item, index }: { item: ThreadInfo; index: number }) => {
-    // 推特卡片（默认）：单列圆角卡 + 头部时间跟随排序字段
-    if (feedCardStyle === 'twitter') {
-      return (
-        <StaggeredCard index={index} animateEntry={!hasStaggeredInitialRef.current}>
-          <TweetCard
-            thread={item}
-            variant="forum"
-            timeType={timeType}
-            onImagePress={imageViewer.handleImagePress}
-            onLike={handleCardLike}
-            onShare={handleCardShare}
-          />
-        </StaggeredCard>
-      );
+  // ── 信息流小 × / 菜单：屏蔽作者 + 举报 ──
+  const handleFeedBlockAuthor = useCallback(async (item: ThreadInfo) => {
+    const authorId = item.authorId;
+    if (!authorId) return;
+    try {
+      await BlockManager.addBlockedUser({
+        id: Date.now().toString(),
+        uid: authorId,
+        username: item.authorNameShow || item.authorName || undefined,
+      });
+      hapticForScene('action-success');
+      // 从当前所有分桶移除该作者的帖子（热门/最新/精品都可能在展示
+      // 相应 tab 时各有副本；useBlockFilter 只影响未来渲染，这里即时移除）
+      const st = useForumStore.getState();
+      const rm = (list: ThreadInfo[]) => list.filter((t) => t.authorId !== authorId);
+      useForumStore.setState({
+        latestThreads: rm(st.latestThreads),
+        newestThreads: rm(st.newestThreads),
+        goodThreads: rm(st.goodThreads),
+      });
+    } catch {
+      hapticForScene('action-fail');
     }
+  }, []);
+
+  const handleFeedReport = useCallback(async (item: ThreadInfo) => {
+    try {
+      const url = await checkReportPost(item.id);
+      if (url) {
+        router.push({ pathname: '/webview', params: { url, title: '举报' } });
+      } else {
+        Alert.alert('提示', '当前帖子不支持在线举报');
+      }
+    } catch {
+      hapticForScene('action-fail');
+      Alert.alert('错误', '举报失败');
+    }
+  }, [router]);
+
+  const handleForumMenuAction = useCallback((action: string, item: ThreadInfo) => {
+    if (action === 'block') void handleFeedBlockAuthor(item);
+    else if (action === 'report') void handleFeedReport(item);
+  }, [handleFeedBlockAuthor, handleFeedReport]);
+
+  const renderItem = useCallback(({ item, index }: { item: ThreadInfo; index: number }) => {
+    // 统一卡片：单列 TweetCard，与动态页信息流同款样式
     return (
       <StaggeredCard index={index} animateEntry={!hasStaggeredInitialRef.current}>
-        <View style={[styles.cardOuter, numColumns === 2 && styles.cardOuterGrid]}>
-          <ForumThreadCard
-            item={item}
-            colors={colors}
-            grid={numColumns === 2}
-            onImagePress={imageViewer.handleImagePress}
-            onLike={handleCardLike}
-          />
-        </View>
+        <TweetCard
+          thread={item}
+          timeType={timeType}
+          onMenuAction={handleForumMenuAction}
+          onImagePress={imageViewer.handleImagePress}
+          onLike={handleCardLike}
+          onShare={handleCardShare}
+        />
       </StaggeredCard>
     );
-  }, [feedCardStyle, timeType, colors, handleCardLike, handleCardShare, imageViewer.handleImagePress, numColumns]);
+  }, [timeType, handleCardLike, handleCardShare, imageViewer.handleImagePress, handleForumMenuAction]);
 
   // ── Follow button label ──
   const followBtnLabel = !isLoggedIn
@@ -690,10 +720,8 @@ export default function ForumPage() {
   const threadKeyExtractor = useCallback((item: ThreadInfo) => item.id, []);
   const getItemType = useCallback(
     (item: ThreadInfo) =>
-      feedCardStyle === 'twitter'
-        ? (item.mediaList && item.mediaList.length > 0 ? 'tweet-media' : 'tweet-text')
-        : undefined,
-    [feedCardStyle],
+      item.mediaList && item.mediaList.length > 0 ? 'tweet-media' : 'tweet-text',
+    [],
   );
   const listHeader = useCallback(
     () => (
@@ -876,12 +904,14 @@ export default function ForumPage() {
       selectedClassifyLabel,
       setGoodClassifyId,
       setShowClassifyPicker,
+      forumSortType,
+      handleSortChange,
     ],
   );
   const listEmpty = useCallback(
     () =>
       loaded && visibleThreads.length === 0 ? (
-        <EmptyState title="暂无帖子" subtitle="这个吧还没有帖子" icon="tray" />
+        <EmptyState title="暂无帖子" description="这个吧还没有帖子" icon="tray" />
       ) : null,
     [loaded, visibleThreads.length],
   );
@@ -902,7 +932,7 @@ export default function ForumPage() {
     return (
       <View style={flattenStyle([styles.container, { backgroundColor: colors.background }])}>
         <Stack.Screen options={{ title: `${name}吧`, headerRight }} />
-        <SkeletonList count={6} variant={numColumns === 2 ? 'card' : 'row'} />
+        <SkeletonList count={6} variant="row" />
       </View>
     );
   }
@@ -929,13 +959,11 @@ export default function ForumPage() {
 
       <Animated.View style={[{ flex: 1 }, listAnimatedStyle]}>
       <FlashList
-        key={`forum-list-${numColumns}`}
+        key="forum-list"
         ref={flatListRef}
         data={visibleThreads}
         keyExtractor={threadKeyExtractor}
-        numColumns={numColumns}
         getItemType={getItemType}
-        extraData={feedCardStyle}
         maintainVisibleContentPosition={{ autoscrollToTopThreshold: 100 }}
         renderItem={renderItem}
         ListHeaderComponent={listHeader}
@@ -953,38 +981,41 @@ export default function ForumPage() {
       />
       </Animated.View>
 
-      {/* ── FAB ── */}
+      {/* ── FAB（iOS 26 液态玻璃 + 系统图标着色） ── */}
       {fabVisible && (
       <Animated.View style={[styles.fabContainer, { bottom: insets.bottom + Spacing.md }, fabAnimatedStyle]}>
-        <Pressable
-          onPress={handleFabPress}
-          style={({ pressed }) => [
-            styles.fab,
-            {
-              backgroundColor: colors.primary,
-              opacity: pressed ? 0.85 : 1,
-              transform: [{ scale: pressed ? 0.93 : 1 }],
-              shadowColor: colors.primary,
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.35,
-              shadowRadius: 12,
-              elevation: 8,
-            },
-          ]}
+        <GlassView
+          borderRadius={Radius.capsule}
+          glassEffectStyle="clear"
+          tintColor={isDark ? 'rgba(28,28,30,0.18)' : 'rgba(255,255,255,0.18)'}
+          style={styles.fab}
         >
-          <SymbolView
-            name={
-              forumFabFunction === 'back_to_top'
-                ? 'arrow.up'
-                : forumFabFunction === 'hide'
-                  ? 'eye.slash'
-                  : 'arrow.clockwise'
-            }
-            size={22}
-            tintColor="#FFFFFF"
-            weight="semibold"
-          />
-        </Pressable>
+          <Pressable
+            onPress={handleFabPress}
+            style={({ pressed }) => ({
+              flex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.7 : 1,
+              transform: [{ scale: pressed ? 0.9 : 1 }],
+            })}
+            accessibilityRole="button"
+            accessibilityLabel={forumFabFunction === 'back_to_top' ? '回到顶部' : forumFabFunction === 'hide' ? '隐藏悬浮按钮' : '刷新'}
+          >
+            <SymbolView
+              name={
+                forumFabFunction === 'back_to_top'
+                  ? 'arrow.up'
+                  : forumFabFunction === 'hide'
+                    ? 'eye.slash'
+                    : 'arrow.clockwise'
+              }
+              size={22}
+              tintColor={colors.text}
+              weight="semibold"
+            />
+          </Pressable>
+        </GlassView>
       </Animated.View>
       )}
 
@@ -1026,220 +1057,17 @@ export default function ForumPage() {
 }
 
 // ────────────────────────────────────────────────────────────
-// Forum Thread Card
-// 有图：Hero 大图 + 底部渐变遮罩 + 白色文字叠加
-// ────────────────────────────────────────────────────────────
-// Card shadows use the shared Shadows.card token from @/theme.
-// ────────────────────────────────────────────────────────────
-// ForumThreadCard — 统一双层卡片结构 (iOS 26+ HeroUI)
-//   外层 cardWrapper: borderRadius + shadow (not clipped by overflow:hidden)
-//   内层 cardInner:   borderRadius + overflow:hidden + backgroundColor
-//   有图 → heroContent (full-bleed image + gradient overlay)
-//   无图 → textContent (author + title + abstract + action bar)
+// Styles
 // ────────────────────────────────────────────────────────────
 
-const ForumThreadCard = React.memo(function ForumThreadCard({
-  item, colors, grid = false, onLike,
-}: {
-  item: ThreadInfo; colors: any; grid?: boolean;
-  onImagePress: (images: string[], index: number) => void;
-  onLike?: (item: ThreadInfo) => void;
-}) {
-  const hideMedia = useAppPreference('hideMedia');
-  const hasMedia = item.mediaList && item.mediaList.length > 0;
-  const mediaCount = item.mediaList?.length ?? 0;
-  const mediaHidden = hideMedia === true;
-  const showHero = !!hasMedia && !mediaHidden;
-
-  const handleShare = useCallback(async () => {
-    hapticForScene('press');
-    try {
-      const url = buildThreadUrl(item.id);
-      await Share.share({ message: url, url }, { dialogTitle: '分享帖子' });
-    } catch {}
-  }, [item.id]);
-
-  // Press feedback: scale + fade driven by the PRESS_ENTER spring (replaces
-  // the previous static opacity-only press style).
-  const pressScale = useSharedValue(1);
-  const pressOpacity = useSharedValue(1);
-  const pressStyle = useAnimatedStyle(() => ({
-    opacity: pressOpacity.value,
-    transform: [{ scale: pressScale.value }],
-  }));
-  const handlePressIn = useCallback(() => {
-    pressScale.value = withSpring(0.97, PRESS_ENTER);
-    pressOpacity.value = withTiming(0.88, { duration: DURATION.exit });
-  }, [pressScale, pressOpacity]);
-  const handlePressOut = useCallback(() => {
-    pressScale.value = withSpring(1, PRESS_ENTER);
-    pressOpacity.value = withTiming(1, { duration: DURATION.enter });
-  }, [pressScale, pressOpacity]);
-
-  return (
-    <Link href={{ pathname: '/thread/[id]', params: { id: item.id } }} push asChild>
-      <Pressable
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-      >
-        <Animated.View style={[styles.cardWrapper, grid && styles.cardWrapperGrid, pressStyle]}>
-        <View style={[styles.cardInner, grid && styles.cardInnerGrid, { backgroundColor: colors.card }]}>
-          {showHero ? (
-            /* == 有图：全幅图片 + 底部渐变遮罩 + 白色文字叠加 == */
-            <View style={styles.heroContent}>
-              <Image
-                source={{ uri: item.mediaList![0].src }}
-                style={StyleSheet.absoluteFill}
-                contentFit="cover"
-                transition={200}
-                recyclingKey={item.mediaList![0].src}
-              />
-
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.7)']}
-                locations={[0, 1]}
-                style={styles.heroGradient}
-              />
-
-              {item.isVideo && (
-                <View style={styles.heroVideoBadge}>
-                  <SymbolView name="play.fill" size={14} tintColor="#FFFFFF" />
-                </View>
-              )}
-
-              <View style={styles.heroOverlayText}>
-                {item.title ? (
-                  <Text style={styles.heroOverlayTitle} numberOfLines={2}>
-                    {item.isTop && <Text style={{ color: '#FFD60A', fontWeight: '700' }}>置顶 </Text>}
-                    {item.isGood && <Text style={{ color: '#FFD60A', fontWeight: '700' }}>精品 </Text>}
-                    {item.title}
-                  </Text>
-                ) : null}
-                <Text style={styles.heroOverlayMeta} numberOfLines={1}>
-                  {item.authorNameShow || item.authorName}
-                  {'  ·  '}
-                  {formatCount(item.replyNum)}回复
-                  {mediaCount > 1 ? `  ·  ${mediaCount}图` : ''}
-                </Text>
-              </View>
-            </View>
-          ) : (
-            /* == 无图：作者 + 标题 + 摘要 + 操作栏 == */
-            <View style={styles.textContent}>
-              {/* -- Author Header Row -- */}
-              <View style={styles.cardAuthorRow}>
-                <Avatar
-                  source={item.authorPortrait || undefined}
-                  initials={(item.authorNameShow || item.authorName)?.charAt(0)}
-                  size={36}
-                />
-                <View style={styles.cardAuthorInfo}>
-                  <View style={styles.cardAuthorNameRow}>
-                    <Text style={[styles.cardAuthorName, { color: colors.text }]} numberOfLines={1}>
-                      {item.authorNameShow || item.authorName}
-                    </Text>
-                    {item.authorLevelId > 0 && (
-                      <View style={[styles.cardLevelBadge, { backgroundColor: getLevelColor(item.authorLevelId) }]}>
-                        <Text style={styles.cardLevelBadgeText}>Lv.{item.authorLevelId}</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={[styles.cardTime, { color: colors.textTertiary }]}>
-                    {relativeTime(item.lastTime)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* -- Title -- */}
-              {item.title ? (
-                <Text style={[styles.threadTitle, { color: colors.text }]} numberOfLines={2}>
-                  {item.isTop && <Text style={{ color: colors.error, fontWeight: '700' }}>置顶 </Text>}
-                  {item.isGood && <Text style={{ color: colors.warning, fontWeight: '700' }}>精品 </Text>}
-                  {item.title}
-                </Text>
-              ) : null}
-
-              {/* -- Abstract / preview -- */}
-              {item.abstract ? (
-                <Text style={[styles.threadAbstract, { color: colors.textSecondary }]} numberOfLines={4}>
-                  {item.abstract}
-                </Text>
-              ) : null}
-
-              {/* Video placeholder (when isVideo but no media) */}
-              {item.isVideo && (!hasMedia || mediaHidden) && (
-                <View style={[styles.videoPlaceholder, { backgroundColor: colors.surfaceSecondary }]}>
-                  <SymbolView name="play.rectangle.fill" size={28} tintColor={colors.primary} />
-                  <Text style={[styles.videoPlaceholderText, { color: colors.primary }]}>视频</Text>
-                </View>
-              )}
-
-              {/* Origin Thread Card */}
-              {item.isShareThread && item.originThreadInfo && (
-                <View style={[styles.originThreadCard, { backgroundColor: colors.surfaceSecondary }]}>
-                  {item.originThreadInfo.title ? (
-                    <Text style={[styles.originThreadTitle, { color: colors.text }]} numberOfLines={1}>
-                      {item.originThreadInfo.title}
-                    </Text>
-                  ) : null}
-                  {item.originThreadInfo.content ? (
-                    <Text style={[styles.originThreadContent, { color: colors.textSecondary }]} numberOfLines={2}>
-                      {item.originThreadInfo.content}
-                    </Text>
-                  ) : null}
-                  {item.originThreadInfo.forumName ? (
-                    <View style={[styles.originForumChip, { backgroundColor: colors.surfaceTertiary || colors.surfaceSecondary }]}>
-                      <Text style={[styles.originForumChipText, { color: colors.textTertiary }]}>
-                        {item.originThreadInfo.forumName}吧
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              )}
-
-              {/* -- Action bar: share | like -- */}
-              <View style={[styles.actionBar, { borderTopColor: colors.divider }]}>
-                <Pressable style={styles.actionBtn} onPress={() => onLike?.(item)}>
-                  <SymbolView
-                    name={item.hasAgree ? 'heart.fill' : 'heart'}
-                    size={14}
-                    tintColor={item.hasAgree ? '#FF3B30' : colors.textTertiary}
-                  />
-                  <Text style={[styles.actionText, { color: item.hasAgree ? '#FF3B30' : colors.textTertiary }]}>
-                    {item.zanNum && item.zanNum > 0 ? formatCount(item.zanNum) : '赞'}
-                  </Text>
-                </Pressable>
-                <Pressable style={styles.actionBtn} onPress={handleShare}>
-                  <SymbolView name="arrowshape.turn.up.right" size={14} tintColor={colors.textTertiary} />
-                  <Text style={[styles.actionText, { color: colors.textTertiary }]}>
-                    {item.shareNum && item.shareNum > 0 ? formatCount(item.shareNum) : '分享'}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
-        </View>
-        </Animated.View>
-      </Pressable>
-    </Link>
-  );
-});
-
-// ────────────────────────────────────────────────────────────
-// ClassifyPickerSheet — native bottom sheet (audit #15)
-// ────────────────────────────────────────────────────────────
-// 评估（P2）：曾考虑换成原生 Picker pickerStyle('menu')（项目 settings/search
-// 已有用法），但保留 bottom sheet。原因：
-//   1. goodClassifyId 是 `string | null`（"全部"=null），SwiftUI Picker 的
-//      selection 需要非空字符串，需哨兵值映射，破坏 setGoodClassifyId(null) 契约。
-//   2. 分类过滤是页面内过滤控件，贴吧分类列表可能较长，bottom sheet 可滚动，
-//      比 menu 弹层更适合该场景。
-//   3. 项目内 pickerStyle('menu') 均用于 Form/Section 设置表单，非工具栏过滤。
-//   4. 改造需重写 visible/onClose 状态机，回归风险大于收益。
-// ────────────────────────────────────────────────────────────
-
-function ClassifyPickerSheet({
-  visible, onClose, goodClassify, goodClassifyId, setGoodClassifyId, colors,
+// ── 精品分类选择（原生 bottom sheet） ──
+const ClassifyPickerSheet = React.memo(function ClassifyPickerSheet({
+  visible,
+  onClose,
+  goodClassify,
+  goodClassifyId,
+  setGoodClassifyId,
+  colors,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -1248,18 +1076,19 @@ function ClassifyPickerSheet({
   setGoodClassifyId: (id: string | null) => void;
   colors: any;
 }) {
-  const sheetRef = useRef<BottomSheet>(null);
-
-  const handleSelect = useCallback((id: string | null) => {
-    setGoodClassifyId(id);
-    onClose();
-  }, [setGoodClassifyId, onClose]);
+  const handleSelect = useCallback(
+    (classId: string | null) => {
+      hapticForScene('toggle');
+      setGoodClassifyId(classId);
+      onClose();
+    },
+    [setGoodClassifyId, onClose],
+  );
 
   return (
     <BottomSheetComponent
-      ref={sheetRef}
       index={visible ? 0 : -1}
-      snapPoints={['50%', '80%']}
+      snapPoints={['40%']}
       enablePanDownToClose
       onClose={onClose}
     >
@@ -1267,59 +1096,55 @@ function ClassifyPickerSheet({
         style={styles.classifySheetScroll}
         contentContainerStyle={styles.classifySheetContent}
         showsVerticalScrollIndicator={false}
-        bounces
+        bounces={false}
       >
-        <Text style={[styles.menuTitle, { color: colors.text }]}>精品分类</Text>
-        {/* "全部" option */}
+        <Text style={[styles.menuTitle, { color: colors.textSecondary }]}>选择分类</Text>
         <Pressable
-          style={styles.menuItem}
+          style={({ pressed }) => [styles.menuItem, { opacity: pressed ? 0.7 : 1 }]}
           onPress={() => handleSelect(null)}
+          accessibilityRole="button"
+          accessibilityLabel="全部"
         >
-          <SymbolView
-            name={goodClassifyId === null ? 'checkmark' : 'circle'}
-            size={20}
-            tintColor={goodClassifyId === null ? colors.primary : colors.textTertiary}
-          />
-          <Text style={[styles.menuItemText, {
-            color: goodClassifyId === null ? colors.primary : colors.text,
-            fontWeight: goodClassifyId === null ? '700' : '500',
-          }]}>
-            全部
-          </Text>
+          <Text style={[styles.menuItemText, { color: colors.text }]}>全部</Text>
+          <View style={{ flex: 1 }} />
+          {goodClassifyId === null && (
+            <SymbolView name="checkmark" size={16} weight="semibold" tintColor={colors.primary} />
+          )}
         </Pressable>
-        {goodClassify.map((c: GoodClassifyItem) => (
-          <Pressable
-            key={c.classId}
-            style={styles.menuItem}
-            onPress={() => handleSelect(c.classId)}
-          >
-            <SymbolView
-              name={goodClassifyId === c.classId ? 'checkmark' : 'circle'}
-              size={20}
-              tintColor={goodClassifyId === c.classId ? colors.primary : colors.textTertiary}
-            />
-            <Text style={[styles.menuItemText, {
-              color: goodClassifyId === c.classId ? colors.primary : colors.text,
-              fontWeight: goodClassifyId === c.classId ? '700' : '500',
-            }]}>
-              {c.className}
-            </Text>
-          </Pressable>
-        ))}
+        {goodClassify.map((c) => {
+          const selected = goodClassifyId === c.classId;
+          return (
+            <Pressable
+              key={c.classId}
+              style={({ pressed }) => [styles.menuItem, { opacity: pressed ? 0.7 : 1 }]}
+              onPress={() => handleSelect(c.classId)}
+              accessibilityRole="button"
+              accessibilityLabel={c.className}
+            >
+              <Text style={[styles.menuItemText, { color: colors.text }]}>{c.className}</Text>
+              <View style={{ flex: 1 }} />
+              {selected && (
+                <SymbolView name="checkmark" size={16} weight="semibold" tintColor={colors.primary} />
+              )}
+            </Pressable>
+          );
+        })}
         <Pressable
-          style={[styles.menuItem, styles.menuCancelItem, { borderTopColor: colors.divider }]}
+          style={({ pressed }) => [
+            styles.menuCancelItem,
+            styles.menuCancelPadding,
+            { opacity: pressed ? 0.7 : 1 },
+          ]}
           onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="取消"
         >
           <Text style={[styles.menuCancelText, { color: colors.textSecondary }]}>取消</Text>
         </Pressable>
       </BottomSheetScrollView>
     </BottomSheetComponent>
   );
-}
-
-// ────────────────────────────────────────────────────────────
-// Styles
-// ────────────────────────────────────────────────────────────
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -1404,138 +1229,6 @@ const styles = StyleSheet.create({
   },
   classifyFilterText: { fontSize: 13, fontWeight: '500' },
 
-  // ── Unified card (双层结构：外层shadow + 内层bg + overflow:hidden) ──
-  cardOuter: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 6,
-  },
-  cardOuterGrid: {
-    flex: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-  },
-  cardWrapper: {
-    borderRadius: Radius.card,
-    ...Shadows.card,
-  },
-  // 双列网格每行等高：FlashList 行内默认 alignItems:stretch，StaggeredCard →
-  // cardOuter(flex:1) 已随行高拉伸；这里补上 cardWrapper/cardInner 的 flex:1，
-  // 让可见卡片背景填满行高，避免行内底部不齐（P2 评估结论）。
-  cardWrapperGrid: {
-    flex: 1,
-  },
-  cardInner: {
-    borderRadius: Radius.card,
-    overflow: 'hidden',
-  },
-  cardInnerGrid: {
-    flex: 1,
-  },
-  heroContent: {
-    height: 240,
-  },
-  textContent: {
-    padding: Spacing.lg,
-  },
-  threadTitle: { fontSize: 18, fontWeight: '700', lineHeight: 26, marginBottom: Spacing.sm, letterSpacing: -0.2 },
-  threadAbstract: { fontSize: 15, lineHeight: 22, marginBottom: Spacing.md, letterSpacing: 0, opacity: 0.85 },
-
-  // ── Hero image overlay styles (card structure handled by cardWrapper/cardInner) ──
-  heroGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '55%',
-  },
-  heroVideoBadge: {
-    position: 'absolute',
-    top: Spacing.md,
-    left: Spacing.md,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroOverlayText: {
-    position: 'absolute',
-    left: 14,
-    right: 14,
-    bottom: 14,
-  },
-  heroOverlayTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    lineHeight: 24,
-    marginBottom: Spacing.xs,
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  heroOverlayMeta: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.85)',
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-
-  // ── Video indicator ──
-  videoPlaceholder: {
-    borderRadius: Radius.input,
-    paddingVertical: 18,
-    paddingHorizontal: Spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  videoPlaceholderText: { fontSize: 14, fontWeight: '600' },
-
-  // ── Origin thread card ──
-  originThreadCard: {
-    borderRadius: Radius.input,
-    padding: 10,
-    marginBottom: Spacing.md,
-  },
-  originThreadTitle: { fontSize: 13, fontWeight: '700', lineHeight: 18, marginBottom: Spacing.xs },
-  originThreadContent: { ...typographyStyles.footnote, marginBottom: Spacing.sm },
-  originForumChip: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.chip,
-  },
-  originForumChipText: { fontSize: 11, fontWeight: '500' },
-
-  // ── Action bar ──
-  // borderTopColor 使用 colors.divider（静态 StyleSheet 无法取主题色，见调用处内联）。
-  actionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  actionText: { fontSize: 13, fontWeight: '500' },
-
-  // ── Card author row ──
-  cardAuthorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  cardAuthorInfo: { flex: 1, marginLeft: 10 },
-  cardAuthorNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  cardAuthorName: { ...typographyStyles.subheadBold, flexShrink: 1 },
-  cardLevelBadge: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
-  cardLevelBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 14 },
-  cardTime: { ...typographyStyles.caption1, marginTop: 2 },
-
-  // ── FAB ──
-  // bottom 由调用处传入 insets.bottom + 12（对齐 thread/[id].tsx 浮动栏），
-  // 避免全面屏 Home Indicator 遮挡。静态样式只保留 right。
   fabContainer: { position: 'absolute', right: Spacing.xl, zIndex: 100 },
   fab: {
     width: 52, height: 52, borderRadius: Radius.capsule,
@@ -1562,6 +1255,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
     marginTop: Spacing.xs,
+  },
+  menuCancelPadding: {
+    paddingVertical: 14,
   },
   menuCancelText: { ...typographyStyles.calloutBold },
 });

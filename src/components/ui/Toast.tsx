@@ -1,13 +1,11 @@
-/* eslint-disable react-hooks/immutability -- Reanimated shared values are mutable refs; React Compiler cannot model them. */
+ 
 // ============================================================
 // TiebaLite React Native - Lightweight Toast Notification
 // Auto-dismissing, non-intrusive popup messages
 // ============================================================
 
-import React, {
-  createContext,
+import {
   useCallback,
-  useContext,
   useEffect,
   useImperativeHandle,
   forwardRef,
@@ -187,35 +185,6 @@ export const Toast = forwardRef<ToastRef>(function Toast(_props, ref) {
     </Animated.View>
   );
 });
-
-// ---------- Toast Context for app-wide usage ----------
-interface ToastContextValue {
-  toast: React.RefObject<ToastRef | null>;
-}
-
-export const ToastContext = createContext<ToastContextValue | null>(null);
-
-export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const toastRef = React.useRef<ToastRef>(null!);
-
-  return (
-    <ToastContext.Provider value={{ toast: toastRef }}>
-      {children}
-      <Toast ref={toastRef} />
-    </ToastContext.Provider>
-  );
-}
-
-export function useToast() {
-  const ctx = useContext(ToastContext);
-  if (!ctx) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return {
-    show: (options: ToastOptions) => ctx.toast.current?.show(options),
-    hide: () => ctx.toast.current?.hide(),
-  };
-}
 
 // ---------- Styles ----------
 const styles = StyleSheet.create({

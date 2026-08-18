@@ -41,18 +41,17 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Avatar } from '@/components/ui/Avatar';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
-import { PRESS_ENTER, PRESS_EXIT, MOMENTUM } from '@/theme/springs';
+import { MOMENTUM } from '@/theme/springs';
 import { Radius, Shadows } from '@/theme/spacing';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useAppPreference } from '@/hooks/useAppPreference';
 import { formatCount, relativeTime } from '@/utils';
-import { thumbnailUrl, THUMB_CARD } from '@/utils/thumbnail';
+import { thumbnailUrl, THUMB_POST } from '@/utils/thumbnail';
 import type { ThreadInfo } from '@/types';
 
 // ── 设计常量（推特 timeline 规格） ──
@@ -60,62 +59,55 @@ const AVATAR_SIZE = 44;
 const AVATAR_GAP = 10;
 /** 内容列缩进：与名字列对齐（推特 timeline 布局） */
 const CONTENT_INDENT = AVATAR_SIZE + AVATAR_GAP;
-const CARD_RADIUS = 16;
+/** 卡片圆角：统一 Radius.card（与 FeedCard/PostCard 卡片容器一致） */
+const CARD_RADIUS = Radius.card;
 /** 长文截断行数（推特 Show more 阈值） */
 const COLLAPSE_LINES = 6;
-/** 媒体高度/宽度 钳制区间（推特约 2:3 ~ 4:3） */
-const MEDIA_RATIO_MIN = 2 / 3;
-const MEDIA_RATIO_MAX = 4 / 3;
+/** 正文行高（标题 22 / 摘要 21，测量阈值取标题行高） */
+const BODY_LINE_HEIGHT = 22;
+/** 超过该高度判定为可截断长文（≈6 行）；onLayout 实测整段自然高度，避免
+    numberOfLines + onTextLayout 在 iOS 上对短文误报"可展开"（点了没变化的根因） */
+const COLLAPSE_MEASURE_THRESHOLD = COLLAPSE_LINES * BODY_LINE_HEIGHT + 1;
+/** 媒体区高度钳制：长图全显不截断（contain），超高则限制高度防撑爆卡片 */
+const MEDIA_HEIGHT_MIN = 200;
+const MEDIA_HEIGHT_MAX = 520;
 const LIKE_COLOR = '#FF3B5C';
 
-export type TweetCardMenuAction = 'dislike' | 'block' | 'copy-title';
+export type TweetCardMenuAction = 'dislike' | 'block' | 'copy-title' | 'report';
 
 export interface TweetCardProps {
   thread: ThreadInfo;
-  /** feed = 动态页（显示吧名 chip + 更多菜单）；forum = 吧内列表（不重复显示吧名） */
-  variant?: 'feed' | 'forum';
   /** 头部时间字段：create = 发帖时间（按发帖时间排序/动态流）；last = 最后回复时间（按回复时间排序） */
   timeType?: 'create' | 'last';
+  /** 右上角 × 的菜单项（默认 屏蔽作者/举报；动态流传扩展项保留 不感兴趣/复制标题） */
+  closeMenuOptions?: ('dislike' | 'block' | 'copy-title' | 'report')[];
   onImagePress?: (images: string[], index: number) => void;
   onLike?: (thread: ThreadInfo) => void;
   onShare?: (thread: ThreadInfo) => void;
-  /** 提供时显示右上角「···」更多菜单（不感兴趣/屏蔽作者/复制标题），回传所属帖子 */
+  /** 提供时显示右上角「×」菜单，回传所属帖子 */
   onMenuAction?: (action: TweetCardMenuAction, thread: ThreadInfo) => void;
 }
 
 const TweetCard = React.memo(function TweetCard({
   thread,
-  variant = 'feed',
   timeType = 'create',
+  closeMenuOptions,
   onImagePress,
   onLike,
   onShare,
   onMenuAction,
 }: TweetCardProps) {
-  const { colors, isDark } = useThemeColors();
+  const { colors } = useThemeColors();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
-  const { reduceMotion } = useReducedMotion();
   const hideMedia = useAppPreference('hideMedia');
 
   // 卡片内容宽度：屏宽 - 列表左右边距 16*2 - 卡片左右 padding 12*2
   const contentWidth = screenWidth - 16 * 2 - 12 * 2;
-
-  // ── 整卡按压反馈（scale 0.98 弹簧） ──
-  const scale = useSharedValue(1);
-  const pressStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-  const handlePressIn = useCallback((e: GestureResponderEvent) => {
-    e.stopPropagation?.();
-    if (reduceMotion) return;
-    scale.value = withSpring(0.98, PRESS_ENTER);
-  }, [scale, reduceMotion]);
-  const handlePressOut = useCallback((e: GestureResponderEvent) => {
-    e.stopPropagation?.();
-    if (reduceMotion) return;
-    scale.value = withSpring(1, PRESS_EXIT);
-  }, [scale, reduceMotion]);
+  // 媒体区位于内容列（marginLeft = CONTENT_INDENT 54pt）内：
+  // 宽度必须再减去缩进，否则媒体右边界 = 缩进 + 整卡内容宽 > 屏宽，
+  // 右侧（含圆角）被溢出裁掉（真机实测"图片右侧被截断/看不出右圆角"）。
+  const mediaWidth = Math.max(0, contentWidth - CONTENT_INDENT);
 
   // ── 导航 ──
   const handleCardPress = useCallback(() => {
@@ -130,13 +122,6 @@ const TweetCard = React.memo(function TweetCard({
     router.push(`/user/${thread.authorId}`);
   }, [router, thread.authorId]);
 
-  const handleForumChipPress = useCallback((e: GestureResponderEvent) => {
-    e.stopPropagation?.();
-    if (!thread.forumName) return;
-    hapticForScene('press');
-    router.push(`/forum/${encodeURIComponent(thread.forumName)}`);
-  }, [router, thread.forumName]);
-
   // ── 长文展开（回收时按 thread.id 重置） ──
   const [expanded, setExpanded] = useState(false);
   const [truncatable, setTruncatable] = useState(false);
@@ -146,8 +131,12 @@ const TweetCard = React.memo(function TweetCard({
     setTruncatable(false);
   }, [thread.id]);
 
-  const handleTextLayout = useCallback((e: any) => {
-    if (e.nativeEvent?.lines?.length >= COLLAPSE_LINES) {
+  // 用 onLayout 实测整段文本的自然高度判断是否超过 6 行：
+  // iOS 上 numberOfLines + onTextLayout 会把截断后的可见行数报上来（短文
+  // 恰好 6 行/截断后 6 行区分不出来），导致短文误显示"显示更多"、点击后内容
+  // 不变。这里在未截断时先渲染完整文本量一次高度，超过阈值才启用截断态。
+  const handleBodyLayout = useCallback((e: any) => {
+    if (e.nativeEvent?.layout?.height > COLLAPSE_MEASURE_THRESHOLD) {
       setTruncatable(true);
     }
   }, []);
@@ -193,18 +182,21 @@ const TweetCard = React.memo(function TweetCard({
     router.push(`/thread/${thread.id}`);
   }, [router, thread.id]);
 
-  // ── 右上角「···」更多菜单：原生 ActionSheet（SwiftUI Menu 嵌 RN 树在
-  // iOS 26 上点击无响应——与吧页三点菜单同因，见 forum/[name].tsx）──
-  const handleMenuPress = useCallback((e: GestureResponderEvent) => {
+  // ── 右上角小 ×：按 closeMenuOptions 组装（默认 屏蔽/举报）──
+  const handleClosePress = useCallback((e: GestureResponderEvent) => {
     e.stopPropagation?.();
     hapticForScene('press');
+    const options = closeMenuOptions ?? ['block', 'report'];
+    const items: { title: string; action: TweetCardMenuAction }[] = [];
+    if (options.includes('dislike')) items.push({ title: '不感兴趣', action: 'dislike' });
+    if (options.includes('block')) items.push({ title: '屏蔽作者', action: 'block' });
+    if (options.includes('report')) items.push({ title: '举报', action: 'report' });
+    if (options.includes('copy-title')) items.push({ title: '复制标题', action: 'copy-title' });
     Alert.alert(thread.title || '帖子', undefined, [
-      { text: '不感兴趣', onPress: () => onMenuAction?.('dislike', thread) },
-      { text: '屏蔽作者', onPress: () => onMenuAction?.('block', thread) },
-      { text: '复制标题', onPress: () => onMenuAction?.('copy-title', thread) },
+      ...items.map((it) => ({ text: it.title, onPress: () => onMenuAction?.(it.action, thread) })),
       { text: '取消', style: 'cancel' as const },
     ]);
-  }, [thread, onMenuAction]);
+  }, [thread, onMenuAction, closeMenuOptions]);
 
   // ── 头部文案 ──
   const displayName = thread.authorNameShow || thread.authorName || '吧友';
@@ -213,14 +205,12 @@ const TweetCard = React.memo(function TweetCard({
   const timeValue = timeType === 'last' ? thread.lastTime : thread.createTime;
   const timeText = timeValue ? relativeTime(timeValue) : '';
 
-  const cardBorderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const cardBorderColor = colors.borderCard;
 
   return (
-    <Animated.View style={[styles.cardWrap, pressStyle]}>
+    <View style={styles.cardWrap}>
       <Pressable
         onPress={handleCardPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
         style={[styles.card, { backgroundColor: colors.card, borderColor: cardBorderColor }, Shadows.card]}
         accessibilityRole="button"
         accessibilityLabel={thread.title || '帖子'}
@@ -250,39 +240,32 @@ const TweetCard = React.memo(function TweetCard({
                 </Text>
               ) : null}
             </View>
-            {/* feed 变体：吧名 chip（点击进吧） */}
-            {variant === 'feed' && thread.forumName ? (
-              <Pressable onPress={handleForumChipPress} onPressIn={stopPropagation} onPressOut={stopPropagation} hitSlop={4}>
-                <Text style={[styles.forumChip, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {thread.forumName}吧
-                </Text>
-              </Pressable>
-            ) : null}
           </View>
           {onMenuAction ? (
+            /* 右上角小 ×（屏蔽/举报，按 closeMenuOptions 扩展） */
             <Pressable
-              onPress={handleMenuPress}
+              onPress={handleClosePress}
               onPressIn={stopPropagation}
               onPressOut={stopPropagation}
-              style={styles.menuButton}
+              style={styles.closeButton}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="更多操作"
+              accessibilityLabel="屏蔽或举报"
             >
-              <SymbolView name="ellipsis" size={16} weight="bold" tintColor={colors.textTertiary} />
+              <SymbolView name="xmark" size={13} weight="bold" tintColor={colors.textTertiary} />
             </Pressable>
           ) : null}
         </View>
 
         {/* ── 内容列（与名字列对齐） ── */}
         <View style={styles.contentCol}>
-          {/* 正文：标题(粗体) + 摘要 同一块，超行截断 + 渐隐 + 显示更多 */}
+          {/* 正文：标题(粗体) + 摘要 同一块，超行截断 + 显示更多（无背景） */}
           {thread.title || thread.abstract ? (
             <View>
               <Text
                 style={[styles.bodyText, { color: colors.text }]}
-                numberOfLines={expanded ? undefined : COLLAPSE_LINES}
-                onTextLayout={expanded ? undefined : handleTextLayout}
+                onLayout={truncatable || expanded ? undefined : handleBodyLayout}
+                numberOfLines={truncatable && !expanded ? COLLAPSE_LINES : undefined}
               >
                 {thread.title ? (
                   <Text style={styles.bodyTitle}>
@@ -297,14 +280,13 @@ const TweetCard = React.memo(function TweetCard({
                 ) : null}
               </Text>
               {truncatable && !expanded ? (
-                <LinearGradient
-                  colors={['transparent', colors.card]}
-                  style={styles.textFade}
-                  pointerEvents="none"
-                />
-              ) : null}
-              {truncatable && !expanded ? (
-                <Pressable onPress={handleShowMore} onPressIn={stopPropagation} onPressOut={stopPropagation} hitSlop={6}>
+                <Pressable
+                  onPress={handleShowMore}
+                  onPressIn={stopPropagation}
+                  onPressOut={stopPropagation}
+                  hitSlop={6}
+                  style={styles.showMoreBtn}
+                >
                   <Text style={[styles.showMore, { color: colors.primary }]}>显示更多</Text>
                 </Pressable>
               ) : null}
@@ -316,7 +298,7 @@ const TweetCard = React.memo(function TweetCard({
             <MediaPager
               images={images.map((m) => ({ src: m.src, originSrc: m.originSrc || m.src, width: m.width, height: m.height }))}
               videoPoster={images.length === 0 ? videoPoster : undefined}
-              width={contentWidth}
+              width={mediaWidth}
               recycleKey={thread.id}
               onImagePress={handleImagePress}
               onFallbackPress={handleCardPress}
@@ -382,7 +364,7 @@ const TweetCard = React.memo(function TweetCard({
           </View>
         </View>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 });
 
@@ -486,11 +468,12 @@ const MediaPager = React.memo(function MediaPager({
     scrollRef.current?.scrollTo?.({ x: 0, animated: false });
   }, [recycleKey, scrollX]);
 
+  // 按首图原始宽高比计算高度（宽度固定）→ 图片完整显示不截断；
+  // 超高（竖长截图）钳制在 MEDIA_HEIGHT_MAX 内，配合 contain 防越界。
   const firstRatio = images.length > 0
     ? (images[0].height > 0 && images[0].width > 0 ? images[0].height / images[0].width : 1)
     : 1;
-  const ratio = Math.min(MEDIA_RATIO_MAX, Math.max(MEDIA_RATIO_MIN, firstRatio));
-  const mediaHeight = Math.round(width * ratio);
+  const mediaHeight = Math.round(clamp(width / Math.max(firstRatio, 0.01), MEDIA_HEIGHT_MIN, MEDIA_HEIGHT_MAX));
   const placeholderBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
 
   const onScroll = useAnimatedScrollHandler((e) => {
@@ -506,7 +489,7 @@ const MediaPager = React.memo(function MediaPager({
   if (images.length <= 1) {
     const uri = images[0]?.src || videoPoster;
     if (!uri) return null;
-    const thumb = thumbnailUrl(uri, THUMB_CARD);
+    const thumb = thumbnailUrl(uri, THUMB_POST);
     const isVideo = !images[0] && !!videoPoster;
     return (
       <View style={[styles.mediaWrap, { width, height: mediaHeight, backgroundColor: placeholderBg }]}>
@@ -520,7 +503,7 @@ const MediaPager = React.memo(function MediaPager({
           <Image
             source={{ uri: thumb }}
             style={{ width, height: mediaHeight }}
-            contentFit="cover"
+            contentFit="contain"
             cachePolicy="memory-disk"
             transition={200}
             recyclingKey={thumb}
@@ -549,7 +532,7 @@ const MediaPager = React.memo(function MediaPager({
         nestedScrollEnabled
       >
         {images.map((img, i) => {
-          const thumb = thumbnailUrl(img.src, THUMB_CARD);
+          const thumb = thumbnailUrl(img.src, THUMB_POST);
           return (
             <Pressable
               key={`${recycleKey}-${i}`}
@@ -562,7 +545,7 @@ const MediaPager = React.memo(function MediaPager({
               <Image
                 source={{ uri: thumb }}
                 style={{ width, height: mediaHeight }}
-                contentFit="cover"
+                contentFit="contain"
                 cachePolicy="memory-disk"
                 transition={200}
                 recyclingKey={thumb}
@@ -639,23 +622,12 @@ const styles = StyleSheet.create({
   time: {
     fontSize: 15,
   },
-  forumChip: {
-    fontSize: 13,
-    fontWeight: '500',
-    alignSelf: 'flex-start',
-  },
-  menuButton: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
   // ── 内容列（与名字列对齐） ──
   contentCol: {
     marginLeft: CONTENT_INDENT,
-    marginTop: 6,
-    gap: 8,
+    marginTop: 2,
+    gap: 6,
   },
   bodyText: {
     fontSize: 15,
@@ -666,18 +638,22 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: '700',
   },
-  textFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 28,
+  showMoreBtn: {
+    marginTop: 2,
   },
   showMore: {
     fontSize: 15,
     fontWeight: '600',
     paddingVertical: 2,
     alignSelf: 'flex-start',
+  },
+  closeButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(128,128,128,0.14)',
   },
 
   // ── 媒体 ──

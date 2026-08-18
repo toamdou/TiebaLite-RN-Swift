@@ -1,13 +1,19 @@
-import { useCallback, useState } from 'react';
-import { ActivityIndicator } from 'react-native';
-import { Form, Section, Toggle, Text, Slider } from '@expo/ui/swift-ui';
+import { useCallback } from 'react';
+import { useColorScheme } from 'react-native';
+import { Form, Section, Toggle, Text, Picker, ProgressView } from '@expo/ui/swift-ui';
+import { progressViewStyle, tag, tint } from '@expo/ui/swift-ui/modifiers';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { usePreferencesStore } from '@/stores/preferencesStore';
+import { useThemeColors } from '@/theme/ThemeContext';
 
-const FONT_SCALE_MIN = 0.8;
-const FONT_SCALE_MAX = 1.5;
-const FONT_SCALE_STEP = 0.05;
+/** 阅读字号档位（乘数，作用于帖子正文字号） */
+const FONT_SCALE_OPTIONS: { label: string; value: string }[] = [
+  { label: '小', value: '0.9' },
+  { label: '标准', value: '1' },
+  { label: '大', value: '1.15' },
+  { label: '特大', value: '1.3' },
+];
 
 export default function DisplaySettingsPage() {
   const hydrated = usePreferencesStore((s) => s.hasHydrated);
@@ -18,9 +24,10 @@ export default function DisplaySettingsPage() {
 
 /** 偏好水合完成前的轻量加载占位 */
 function DisplayHydratedPlaceholder() {
+  const { colors } = useThemeColors();
   return (
     <ThemedHost style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <ActivityIndicator size="large" color="#2563EB" />
+      <ProgressView modifiers={[progressViewStyle('circular'), tint(colors.primary)]} />
     </ThemedHost>
   );
 }
@@ -28,31 +35,79 @@ function DisplayHydratedPlaceholder() {
 function DisplaySettingsForm() {
   const preferences = usePreferencesStore((s) => s.preferences);
   const setPreference = usePreferencesStore((s) => s.setPreference);
-  const [fontScale, setFontScaleState] = useState(preferences.fontScale);
+  const systemIsDark = useColorScheme() === 'dark';
 
-  const handleFontScaleChange = useCallback((value: number) => {
-    setFontScaleState(value);
-  }, []);
-
-  const handleFontScaleCommit = useCallback((isEditing: boolean) => {
-    if (!isEditing) {
-      setPreference('fontScale', fontScale);
+  const handleFollowSystemChange = useCallback((v: boolean) => {
+    hapticForScene('toggle');
+    setPreference('followSystemDarkMode', v);
+    // 关闭"跟随系统"时，立即以当前系统外观作为手动模式的初值，
+    // 避免用户一关掉跟随就白屏/黑屏跳变。
+    if (!v) {
+      setPreference('darkMode', systemIsDark);
     }
-  }, [fontScale, setPreference]);
+  }, [setPreference, systemIsDark]);
+
+  // 常驻「深色模式」开关：跟随系统时显示当前系统外观（系统变深即同步为开）；
+  // 手动开启则退出跟随系统，进入手动模式。
+  const effectiveDark = preferences.followSystemDarkMode
+    ? systemIsDark
+    : preferences.darkMode;
+
+  const handleDarkModeChange = useCallback((v: boolean) => {
+    hapticForScene('toggle');
+    setPreference('darkMode', v);
+    if (preferences.followSystemDarkMode) {
+      setPreference('followSystemDarkMode', false);
+    }
+  }, [preferences.followSystemDarkMode, setPreference]);
+
+  const handleFontScaleChange = useCallback((v: string | number | null) => {
+    hapticForScene('toggle');
+    const scale = parseFloat(String(v));
+    if (!Number.isNaN(scale)) setPreference('fontScale', scale);
+  }, [setPreference]);
 
   return (
     <ThemedHost style={{ flex: 1 }}>
       <Form>
-        <Section title="显示">
-          <Slider
-            label={<Text>阅读字号 {fontScale.toFixed(2)}×</Text>}
-            value={fontScale}
-            min={FONT_SCALE_MIN}
-            max={FONT_SCALE_MAX}
-            step={FONT_SCALE_STEP}
-            onValueChange={handleFontScaleChange}
-            onEditingChanged={handleFontScaleCommit}
-          />
+        <Section
+          title="外观"
+          footer={<Text>「深色模式」在跟随系统时随系统自动同步；手动切换后即退出跟随。</Text>}
+        >
+          <Toggle
+            label="深色模式"
+            systemImage="moon.fill"
+            isOn={effectiveDark}
+            onIsOnChange={handleDarkModeChange}
+          >
+            <Text>黑底白字；系统变深色时自动跟随开启</Text>
+          </Toggle>
+          <Toggle
+            label="跟随系统外观"
+            systemImage="iphone"
+            isOn={preferences.followSystemDarkMode}
+            onIsOnChange={handleFollowSystemChange}
+          >
+            <Text>界面颜色自动跟随系统浅色 / 深色设置</Text>
+          </Toggle>
+        </Section>
+
+        <Section
+          title="阅读字号"
+          footer={<Text>调整帖子正文与回复的字号，即时生效。</Text>}
+        >
+          <Picker
+            label="正文字号"
+            systemImage="textformat.size"
+            selection={String(preferences.fontScale)}
+            onSelectionChange={handleFontScaleChange}
+          >
+            {FONT_SCALE_OPTIONS.map((opt) => (
+              <Text key={opt.value} modifiers={[tag(opt.value)]}>
+                {opt.label}
+              </Text>
+            ))}
+          </Picker>
         </Section>
 
         <Section title="工具栏选项">
@@ -74,13 +129,6 @@ function DisplaySettingsForm() {
               onIsOnChange={(v) => { hapticForScene('toggle'); setPreference('statusBarFontDark', v); }}
             />
           )}
-        </Section>
-
-        <Section
-          title="外观"
-          footer={<Text>界面颜色跟随系统外观：浅色模式为白底黑字，深色模式为黑底白字。</Text>}
-        >
-          <Text>浅色模式 / 深色模式</Text>
         </Section>
       </Form>
     </ThemedHost>

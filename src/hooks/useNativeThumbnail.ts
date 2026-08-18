@@ -30,7 +30,11 @@ export function useNativeThumbnail(
         height,
         safeUri,
         TIEBA_REFERER,
-      ).catch((error: any) => {
+      ).then((result) => {
+        // 成功路径也释放条目：Map 只做并发去重，不驻留已完成 promise（原生侧已有磁盘缓存）
+        pendingThumbnails.delete(safeUri);
+        return result;
+      }).catch((error: any) => {
         pendingThumbnails.delete(safeUri);
         if (__DEV__) {
           console.warn('[TiebaImageIO] thumbnail failed:', error?.message ?? error);

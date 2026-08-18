@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/immutability -- Reanimated shared values are mutable refs; React Compiler cannot model them. */
 /**
  * Notifications Tab (消息) — SwiftUI 原生实现
  *
@@ -42,14 +41,14 @@ import { useBlockFilter } from '@/hooks/useBlockFilter';
 import { BlockManager } from '@/utils/BlockManager';
 import { relativeTime } from '@/utils';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { PressScale } from '@/components/ui/PressScale';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { DURATION, EASE_OUT, PRESS_ENTER, Spacing, Radius } from '@/theme';
+import { DURATION, EASE_OUT, Spacing, Radius } from '@/theme';
 import { typographyStyles } from '@/theme/typography';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { MessageItem } from '@/types';
@@ -133,32 +132,6 @@ function SegmentFade({ segment, children }: { segment: string; children: React.R
 
   const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return <Animated.View style={[styles.segmentFade, animatedStyle]}>{children}</Animated.View>;
-}
-
-/**
- * 按压反馈：进入用 PRESS_ENTER 弹簧缩放（0.97），释放回 1。
- * 替代原先 opacity-only 的按压态（index/notifications 同步统一）。
- */
-function PressScale({ onPress, children }: { onPress?: () => void; children: React.ReactNode }) {
-  const { reduceMotion } = useReducedMotion();
-  const scale = useSharedValue(1);
-
-  const pressIn = useCallback(() => {
-    if (reduceMotion) return;
-    scale.value = withSpring(0.97, PRESS_ENTER);
-  }, [reduceMotion, scale]);
-
-  const pressOut = useCallback(() => {
-    if (reduceMotion) return;
-    scale.value = withSpring(1, PRESS_ENTER);
-  }, [reduceMotion, scale]);
-
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return (
-    <Animated.View style={animatedStyle}>
-      <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut}>{children}</Pressable>
-    </Animated.View>
-  );
 }
 
 function getSegmentLabel(tab: MessageTab): string {
@@ -529,7 +502,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    borderRadius: 14,
+    borderRadius: Radius.card,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
     position: 'relative',

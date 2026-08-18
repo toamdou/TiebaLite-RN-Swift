@@ -94,6 +94,8 @@ export default function BlockPage() {
   }, []);
 
   useEffect(() => {
+    // 挂载时加载屏蔽列表/不感兴趣吧（loader 内置 loading 态）
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time data load
     loadBlacklist();
     loadDislikeForums();
   }, [loadBlacklist, loadDislikeForums]);

@@ -15,12 +15,14 @@ import {
   Alert,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { hapticNotify, NotificationFeedbackType } from '@/utils/haptics';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { MenuView, type MenuAction } from '@expo/ui/community/menu';
+import { VStack, Spacer, ContentUnavailableView, Button as SwiftButton, Label } from '@expo/ui/swift-ui';
+import { buttonStyle, buttonBorderShape } from '@expo/ui/swift-ui/modifiers';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -58,6 +60,7 @@ const FAVORITE_LIST_OVERRIDES = { initialDrawBatchSize: 10 };
 export default function ThreadStorePage() {
   const insets = useSafeAreaInsets();
   const { colors } = useThemeColors();
+  const router = useRouter();
   const { isLoggedIn } = useAuthStore();
   // fetcher 必须稳定引用：内联会导致 usePagedList 的 run/load 每次渲染重建，
   // 下方 useEffect([load]) 反复触发 → 请求风暴（thread/[id].tsx 同款修复）。
@@ -84,8 +87,10 @@ export default function ThreadStorePage() {
   const [undoRemoved, setUndoRemoved] = useState<{ item: FavoriteThread; index: number } | null>(null);
 
   useEffect(() => {
+    // 未登录不请求收藏接口（避免报错刷屏），由下方登录引导态承接
+    if (!isLoggedIn) return;
     load(1);
-  }, [load]);
+  }, [load, isLoggedIn]);
 
   // TODO(F3): FavoriteThread only carries the bookmarked floor and a total
   // latestReplyNum count, not a "newest floor/post id". threadStore() also
@@ -215,6 +220,29 @@ export default function ThreadStorePage() {
     }
     return null;
   }, [loadingMore, hasMore, items.length, colors]);
+
+  // 未登录：不请求收藏接口，直接引导登录（登录后返回本页自动拉取）
+  if (!isLoggedIn) {
+    return (
+      <ThemedHost style={{ flex: 1 }}>
+        <VStack alignment="center" spacing={16}>
+          <Spacer />
+          <ContentUnavailableView
+            systemImage="person.crop.circle.badge.questionmark"
+            title="需要登录"
+            description="登录后才能查看收藏的贴子"
+          />
+          <SwiftButton
+            onPress={() => router.push('/login')}
+            modifiers={[buttonStyle('glassProminent'), buttonBorderShape('capsule')]}
+          >
+            <Label title="登录百度账号" systemImage="person.crop.circle.badge.checkmark" />
+          </SwiftButton>
+          <Spacer />
+        </VStack>
+      </ThemedHost>
+    );
+  }
 
   // Loading
   if (loading && items.length === 0) {

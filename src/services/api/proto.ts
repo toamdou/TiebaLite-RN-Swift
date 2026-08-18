@@ -636,7 +636,7 @@ export function encodeGeneralTabListRequest(
     rn?: number;
     sortType?: number;
     tabName?: string;
-    tabCode?: string;
+    tabId?: number;
   },
 ): string {
   return encodeProtobuf(GeneralTabListRequest(), {
@@ -648,7 +648,7 @@ export function encodeGeneralTabListRequest(
       rn: opts.rn ?? 30,
       sortType: opts.sortType ?? 0,
       tabName: opts.tabName ?? '',
-      tabCode: opts.tabCode ?? '',
+      tabId: opts.tabId ?? 0,
     },
   });
 }

@@ -12,7 +12,6 @@ export type { SemanticColors } from './colors';
 
 // Typography
 export {
-  Typography,
   typographyStyles,
   typographyStyles as TypographyStyles,
 } from './typography';
@@ -43,9 +42,6 @@ export type {
 // Haptic scene map
 export { HAPTICS_MAP, hapticForScene } from './hapticsMap';
 export type { HapticsScene } from './hapticsMap';
-
-// Motion tokens
-export { LIST_ENTER, SHEET_PRESENT, SHEET_DISMISS, ICON_POP } from './motion';
 
 // Theme Context
 export { ThemeProvider, useThemeContext, useAppTheme } from './ThemeContext';

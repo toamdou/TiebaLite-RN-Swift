@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Picker, Text as SWText } from '@expo/ui/swift-ui';
 import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import { hapticForScene } from '@/theme/hapticsMap';
+import { HOT_RANK_COLORS } from '@/constants/rank';
 
 import { SymbolView } from '@/components/ui/SymbolView';
 import { Avatar } from '@/components/ui/Avatar';
@@ -139,7 +140,7 @@ export default function ForumMembersPage() {
   const { name, forumId } = useLocalSearchParams<{ name: string; forumId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useThemeColors();
+  const { colors } = useThemeColors();
   const { width: screenWidth } = useWindowDimensions();
   const gridCols = useMemo(
     () =>
@@ -344,7 +345,7 @@ export default function ForumMembersPage() {
     [colors, renderCell, gridCols],
   );
 
-  const groupBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(120,120,128,0.08)';
+  const groupBg = colors.groupFill;
   const levelProgress =
     myInfo && myInfo.levelupScore > 0
       ? Math.min((myInfo.curScore / myInfo.levelupScore) * 100, 100)
@@ -402,7 +403,7 @@ export default function ForumMembersPage() {
   const renderRankItem = useCallback(
     ({ item, index }: { item: RankUserItem; index: number }) => {
       const rank = index + 1;
-      const rankColor = rank <= 3 ? ['#FF3B30', '#FF9500', '#FFCC00'][rank - 1] : colors.textTertiary;
+      const rankColor = rank <= 3 ? HOT_RANK_COLORS[rank - 1] : colors.textTertiary;
       const displayName = item.userName || '未知用户';
       return (
         <View style={[styles.rankRow, { backgroundColor: colors.card }]}>

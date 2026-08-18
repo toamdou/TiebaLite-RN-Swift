@@ -6,38 +6,6 @@
 import { Easing } from 'react-native-reanimated';
 
 /**
- * SPRING_UI — Critically damped, no overshoot.
- * Use for: all UI state transitions (segment indicators, press feedback, overlays)
- * Apple: damping 1.0, response 0.3–0.4
- */
-export const SPRING_UI = {
-  damping: 20,
-  stiffness: 250,
-  mass: 1,
-} as const;
-
-/**
- * SPRING_MOMENTUM — Slightly under-damped, subtle overshoot.
- * Use for: gesture release, flick, drag-to-dismiss, sheet enter
- * Apple: damping ~0.8, response 0.3–0.4
- */
-export const SPRING_MOMENTUM = {
-  damping: 16,
-  stiffness: 200,
-  mass: 1,
-} as const;
-
-/**
- * SPRING_GENTLE — Very soft, for large surfaces / staggered reveals.
- * No overshoot, slower settle.
- */
-export const SPRING_GENTLE = {
-  damping: 22,
-  stiffness: 170,
-  mass: 1,
-} as const;
-
-/**
  * Press feedback scale values
  */
 export const PRESS_SCALE = {

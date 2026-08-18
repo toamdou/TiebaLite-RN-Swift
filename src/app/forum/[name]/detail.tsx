@@ -59,7 +59,7 @@ export default function ForumDetailPage() {
   const { name, forumId } = useLocalSearchParams<{ name: string; forumId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useThemeColors();
+  const { colors } = useThemeColors();
 
   const [detail, setDetail] = useState<ForumDetail | null>(null);
   const [extra, setExtra] = useState<any>(null);
@@ -132,7 +132,7 @@ export default function ForumDetailPage() {
     stats.push({ label: '回贴', value: formatCount(postCount) });
   }
 
-  const groupBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(120,120,128,0.08)';
+  const groupBg = colors.groupFill;
 
   // ── Loading ──
   if (loading && !detail) {

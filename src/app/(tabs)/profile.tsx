@@ -25,6 +25,7 @@ import { GlassView } from '@/components/ui/GlassView';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { ThemedHost } from '@/components/ui/ThemedHost';
+import { RowIcon } from '@/components/ui/RowIcon';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { Radius, Spacing } from '@/theme';
 import { typographyStyles } from '@/theme/typography';
@@ -36,15 +37,7 @@ import type { UserProfile } from '@/types';
 
 const TAB_RESELECT_EVENT = 'tieba:tab-reselect';
 
-/** 行前色块图标：RN 圆角色块 + SymbolView（ListItem 的 leading 自动 matchContents） */
-function RowIcon({ icon, tint }: { icon: string; tint: string }) {
-  return (
-    <View style={[styles.rowIconBadge, { backgroundColor: tint }]}>
-      <SymbolView name={icon} size={15} weight="semibold" tintColor="#FFFFFF" />
-    </View>
-  );
-}
-
+/** 行前色块图标：见 @/components/ui/RowIcon（Profile/Settings 统一） */
 export default function ProfileScreen() {
   const { colors } = useThemeColors();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -69,6 +62,8 @@ export default function ProfileScreen() {
   }, [isLoggedIn, currentUid]);
 
   useEffect(() => {
+    // 挂载时拉一次个人资料（跨端数据源，setState 发生在 await 之后）
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time data load
     loadProfile();
   }, [loadProfile]);
 
@@ -309,12 +304,5 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     ...typographyStyles.caption1,
-  },
-  rowIconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

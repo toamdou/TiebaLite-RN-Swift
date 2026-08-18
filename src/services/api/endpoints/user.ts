@@ -74,7 +74,20 @@ export async function userPost(uid: string, page: number = 1, isThread: boolean 
     assertProtoSuccess(decoded);
     const data = decoded.data;
     const content = data?.postList ?? [];
-    return { items: content, hasMore: content.length >= 20 };
+    return {
+      items: content.map((i: any) => ({
+        ...i,
+        // proto 路径 content 是 PostInfoContent 对象（postContent: Abstract[]，type 为数值），
+        // 归一化为 contentToText 可读的片段数组，避免回复行正文恒空（JSON 路径保持透传）。
+        content:
+          typeof i.content === 'string'
+            ? i.content
+            : Array.isArray(i.content)
+              ? i.content
+              : (i.content?.postContent ?? []).map((s: any) => ({ type: 'text', text: s.text ?? '' })),
+      })),
+      hasMore: content.length >= 20,
+    };
   } catch (e) {
     if (__DEV__) console.warn('[userPost] proto failed, fallback:', e);
     const raw = extractData(await apiPost<any>(

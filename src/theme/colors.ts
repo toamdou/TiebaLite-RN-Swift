@@ -55,6 +55,11 @@ export interface SemanticColors {
   separator: string;
   border: string;
 
+  /** 浅灰/深灰半透明分组底（分区 header / 楼层 blockTip 等） */
+  groupFill: string;
+  /** 卡片细描边（比 border 更淡，用于卡片轮廓） */
+  borderCard: string;
+
   unselected: string;
   placeholder: string;
   disabled: string;
@@ -148,6 +153,8 @@ const LIGHT: SemanticColors = {
   divider: 'rgba(60,60,67,0.12)',
   separator: 'rgba(60,60,67,0.12)',
   border: 'rgba(60,60,67,0.12)',
+  groupFill: 'rgba(120,120,128,0.08)',
+  borderCard: 'rgba(0,0,0,0.06)',
 
   unselected: 'rgba(60,60,67,0.3)',
   placeholder: 'rgba(60,60,67,0.3)',
@@ -235,6 +242,8 @@ const DARK: SemanticColors = {
   divider: 'rgba(84,84,88,0.65)',
   separator: 'rgba(84,84,88,0.65)',
   border: 'rgba(84,84,88,0.65)',
+  groupFill: 'rgba(255,255,255,0.08)',
+  borderCard: 'rgba(255,255,255,0.08)',
 
   unselected: 'rgba(235,235,245,0.3)',
   placeholder: 'rgba(235,235,245,0.3)',

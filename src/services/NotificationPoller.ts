@@ -362,12 +362,25 @@ export async function setupNotifications(): Promise<void> {
   }
 }
 
+/**
+ * 幂等注册原生 BGAppRefreshTask 通知同步 + 自动签到。
+ * 登出/过期/清数据会 cancelNativeBackgroundSync，登录/换号时必须重新注册，
+ * 否则同会话内后台同步永久失效（直到冷启动）。
+ */
+export function ensureBackgroundSync(): void {
+  TiebaNative.registerNotificationSync(BACKGROUND_MIN_INTERVAL_MS);
+}
+
 /** Cancel only the native BGAppRefreshTask; foreground poller is unchanged. */
 export function cancelNativeBackgroundSync(): void {
   TiebaNative.cancelNotificationSync();
 }
 
+// 轮询实例代次：stop 后迟到的异步回调（如 getLowPowerMode）不得再污染标记
+let pollerRunId = 0;
+
 export function startNotificationPoller(): void {
+  const runId = ++pollerRunId;
   if (isRunning) return;
   isRunning = true;
 
@@ -398,7 +411,10 @@ export function startNotificationPoller(): void {
   };
 
   lowPowerSub = addLowPowerModeListener(onLowPowerChange);
-  void getLowPowerMode().then(onLowPowerChange);
+  void getLowPowerMode().then((enabled) => {
+    if (runId !== pollerRunId) return;
+    onLowPowerChange(enabled);
+  });
 
   ensureTimer();
   if (AppState.currentState === 'active') pollMessages();
@@ -415,6 +431,7 @@ export function startNotificationPoller(): void {
 }
 
 export function stopNotificationPoller(): void {
+  pollerRunId += 1;
   isRunning = false;
   lastPollAt = 0;
   if (pollTimer) {

@@ -26,14 +26,8 @@ export interface AvatarProps {
   initials?: string;
   /** Avatar size (default: 40) */
   size?: number;
-  /** Whether to show online status dot */
-  showOnlineStatus?: boolean;
-  /** Online status: 'online', 'offline', 'away' */
-  onlineStatus?: 'online' | 'offline' | 'away';
   /** Level number to show as badge */
   level?: number;
-  /** Custom background color for initials fallback */
-  fallbackColor?: string;
   /** Custom style */
   style?: StyleProp<ViewStyle>;
   /** Accessibility label */
@@ -49,10 +43,7 @@ export function Avatar({
   source,
   initials,
   size = 40,
-  showOnlineStatus = false,
-  onlineStatus,
   level,
-  fallbackColor,
   style,
   accessibilityLabel,
   onPress,
@@ -64,7 +55,6 @@ export function Avatar({
   // Convert portrait ID to full URL (mirrors Kotlin StringUtil.getAvatarUrl)
   const avatarUri = getAvatarUrl(source);
   const showFallback = !avatarUri || imageError;
-  const bgColor = fallbackColor ?? colors.primary;
   const fontSize = Math.round(size * 0.38);
   const isPressable = Boolean(onPress || onLongPress);
 
@@ -95,7 +85,7 @@ export function Avatar({
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: showFallback ? bgColor : colors.surfaceSecondary,
+            backgroundColor: colors.surfaceSecondary,
           },
         ]}
       >
@@ -131,26 +121,6 @@ export function Avatar({
           />
         )}
       </View>
-
-      {/* Online Status Indicator */}
-      {showOnlineStatus && onlineStatus && onlineStatus !== 'offline' && (
-        <View
-          style={[
-            styles.statusDot,
-            {
-              width: size * 0.28,
-              height: size * 0.28,
-              borderRadius: size * 0.14,
-              backgroundColor:
-                onlineStatus === 'online' ? colors.success : colors.warning,
-              borderColor: colors.background,
-              borderWidth: 2,
-              right: -1,
-              bottom: -1,
-            },
-          ]}
-        />
-      )}
 
       {/* Level Badge */}
       {level !== undefined && level > 0 && (
@@ -194,9 +164,6 @@ const styles = StyleSheet.create({
   initials: {
     fontWeight: '600',
     textAlign: 'center',
-  },
-  statusDot: {
-    position: 'absolute',
   },
   levelBadge: {
     position: 'absolute',

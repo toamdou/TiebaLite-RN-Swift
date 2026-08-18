@@ -11,19 +11,16 @@
 // ============================================================
 
 import {
-  ActivityIndicator,
   DeviceEventEmitter,
-  StyleSheet,
-  Text,
-  View,
 } from 'react-native';
+import { useEffect, useState } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider, usePathname } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
 import { useThemeColors } from '@/theme/ThemeContext';
 import { useNotificationStore } from '@/stores/notificationStore';
-import { useSignStore } from '@/stores/signStore';
 import { hapticForScene } from '@/theme/hapticsMap';
+import { TAB_BAR_AUTO_HIDE_EVENT, forceShowTabBar } from '@/hooks/useTabBarAutoHide';
 
 const TAB_RESELECT_EVENT = 'tieba:tab-reselect';
 
@@ -32,13 +29,24 @@ export default function TabLayout() {
   const { colors, isDark } = useThemeColors();
   const pathname = usePathname();
   const totalUnread = useNotificationStore((s) => s.counts.total);
-  const isSigning = useSignStore((s) => s.isSigning);
+  // 动态页滚动自动隐藏底栏：由 useTabBarAutoHide 的 onScroll 事件驱动，
+  // 完全隐藏到屏幕底部（不用 iOS 26 的圆形悬浮按钮）。
+  const [tabBarHidden, setTabBarHidden] = useState(false);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(TAB_BAR_AUTO_HIDE_EVENT, (hidden: boolean) => {
+      setTabBarHidden(hidden);
+    });
+    return () => sub.remove();
+  }, []);
 
   // NativeTabs.Trigger exposes a tabPress listener. Emit only when the tapped
   // tab is already focused so a repeated tap refreshes without double-loading
   // during a normal tab switch.
   const handleTabReselect = (tabName: string, tabPath: string) => {
     hapticForScene('press');
+    // 切换到任何标签都强制恢复底栏可见（避免带着"隐藏"状态切走）
+    forceShowTabBar();
     if (pathname === tabPath || (tabPath === '/' && (pathname === '' || pathname === '/'))) {
       DeviceEventEmitter.emit(TAB_RESELECT_EVENT, tabName);
     }
@@ -61,8 +69,11 @@ export default function TabLayout() {
       <NativeTabs
           // defaultStartTab is intentionally not wired here: NativeTabsProps
           // does not expose initialRouteName in expo-router/unstable-native-tabs.
-          // §4.2: Auto-hide tab bar on scroll down (iOS 26 system animation)
-          minimizeBehavior="onScrollDown"
+          // §4.2: 底栏隐藏/显示由 JS 滚动方向驱动（useTabBarAutoHide +
+          // 原生 ScrollObserver），显式禁用系统 minimize（避免 iOS 26
+          // 收成圆形悬浮按钮）。
+          minimizeBehavior="never"
+          hidden={tabBarHidden}
           // §4.11: Fix transparent tab bar issues with FlatList/FlashList
           disableTransparentOnScrollEdge
           // §4.12: Liquid-glass / floating tab bar — fully transparent so no
@@ -153,57 +164,8 @@ export default function TabLayout() {
             />
             <NativeTabs.Trigger.Label>我的</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
-
-          {/* §4.3: BottomAccessory — sign-in progress. State selectors live in
-              TabLayout (outside the accessory) because two accessory instances
-              render simultaneously and must stay in sync. */}
-          <NativeTabs.BottomAccessory>
-            <SignProgressAccessory
-              isSigning={isSigning}
-              tintColor={colors.primary}
-              textColor={colors.textSecondary}
-            />
-          </NativeTabs.BottomAccessory>
       </NativeTabs>
     </ThemeProvider>
   );
 }
 
-function SignProgressAccessory({
-  isSigning,
-  tintColor,
-  textColor,
-}: {
-  isSigning: boolean;
-  tintColor: string;
-  textColor: string;
-}) {
-  const placement = NativeTabs.BottomAccessory.usePlacement();
-  if (!isSigning) return null;
-  const isInline = placement === 'inline';
-  return (
-    <View style={[styles.signAccessoryRow, isInline && styles.signAccessoryRowInline]}>
-      <ActivityIndicator size="small" color={tintColor} />
-      <Text style={[styles.signAccessoryText, { color: textColor }]}>签到中…</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  signAccessoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  signAccessoryRowInline: {
-    justifyContent: 'flex-start',
-    paddingVertical: 2,
-  },
-  signAccessoryText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-});

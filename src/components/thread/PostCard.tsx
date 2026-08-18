@@ -174,6 +174,7 @@ function InlineQuoteContent({
                   source={{ uri }}
                   style={s.quoteImageThumbImg}
                   contentFit="cover"
+                  transition={200}
                   cachePolicy="memory-disk"
                   recyclingKey={img.src ?? ''}
                 />

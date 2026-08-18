@@ -324,6 +324,11 @@ public final class TiebaNativeModule: Module {
       }
     }
 
+    // 滚动观察器：把 RNHostView 嵌套列表的 contentOffset 事件送进 JS
+    View(TiebaScrollObserverView.self) {
+      Events("onScrollChanged")
+    }
+
     View(TiebaGlassSurfaceView.self) {
       Events("onPress")
 

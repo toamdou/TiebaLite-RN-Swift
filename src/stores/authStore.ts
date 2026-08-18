@@ -30,6 +30,7 @@ import { hydrateSecureCredentials } from '@/services/storage/AuthSecureStorage';
 import {
   cancelNativeBackgroundSync,
   clearNotificationBaseline,
+  ensureBackgroundSync,
   startNotificationPoller,
   stopNotificationPoller,
 } from '@/services/NotificationPoller';
@@ -89,6 +90,17 @@ async function refreshPostLoginStores(): Promise<void> {
   } catch {}
 }
 
+/**
+ * 用后台拉取的 profile 回填 account，但仅当回填仍属于当前活跃账号时生效。
+ * 快速切换账号时，晚到的旧账号响应不得覆盖刚切到的新账号（否则通知基线/凭据错位）。
+ */
+function applyRefreshedProfile(account: Account, refreshed: Account): void {
+  const current = useAuthStore.getState().account;
+  if (current?.uid && current.uid === account.uid && current.uid === refreshed.uid) {
+    useAuthStore.setState({ account: refreshed });
+  }
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   isLoggedIn: false,
   isLoading: false,
@@ -103,12 +115,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ isLoggedIn: true, isLoading: false, account, error: null });
       void saveAccountProfile(account);
       void refreshAccountProfile(account).then((refreshed) => {
-        useAuthStore.setState({ account: refreshed });
+        applyRefreshedProfile(account, refreshed);
       });
       invalidateFollowedForumsCache();
       void refreshPostLoginStores();
       stopNotificationPoller();
       startNotificationPoller();
+      // 重新登录需恢复原生后台通知同步（登出时被 cancelNativeBackgroundSync 取消）
+      ensureBackgroundSync();
     } catch (e: any) {
       set({ isLoading: false, error: e?.message ?? 'Login failed' });
       throw e;
@@ -192,7 +206,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           syncBackgroundSnapshot();
           void saveAccountProfile(restored);
           void refreshAccountProfile(restored).then((refreshed) => {
-            useAuthStore.setState({ account: refreshed });
+            applyRefreshedProfile(restored, refreshed);
           });
           void refreshPostLoginStores();
           set({
@@ -263,12 +277,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
       void saveAccountProfile({ ...switched, bduss, sToken });
       void refreshAccountProfile({ ...switched, bduss, sToken }).then((refreshed) => {
-        useAuthStore.setState({ account: refreshed });
+        applyRefreshedProfile({ ...switched, bduss, sToken }, refreshed);
       });
       invalidateFollowedForumsCache();
       void refreshPostLoginStores();
       stopNotificationPoller();
       startNotificationPoller();
+      // 切换账号后同样需要恢复原生后台通知同步
+      ensureBackgroundSync();
     } catch (e: any) {
       set({ isLoading: false, error: e?.message ?? 'Switch account failed' });
     }

@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View, Text as RNText } from 'react-native';
+import { Alert, StyleSheet, View, Text as RNText } from 'react-native';
 import {
   Button,
   DatePicker,
@@ -192,7 +192,7 @@ export default function OKSignSettingsPage() {
   if (!hasHydrated) {
     return (
       <ThemedHost style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ProgressView modifiers={[progressViewStyle('circular'), tint(colors.primary)]} />
       </ThemedHost>
     );
   }

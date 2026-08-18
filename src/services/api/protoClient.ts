@@ -515,7 +515,7 @@ export async function protoGeneralTabList(opts: {
   rn?: number;
   sortType?: number;
   tabName?: string;
-  tabCode?: string;
+  tabId?: number;
 }, signal?: AbortSignal): Promise<DecodedGeneralTabListResponse> {
   const protoCommon = buildProtoCommonRequest('v12');
 

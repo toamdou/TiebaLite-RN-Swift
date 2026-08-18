@@ -26,31 +26,22 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   collectDescSort: false,
   showShortcutInThread: true,
   hideReply: false,
-  forumSingleColumn: false, // Not consumed by forum layout yet.
   blockVideo: false,
   hideMedia: false,
-  showFollowedOnly: false, // Not consumed by feed pages yet.
   hideBlockedContent: false,
   imageWatermarkEnabled: false,
   imageWatermark: 'none',
   imageDarkenWhenNight: true,
   useBuiltInBrowser: true,
-  useCustomTabs: true, // No UI or consumer yet.
-  liftUpBottomBar: false, // No UI or consumer yet.
-  statusBarDarker: false, // No UI or consumer yet.
   translucentAlpha: 0.85,
-  translucentBlur: 10,
-  translucentBackgroundPath: '',
   customPrimaryColor: '#4477E0',
-  translucentPrimaryColor: '#FFFFFF',
-  ignoreBatteryOptimizationsDialog: false,
   slowSignMode: false,
   failAutoStop: true,
   useOfficialSign: true,
   liveActivitySignEnabled: true,
-  experimentalFeatures: false,
   homePageShowHistoryForum: true,
+  /** 关注吧列表布局：true = 一行一个；false = 一行两个（Kotlin listSingle 对位） */
+  forumListSingle: true,
   exploreAutoRefresh: true,
   hapticFeedback: true,
-  feedCardStyle: 'twitter',
 };

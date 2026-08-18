@@ -13,18 +13,10 @@ import { useRouter } from 'expo-router';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { usePreferencesStore } from '@/stores/preferencesStore';
-import { SymbolView } from '@/components/ui/SymbolView';
 import { ThemedHost } from '@/components/ui/ThemedHost';
+import { RowIcon } from '@/components/ui/RowIcon';
 
-/** 行前色块图标：RN 圆角色块 + SymbolView（ListItem 的 leading 自动 matchContents） */
-function RowIcon({ icon, tint }: { icon: string; tint: string }) {
-  return (
-    <View style={[styles.rowIconBadge, { backgroundColor: tint }]}>
-      <SymbolView name={icon} size={15} weight="semibold" tintColor="#FFFFFF" />
-    </View>
-  );
-}
-
+/** 行前色块图标：见 @/components/ui/RowIcon（Profile/Settings 统一） */
 export default function SettingsPage() {
   const router = useRouter();
   const { colors } = useThemeColors();
@@ -46,7 +38,7 @@ export default function SettingsPage() {
         <FieldGroup.Section title="外观">
           <ListItem
             leading={<RowIcon icon="textformat.size" tint="#AF52DE" />}
-            supportingText="阅读字号、工具栏选项"
+            supportingText="深浅色外观、导航栏样式"
             onPress={() => navigateTo('/settings/theme')}
           >
             显示设置
@@ -127,12 +119,5 @@ export default function SettingsPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  rowIconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
