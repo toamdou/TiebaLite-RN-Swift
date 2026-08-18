@@ -341,11 +341,6 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
     setDislikeTarget(item);
   }, []);
 
-  // 屏蔽作者成功 → 从当前列表移除该条
-  const handleBlockAuthor = useCallback((item: FeedItem) => {
-    setItems((prev) => prev.filter((i) => i !== item));
-  }, [setItems]);
-
   const toggleReason = useCallback((id: string) => {
     hapticForScene('toggle');
     setSelectedReasons((prev) => (prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]));
@@ -554,15 +549,10 @@ function FeedContent({ segment }: { segment: 'personalized' | 'concern' }) {
     }
     return (
       <EntranceRow index={index} animateEntry={!entranceDoneRef.current}>
-        <FeedCard
-          item={item}
-          onImagePress={imageViewer.handleImagePress}
-          onDislike={handleDislikePress}
-          onBlockAuthor={handleBlockAuthor}
-        />
+        <FeedCard item={item} />
       </EntranceRow>
     );
-  }, [imageViewer.handleImagePress, handleDislikePress, handleBlockAuthor, handleThreadShare, handleThreadLike, handleTweetMenuAction]);
+  }, [imageViewer.handleImagePress, handleThreadShare, handleThreadLike, handleTweetMenuAction]);
 
   const keyExtractor = useCallback((item: FeedItem, index: number) => {
     const id = item.threadInfo?.id || item.forumInfo?.forumId || item.topicInfo?.topicId || '';

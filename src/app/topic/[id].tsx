@@ -10,23 +10,30 @@ import {
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
+  Alert,
+  Share,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withDelay, withTiming, interpolate } from 'react-native-reanimated';
 import { FlashList } from '@shopify/flash-list';
-import { useLocalSearchParams, Stack, Link } from 'expo-router';
+import { useLocalSearchParams, Stack, Link, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { SymbolView } from '@/components/ui/SymbolView';
+import ImageViewer from '@/components/ImageViewer';
+import TweetCard from '@/components/feed/TweetCard';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/Skeleton';
-import FeedCard from '@/components/FeedCard';
-import { topicDetail, mapProtoThread } from '@/services/api/endpoints';
+import { hapticForScene } from '@/theme/hapticsMap';
+import { useImageViewer } from '@/hooks/useImageViewer';
+import { useAuthStore } from '@/stores/authStore';
+import { BlockManager } from '@/utils/BlockManager';
+import { topicDetail, mapProtoThread, agree, checkReportPost } from '@/services/api/endpoints';
 import { usePagedList } from '@/hooks/usePagedList';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
-import { formatCount } from '@/utils';
+import { formatCount, buildThreadUrl } from '@/utils';
 import { Spacing, Radius, DURATION, EASE_OUT, HERO, typographyStyles } from '@/theme';
-import type { FeedItem, ThreadInfo } from '@/types';
+import type { ThreadInfo } from '@/types';
 
 // ---------- 首屏级联入场（仅首次数据批次，Reduce Motion 跳过） ----------
 function FirstBatchStagger({
@@ -66,6 +73,9 @@ export default function TopicDetailPage() {
   const { colors } = useThemeColors();
   const { reduceMotion } = useReducedMotion();
   const topicName = name || '话题';
+  const router = useRouter();
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const imageViewer = useImageViewer();
   const fetcher = useCallback(
     async (pageNum: number, _params: undefined, signal?: AbortSignal) => {
       const data = await topicDetail(id, topicName, pageNum, signal);
@@ -113,9 +123,98 @@ export default function TopicDetailPage() {
     hasMore,
     loadingMore,
     extra,
+    setItems,
   } = paged;
   const topicInfo = extra?.topicInfo ?? null;
   const relateForums = useMemo<any[]>(() => extra?.relateForums ?? [], [extra?.relateForums]);
+
+  // ── 卡片操作：点赞 / 分享 / 屏蔽作者 / 举报（与吧内、动态页同款 TweetCard 交互）──
+  const handleCardLike = useCallback(
+    async (item: ThreadInfo) => {
+      if (!isLoggedIn) {
+        Alert.alert('提示', '请先登录');
+        return;
+      }
+      try {
+        await agree(item.id, item.id, item.hasAgree ? 0 : 1);
+        setItems((prev) =>
+          prev.map((t) =>
+            t.id === item.id
+              ? {
+                  ...t,
+                  hasAgree: !t.hasAgree,
+                  zanNum: Math.max(0, (t.zanNum || 0) + (t.hasAgree ? -1 : 1)),
+                }
+              : t,
+          ),
+        );
+      } catch {
+        Alert.alert('错误', '点赞失败');
+      }
+    },
+    [isLoggedIn, setItems],
+  );
+
+  const handleCardShare = useCallback(async (item: ThreadInfo) => {
+    hapticForScene('press');
+    try {
+      const url = buildThreadUrl(item.id);
+      await Share.share({ message: url, url }, { dialogTitle: '分享帖子' });
+    } catch {}
+  }, []);
+
+  const handleImagePress = useCallback(
+    (images: string[], index: number) => {
+      hapticForScene('press');
+      imageViewer.handleImagePress(images, index);
+    },
+    [imageViewer],
+  );
+
+  const handleBlockAuthor = useCallback(
+    async (item: ThreadInfo) => {
+      const authorId = item.authorId;
+      if (!authorId) return;
+      try {
+        await BlockManager.addBlockedUser({
+          id: Date.now().toString(),
+          uid: authorId,
+          username: item.authorNameShow || item.authorName || undefined,
+        });
+        hapticForScene('action-success');
+        // 屏蔽成功后即时从当前话题贴列表移除该作者的贴子
+        setItems((prev) => prev.filter((t) => t.authorId !== authorId));
+      } catch {
+        hapticForScene('action-fail');
+      }
+    },
+    [setItems],
+  );
+
+  const handleReport = useCallback(
+    async (item: ThreadInfo) => {
+      try {
+        const url = await checkReportPost(item.id);
+        if (url) {
+          router.push({ pathname: '/webview', params: { url, title: '举报' } });
+        } else {
+          Alert.alert('提示', '当前帖子不支持在线举报');
+        }
+      } catch {
+        hapticForScene('action-fail');
+        Alert.alert('错误', '举报失败');
+      }
+    },
+    [router],
+  );
+
+  const handleMenuAction = useCallback(
+    (action: string, item: ThreadInfo) => {
+      if (action === 'block') void handleBlockAuthor(item);
+      else if (action === 'report') void handleReport(item);
+    },
+    [handleBlockAuthor, handleReport],
+  );
 
   // Hero entrance animation (fade + slide up when topic info loads) — Reanimated 4
   const heroAnim = useSharedValue(0);
@@ -146,18 +245,19 @@ export default function TopicDetailPage() {
   }, [threads.length]);
 
   const renderItem = useCallback(
-    ({ item, index }: { item: ThreadInfo; index: number }) => {
-      const feedItem: FeedItem = {
-        type: 'thread',
-        threadInfo: item,
-      };
-      return (
-        <FirstBatchStagger index={index} enabled={firstBatchRef.current}>
-          <FeedCard item={feedItem} />
-        </FirstBatchStagger>
-      );
-    },
-    [],
+    ({ item, index }: { item: ThreadInfo; index: number }) => (
+      <FirstBatchStagger index={index} enabled={firstBatchRef.current}>
+        <TweetCard
+          thread={item}
+          timeType="create"
+          onMenuAction={handleMenuAction}
+          onImagePress={handleImagePress}
+          onLike={handleCardLike}
+          onShare={handleCardShare}
+        />
+      </FirstBatchStagger>
+    ),
+    [handleMenuAction, handleImagePress, handleCardLike, handleCardShare],
   );
 
   const threadKeyExtractor = useCallback((item: ThreadInfo) => item.id, []);
@@ -204,10 +304,13 @@ export default function TopicDetailPage() {
                   const avatar = forum.avatar ?? forum.pic ?? '';
                   const chip = (
                     <Pressable
-                      style={[
+                      // expo-router Slot 断言：Link asChild 的唯一子元素 style 不能被数组
+                      // 包裹（否则 dev 下抛 "-- passing an array of styles to child of <Slot>"），
+                      // 这里用 flatten 合成单个样式对象。
+                      style={StyleSheet.flatten([
                         styles.relateChip,
                         { backgroundColor: colors.surfaceSecondary },
-                      ]}
+                      ])}
                     >
                       {avatar ? (
                         <Image
@@ -339,6 +442,12 @@ export default function TopicDetailPage() {
         ListFooterComponent={listFooter}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+      />
+      <ImageViewer
+        images={imageViewer.imageViewerImages}
+        initialIndex={imageViewer.imageViewerIndex}
+        visible={imageViewer.imageViewerVisible}
+        onClose={imageViewer.closeImageViewer}
       />
     </View>
   );
