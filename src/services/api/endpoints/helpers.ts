@@ -114,10 +114,14 @@ export function mapMediaList(raw: any): MediaInfo[] {
     const isVideo =
       mediaType === 'video' ||
       !!(m.vsrc ?? m.video_src ?? m.videoSrc ?? m.video);
+    // ⚠️ 列表/卡片显示用“服务端已算好的中等尺寸图”(bigPic ~960px) 优先：
+    // 2026-08 Tieba CDN 已停用客户端注入的 w= 尺寸段（一律返回默认「贴」占位图），
+    // 只有服务端带 sign 的尺寸 URL（bigPic/srcPic）与裸 /pic/item/ 原图真实可显示。
+    // 故 src 直接取服务端派生图原样显示（thumbnailUrl 不再改写），裸原图兜底。
     const src = toHttpsImgUrl(String(
       m.bigPic ?? m.big_pic ?? m.bigSrc ?? m.big_src ??
-      m.originPic ?? m.origin_pic ?? m.originSrc ?? m.origin_src ??
-      m.srcPic ?? m.src_pic ?? m.src ?? '',
+      m.srcPic ?? m.src_pic ?? m.src ??
+      m.originPic ?? m.origin_pic ?? m.originSrc ?? m.origin_src ?? '',
     ));
     if (!src) continue;
     result.push({

@@ -130,10 +130,20 @@ export const useForumStore = create<ForumState>((set, get) => ({
   // 返回 forum + thread_list + user_list + page + anti + nav_tab_info
   loadForumData: async (forumName: string, page: number, sortType: ForumSortType, isGood?: boolean) => {
     const seq = ++forumLoadSeq;
-    const sortTypeNum = sortType === ForumSortType.SEND_TIME ? 7 : 5;
+    // 对齐 Kotlin v12 frsPage 语义（MixedTiebaApiImpl.frsPage + ForumThreadListViewModel）：
+    // - 热门(0)/精品(2)：sort_type = -1 —— 让服务端按该吧默认列表返回。此前硬编码
+    //   5(按回复) 会被服务端当成"热门推荐"流，返回混合其他吧的贴子（串吧 bug）。
+    // - 最新(1)：sort_type = 用户选择的 5(按回复) / 7(按发帖)。
+    // - load_type：首载 1 / 翻页 2（Kotlin LoadMore 语义），不能恒为 0。
+    const { goodClassifyId, currentTab } = get();
+    // 热门(0)/精品(2) 走 -1（吧内默认列表）；仅"最新"(1) 用用户选择的排序，且 v12
+    // frsPage 的 sort_type 是 0(按回复)/1(按发帖)（对齐 Kotlin default_sort_type 偏好
+    // 与 getSortType），不是旧 JSON 接口的 5/7。
+    const isDefaultList = currentTab === 0 || currentTab === 2 || isGood;
+    const sortTypeNum = isDefaultList ? -1 : (sortType === ForumSortType.SEND_TIME ? 1 : 0);
+    const loadType = page === 1 ? 1 : 2;
 
     // Add good classify if selected
-    const { goodClassifyId } = get();
     const cidNum = (isGood && goodClassifyId) ? parseInt(goodClassifyId, 10) : undefined;
 
     try {
@@ -143,7 +153,7 @@ export const useForumStore = create<ForumState>((set, get) => ({
         sortType: sortTypeNum,
         isGood: !!isGood,
         goodClassifyId: cidNum,
-        loadType: 0,
+        loadType,
       });
       if (seq !== forumLoadSeq) return;
 
