@@ -81,6 +81,13 @@ const withWidgetFiles = (config, { widgetName, appGroup }) => {
             }
             fs.copyFileSync(source.absolutePath, path.join(targetDir, source.basename));
         }
+        // 1b. Copy the app icon used by the widget's Dynamic Island leading
+        //     view + lock-screen card (UIImage(named: "AppIcon") in the
+        //     extension bundle; the Xcode target mod adds it to Resources).
+        const appIconSource = path.join(packageRoot, "plugins", "live-activity", "AppIcon.png");
+        if (fs.existsSync(appIconSource)) {
+            fs.copyFileSync(appIconSource, path.join(targetDir, "AppIcon.png"));
+        }
         // 2. Write the extension Info.plist. We set the keys explicitly (rather
         //    than relying solely on GENERATE_INFOPLIST_FILE) so the NSExtension
         //    point is guaranteed correct — a wrong/absent NSExtensionPointIdentifier

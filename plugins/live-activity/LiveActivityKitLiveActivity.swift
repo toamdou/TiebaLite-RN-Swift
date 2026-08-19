@@ -101,7 +101,8 @@ struct LiveActivityKitLiveActivity: Widget {
         }
       } compactLeading: {
         HStack(spacing: 5) {
-          LiveActivityKitTheme.symbol(state.imageName, tint: tint, pointSize: 13)
+          // 左 = App 图标（液态玻璃圆角小图）；摄像头右侧 = 圆环进度（compactTrailing）
+          LiveActivityKitTheme.appIcon(size: 18)
           Text(state.status ?? "签到")
             .font(.caption2)
             .monospacedDigit()
@@ -147,7 +148,8 @@ private struct TiebaLiveActivityLockScreenView: View {
     let progress = state.progress.map { LiveActivityKitTheme.clamp($0) }
 
     HStack(alignment: .center, spacing: 12) {
-      LiveActivityKitTheme.symbol(state.imageName, tint: tint, pointSize: 22)
+      // 锁屏卡片左侧 = App 图标（与灵动岛紧凑态左图标一致）
+      LiveActivityKitTheme.appIcon(size: 34)
         .frame(width: 38)
 
       VStack(alignment: .leading, spacing: 5) {
@@ -199,6 +201,24 @@ private struct TiebaLiveActivityLockScreenView: View {
 }
 
 enum LiveActivityKitTheme {
+  /// App 图标（widget bundle 内嵌 AppIcon.png 资源；缺失时回退 SF Symbol）。
+  /// 灵动岛紧凑态左侧 + 锁屏卡片左侧共用，与主屏图标视觉一致。
+  @ViewBuilder
+  static func appIcon(size: CGFloat) -> some View {
+    if let image = UIImage(named: "AppIcon") {
+      Image(uiImage: image)
+        .resizable()
+        .scaledToFit()
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
+    } else {
+      Image(systemName: "checkmark.circle.fill")
+        .font(.system(size: size, weight: .semibold))
+        .foregroundStyle(.blue)
+        .frame(width: size, height: size)
+    }
+  }
+
   @ViewBuilder
   static func symbol(
     _ name: String?,

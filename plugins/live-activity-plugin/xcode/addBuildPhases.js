@@ -56,7 +56,7 @@ const util = __importStar(require("util"));
  * `software-mansion-labs/expo-live-activity` plugin — it is the most fragile
  * step and should not be "simplified".
  */
-function addBuildPhases(xcodeProject, { targetUuid, groupName, productFile, swiftFiles, }) {
+function addBuildPhases(xcodeProject, { targetUuid, groupName, productFile, swiftFiles, widgetName }) {
     const buildPath = `""`;
     const folderType = "app_extension";
     // (1) Sources phase on the extension target.
@@ -74,4 +74,9 @@ function addBuildPhases(xcodeProject, { targetUuid, groupName, productFile, swif
     xcodeProject.addBuildPhase([], "PBXFrameworksBuildPhase", groupName, targetUuid, folderType, buildPath);
     // (4) Resources phase (empty) on the extension target.
     xcodeProject.addBuildPhase([], "PBXResourcesBuildPhase", groupName, targetUuid, folderType, buildPath);
+    // (4b) App icon resource on the extension: the widget's Dynamic Island
+    // leading + lock-screen card loads it via `UIImage(named: "AppIcon")`.
+    // The widget dir sits at `ios/<widgetName>/`; pass the relative path so
+    // the file reference resolves against the project root.
+    xcodeProject.addResourceFile(`${widgetName}/AppIcon.png`, { target: targetUuid });
 }

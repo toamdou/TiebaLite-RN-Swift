@@ -75,6 +75,7 @@ const withWidgetXcodeTarget = (config, { widgetName, bundleIdentifier, deploymen
         groupName,
         productFile,
         swiftFiles: swiftBasenames,
+        widgetName,
     });
     (0, addPbxGroup_1.addPbxGroup)(xcodeProject, {
         targetName: widgetName,
