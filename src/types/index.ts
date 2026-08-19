@@ -229,6 +229,8 @@ export interface MediaInfo {
   type: 'image' | 'video';
   src: string;
   originSrc?: string;
+  /** 更小一档的服务端派生图（srcPic，比 src/bigPic 更省流量；可能缺失） */
+  smallSrc?: string;
   width: number;
   height: number;
   poster?: string;
@@ -569,14 +571,22 @@ export interface AppPreferences {
   useOfficialSign: boolean;
   /** Whether one-click sign progress is shown as an iOS Live Activity. */
   liveActivitySignEnabled: boolean;
+  /** 签到进度显示位置：灵动岛 Live Activity / 通知栏横幅（二选一）。 */
+  signDisplayMode: 'liveActivity' | 'notification';
+  /** 签到静默显示：完成通知不发声、不振动（横幅照常显示）。 */
+  signSilent: boolean;
+  /** 关注吧列表排序：按等级 / 按名称（首页右上角图标切换）。 */
+  forumSortMode: 'level' | 'name';
   homePageShowHistoryForum: boolean;
   /** 关注吧列表布局：true = 一行一个；false = 一行两个 */
   forumListSingle: boolean;
   exploreAutoRefresh: boolean;
   hapticFeedback: boolean;
   /**
-   * 省流量模式：查看器大图不再加载原图（originPic，可数 MB），改用服务端
-   * 中等尺寸图（bigPic ~960px）。off = 原图；on = 省流量（约省 60-80% 流量）。
+   * 大图清晰度（查看器加载哪一档图）：
+   * - origin = 原图（originPic，数 MB，画质最佳）
+   * - high   = 高清（bigPic ~960px，手机屏幕观感几乎无差，省 60-80%）
+   * - lite   = 省流（srcPic 小档，不存在时回落 bigPic，最省流量）
    */
-  dataSaverMode: 'off' | 'on';
+  dataSaverMode: 'origin' | 'high' | 'lite';
 }

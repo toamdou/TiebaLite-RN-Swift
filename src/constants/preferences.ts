@@ -39,11 +39,17 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   failAutoStop: true,
   useOfficialSign: true,
   liveActivitySignEnabled: true,
+  /** 默认在灵动岛显示签到进度（可在设置改为通知栏） */
+  signDisplayMode: 'liveActivity',
+  /** 默认关闭静默签到（完成通知带声音提示） */
+  signSilent: false,
+  /** 默认按等级排序关注吧列表（右上角图标切换为按名称） */
+  forumSortMode: 'level',
   homePageShowHistoryForum: true,
   /** 关注吧列表布局：true = 一行一个；false = 一行两个（Kotlin listSingle 对位） */
   forumListSingle: true,
   exploreAutoRefresh: true,
   hapticFeedback: true,
-  /** 省流量模式：默认关闭（查看器加载原图）；开启后改用服务端中等尺寸图 */
-  dataSaverMode: 'off',
+  /** 大图清晰度：默认 high（bigPic ~960px，省 60-80%）；origin=原图；lite=更省 */
+  dataSaverMode: 'high',
 };
