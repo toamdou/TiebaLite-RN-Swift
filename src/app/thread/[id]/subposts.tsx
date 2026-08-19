@@ -1,12 +1,10 @@
 /**
  * Sub-Posts Page (楼中楼) — Threaded conversation design
  *
- * Design philosophy: between flat list and heavy cards.
- * - No card borders or shadows (too cluttered)
- * - No plain flat list (too boring)
- * - Instead: subtle left accent bar + generous spacing + light hover tint
- * - Typography-driven hierarchy with inline metadata
- * - Smooth fade-in animation for lazy-loaded items
+ * Design: 与帖子回复卡一致的卡片化（卡背景 + 细边框 + 连续圆角），
+ * 头像/昵称/等级徽标在上行、点赞固定在卡片右上角，正文 + 缩略图流畅排列。
+ * 空间紧凑（无独立操作行），与其他帖子浏览界面观感统一。
+ * 平滑淡入动画用于首屏批次的条目。
  */
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -179,12 +177,10 @@ const ReplyItem = React.memo(function ReplyItem({
           delayLongPress={400}
           style={({ pressed }) => [
             s.item,
-            pressed && { backgroundColor: colors.surfaceSecondary },
+            { backgroundColor: pressed ? colors.surfaceSecondary : colors.card },
+            { borderColor: colors.divider },
           ]}
         >
-        {/* Left accent bar */}
-        <View style={[s.accentBar, { backgroundColor: isLz ? colors.primary : colors.separator }]} />
-
         {/* Main content area */}
         <View style={s.itemContent}>
           {/* Row 1: Avatar + Name + Badges */}
@@ -219,13 +215,31 @@ const ReplyItem = React.memo(function ReplyItem({
               </View>
             )}
 
-            <View style={s.spacer} />
-
-            {/* Time + IP inline */}
-            <Text style={[s.meta, { color: colors.textTertiary }]} numberOfLines={1}>
-              {relativeTime(item.createTime)}
-              {item.ipLocation ? ` · ${item.ipLocation}` : ''}
-            </Text>
+            <View style={s.headerRight}>
+              <Text style={[s.meta, { color: colors.textTertiary }]} numberOfLines={1}>
+                {relativeTime(item.createTime)}
+                {item.ipLocation ? ` · ${item.ipLocation}` : ''}
+              </Text>
+              {/* 点赞：右上角（与帖子回复卡一致） */}
+              <Pressable
+                onPress={() => onAgree(item)}
+                style={({ pressed }) => [s.likeBtn, pressed && { opacity: 0.6 }]}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={item.isAgree ? '取消点赞' : '点赞'}
+              >
+                <SymbolView
+                  name={item.isAgree ? 'heart.fill' : 'heart'}
+                  size={15}
+                  tintColor={item.isAgree ? '#FF2D55' : colors.textTertiary}
+                />
+                {(item.agreeNum ?? 0) > 0 && (
+                  <Text style={[s.agreeCount, { color: item.isAgree ? '#FF2D55' : colors.textTertiary }]}>
+                    {formatCount(item.agreeNum ?? 0)}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
           </View>
 
           {/* Row 2: Reply-to reference (if any) */}
@@ -287,29 +301,6 @@ const ReplyItem = React.memo(function ReplyItem({
               )}
             </View>
           )}
-
-          {/* Row 4: Actions (minimal) */}
-          <View style={s.actionsRow}>
-            <Pressable
-              onPress={() => onAgree(item)}
-              style={({ pressed }) => [
-                s.agreeBtn,
-                pressed && { opacity: 0.6 },
-              ]}
-              hitSlop={8}
-            >
-              <SymbolView
-                name={item.isAgree ? 'heart.fill' : 'heart'}
-                size={14}
-                tintColor={item.isAgree ? colors.primary : colors.textTertiary}
-              />
-              {(item.agreeNum ?? 0) > 0 && (
-                <Text style={[s.agreeCount, { color: item.isAgree ? colors.primary : colors.textTertiary }]}>
-                  {formatCount(item.agreeNum ?? 0)}
-                </Text>
-              )}
-            </Pressable>
-          </View>
         </View>
       </Pressable>
       </MenuView>
@@ -752,21 +743,13 @@ const s = StyleSheet.create({
     lineHeight: 22,
   },
 
-  // Item container
+  // Item container — 与帖子回复卡同款处理（卡背景 + 细边框 + 连续圆角）
   item: {
-    flexDirection: 'row',
-    paddingVertical: 9,
-    paddingHorizontal: 4,
-    borderRadius: 10,
-    marginVertical: 1,
-  },
-
-  // Left accent bar — thin, subtle visual anchor
-  accentBar: {
-    width: 3,
-    borderRadius: 1.5,
-    marginRight: 12,
-    alignSelf: 'stretch',
+    borderRadius: Radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    marginVertical: 4,
   },
 
   // Content wrapper
@@ -780,6 +763,19 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginBottom: 4,
+  },
+  // Header 右端：时间 · IP + 点赞（点赞固定右上角）
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginLeft: 'auto',
+  },
+  likeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
   },
   avatarNameRow: {
     flexDirection: 'row',
@@ -862,19 +858,7 @@ const s = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Actions row
-  actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  agreeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-  },
+  // 点赞计数（右上角心形旁）
   agreeCount: {
     fontSize: 12,
     fontWeight: '500',

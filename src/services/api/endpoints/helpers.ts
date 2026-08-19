@@ -124,11 +124,18 @@ export function mapMediaList(raw: any): MediaInfo[] {
       m.originPic ?? m.origin_pic ?? m.originSrc ?? m.origin_src ?? '',
     ));
     if (!src) continue;
+    const smallRaw = String(m.srcPic ?? m.src_pic ?? '');
     result.push({
       type: isVideo ? 'video' : 'image',
       src,
       originSrc:
         toHttpsImgUrl(String(m.originPic ?? m.origin_pic ?? m.originSrc ?? m.origin_src ?? m.bigPic ?? m.big_pic ?? '')) || undefined,
+      // srcPic 是比 bigPic 更小的一档（若服务端提供且与 src 不同），
+      // 供「省流」档使用；与 src 相同/缺失时不重复出现。
+      smallSrc:
+        smallRaw && smallRaw !== String(m.bigPic ?? m.big_pic ?? '')
+          ? toHttpsImgUrl(smallRaw) || undefined
+          : undefined,
       poster:
         String(m.poster ?? m.video_poster ?? m.videoPoster ?? '') ||
         (isVideo ? src : undefined),

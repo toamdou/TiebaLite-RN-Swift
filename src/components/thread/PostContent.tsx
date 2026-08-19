@@ -124,7 +124,7 @@ function ImageSegment({
   dimmed = false,
   style,
 }: {
-  images: { src: string; width: number; height: number; originSrc?: string }[];
+  images: { src: string; width: number; height: number; originSrc?: string; smallSrc?: string }[];
   contentWidth: number;
   watermarkText?: string;
   onPress?: (images: string[], index: number) => void;
@@ -134,7 +134,7 @@ function ImageSegment({
   const { colors } = useThemeColors();
   const count = images.length;
   const imageLoadType = useAppPreference('imageLoadType', 'smart_load');
-  const dataSaverMode = useAppPreference('dataSaverMode', 'off') ?? 'off';
+  const dataSaverMode = useAppPreference('dataSaverMode', 'high') ?? 'high';
   // 多图横向分页当前页（页码点高亮）
   const [pagerPage, setPagerPage] = useState(0);
 
@@ -970,7 +970,7 @@ function PostContent({
     const inlineRuns: TiebaRichTextRun[] = [];
     const blockTips: React.ReactNode[] = [];
     const blockNodes: React.ReactNode[] = [];
-    const extractedImages: { src: string; width: number; height: number; originSrc?: string }[] = [];
+    const extractedImages: { src: string; width: number; height: number; originSrc?: string; smallSrc?: string }[] = [];
     let key = 0;
 
     // BlockTip — matches Kotlin Block.kt BlockTip composable
@@ -1076,6 +1076,7 @@ function PostContent({
             width: segment.width,
             height: segment.height,
             originSrc: segment.originSrc,
+            smallSrc: (segment as any).smallSrc,
           });
           break;
 

@@ -98,7 +98,7 @@ const TweetCard = React.memo(function TweetCard({
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   const hideMedia = useAppPreference('hideMedia');
-  const dataSaverMode = useAppPreference('dataSaverMode', 'off') ?? 'off';
+  const dataSaverMode = useAppPreference('dataSaverMode', 'high') ?? 'high';
 
   // 卡片内容宽度：屏宽 - 列表左右边距 16*2 - 卡片左右 padding 12*2
   const contentWidth = screenWidth - 16 * 2 - 12 * 2;
@@ -293,7 +293,7 @@ const TweetCard = React.memo(function TweetCard({
           {/* 媒体区：单图按宽高比 / 多图分页滑动 / 视频 poster + 播放角标 */}
           {showMedia ? (
             <MediaPager
-              images={images.map((m) => ({ src: m.src, originSrc: m.originSrc || m.src, width: m.width, height: m.height }))}
+              images={images.map((m) => ({ src: m.src, originSrc: m.originSrc || m.src, smallSrc: m.smallSrc, width: m.width, height: m.height }))}
               videoPoster={images.length === 0 ? videoPoster : undefined}
               width={mediaWidth}
               recycleKey={thread.id}
@@ -467,11 +467,12 @@ const MediaPager = React.memo(function MediaPager({
   }, [recycleKey, scrollX]);
 
   // 按首图原始宽高比计算高度（宽度固定）→ 图片完整显示不截断；
-  // 超高（竖长截图）钳制在 MEDIA_HEIGHT_MAX 内，配合 contain 防越界。
+  // firstRatio = h/w，height = width * h/w（16:9 横图不高估）；
+  // 超高（竖长截图/长图）钳制在 MEDIA_HEIGHT_MAX 内，配合 contain 防越界。
   const firstRatio = images.length > 0
     ? (images[0].height > 0 && images[0].width > 0 ? images[0].height / images[0].width : 1)
     : 1;
-  const mediaHeight = Math.round(clamp(width / Math.max(firstRatio, 0.01), MEDIA_HEIGHT_MIN, MEDIA_HEIGHT_MAX));
+  const mediaHeight = Math.round(clamp(width * Math.max(firstRatio, 0.01), MEDIA_HEIGHT_MIN, MEDIA_HEIGHT_MAX));
   const placeholderBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
 
   const onScroll = useAnimatedScrollHandler((e) => {

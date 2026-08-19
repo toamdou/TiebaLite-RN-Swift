@@ -43,20 +43,22 @@ export function thumbnailUrl(url: string, width: number): string {
 }
 
 /**
- * 省流量模式下的查看器图片选择。
- *
- * 贴吧图片分两档：originSrc = 原图（可数 MB，查看器默认加载）；src = 服务端
- * 中等尺寸图（bigPic ~960px，列表/帖内缩略图用）。开启省流量后，查看器大图
- * 改用 src（bigPic），画质在手机屏幕上几乎无感，流量省 60-80%。
+ * 查看器大图清晰度档位（设置项 dataSaverMode）：
+ * - origin：原图（originSrc，可数 MB，画质最佳）
+ * - high：高清（src = 服务端 bigPic ~960px，手机屏幕观感几乎无差）
+ * - lite：省流（smallSrc = srcPic 小档，缺失时回落 bigPic）
+ * 贴吧 CDN 只提供服务端算好的这若干档；viewer 仅做"选哪一档"。
  */
-export type ViewerImageMode = 'off' | 'on';
+export type ViewerImageMode = 'origin' | 'high' | 'lite';
 
 export function pickViewerImages(
-  images: { src?: string; originSrc?: string }[],
+  images: { src?: string; originSrc?: string; smallSrc?: string }[],
   mode: ViewerImageMode,
 ): string[] {
   return images.map((i) => {
-    const preferred = mode === 'on' ? i.src : i.originSrc || i.src;
-    return preferred || i.src || '';
+    if (mode === 'origin') return i.originSrc || i.src || '';
+    if (mode === 'lite') return i.smallSrc || i.src || i.originSrc || '';
+    // high：大图（bigPic）
+    return i.src || i.originSrc || '';
   });
 }

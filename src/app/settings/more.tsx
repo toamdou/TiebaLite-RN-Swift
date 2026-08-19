@@ -152,12 +152,16 @@ export default function MoreSettingsPage() {
             isOn={preferences.imageDarkenWhenNight}
             onIsOnChange={(v) => setPreference('imageDarkenWhenNight', v)}
           />
-          <Toggle
-            label="省流量模式"
-            systemImage="arrow.down.circle.fill"
-            isOn={preferences.dataSaverMode === 'on'}
-            onIsOnChange={(v) => setPreference('dataSaverMode', v ? 'on' : 'off')}
-          />
+          <Picker
+            label="大图清晰度"
+            selection={preferences.dataSaverMode}
+            onSelectionChange={(v: string) => setPreference('dataSaverMode', v as never)}
+            modifiers={[pickerStyle('menu')]}
+          >
+            <Text modifiers={[tag('origin')]}>原图（最清晰，费流量）</Text>
+            <Text modifiers={[tag('high')]}>高清（默认，省流量）</Text>
+            <Text modifiers={[tag('lite')]}>省流（最省流量）</Text>
+          </Picker>
         </Section>
 
         {/* 「默认启动页」偏好暂不生效（启动标签页由原生标签栏记忆上次位置），

@@ -61,7 +61,7 @@ function InlineQuoteContent({
   onImagePress?: (images: string[], index: number) => void;
 }) {
   const router = useRouter();
-  const dataSaverMode = useAppPreference('dataSaverMode', 'off') ?? 'off';
+  const dataSaverMode = useAppPreference('dataSaverMode', 'high') ?? 'high';
   if (!content || content.length === 0) {
     return <Text style={[s.quoteInlineText, { color: colors.textSecondary }]}>[内容已删除]</Text>;
   }
@@ -311,20 +311,29 @@ const PostCard = React.memo(function PostCard({
                 </View>
               </Pressable>
             </Link>
-            {/* Like button (plain heart, no glass — matches Kotlin) */}
-            <Pressable onPress={handleAgreePress} hitSlop={8} style={s.likeBtn}>
-              <SymbolView
-                name={post.isAgree ? 'heart.fill' : 'heart'}
-                size={18}
-                tintColor={post.isAgree ? '#FF2D55' : colors.textTertiary}
-              />
-              {post.agreeNum > 0 && (
-                <Text style={[s.likeCount, { color: post.isAgree ? '#FF2D55' : colors.textTertiary }]}>
-                  {formatCount(post.agreeNum)}
-                </Text>
-              )}
-            </Pressable>
-            {/* "..." menu moved to bottom */}
+            {/* 右侧操作：三点菜单 + 点赞（同行，共占一行，不单独占行） */}
+            <View style={s.authorActions}>
+              <Pressable
+                onPress={handleMorePress}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="更多操作"
+              >
+                <SymbolView name="ellipsis" size={18} weight="bold" tintColor={colors.textTertiary} />
+              </Pressable>
+              <Pressable onPress={handleAgreePress} hitSlop={8} style={s.likeBtn}>
+                <SymbolView
+                  name={post.isAgree ? 'heart.fill' : 'heart'}
+                  size={18}
+                  tintColor={post.isAgree ? '#FF2D55' : colors.textTertiary}
+                />
+                {post.agreeNum > 0 && (
+                  <Text style={[s.likeCount, { color: post.isAgree ? '#FF2D55' : colors.textTertiary }]}>
+                    {formatCount(post.agreeNum)}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
           </View>
         )}
 
@@ -369,20 +378,6 @@ const PostCard = React.memo(function PostCard({
           </Pressable>
         )}
       </Pressable>
-
-      {/* ── Bottom bar: "..." menu (native ActionSheet on tap) ── */}
-      {!immersive && (
-        <View style={[s.bottomBar, { borderTopColor: colors.divider }]}>
-          <Pressable
-            onPress={handleMorePress}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="更多操作"
-          >
-            <SymbolView name="ellipsis" size={18} weight="bold" tintColor={colors.textTertiary} />
-          </Pressable>
-        </View>
-      )}
     </View>
   );
 });
@@ -520,6 +515,14 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
 
+  // 右侧操作组：三点菜单 + 点赞 同行（不单独占行）
+  authorActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginLeft: 8,
+  },
+
   // Like button (top-right, plain heart)
   likeBtn: {
     flexDirection: 'row',
@@ -531,14 +534,5 @@ const s = StyleSheet.create({
   likeCount: {
     fontSize: 12,
     fontWeight: '500',
-  },
-
-  // Bottom bar ("..." menu)
-  bottomBar: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: 12,
-    paddingTop: 8,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
   },
 });

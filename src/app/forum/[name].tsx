@@ -158,16 +158,10 @@ export default function ForumPage() {
     () => (Array.isArray(navTabInfo) ? navTabInfo : (navTabInfo as any)?.tab ?? EMPTY_TABS),
     [navTabInfo],
   );
-  const allSegments = useMemo(
-    () => [
-      ...TAB_SEGMENTS,
-      ...customTabs.map((tab: any, i: number) => ({
-        label: tab.tabName || tab.name || `Tab ${i + 1}`,
-        value: String(3 + i),
-      })),
-    ],
-    [customTabs],
-  );
+  // 板块 Tab（navTabInfo/generalTabList）目前打不开/无数据，先不渲染，
+  // 只保留 iOS 原生液态玻璃 segmented 的三段（热门/最新/精品），
+  // 待板块接口验证可开后再把 customTabs 拼回来（见 customFetcher/customPaged）。
+  const allSegments = TAB_SEGMENTS;
   const customFetcher = useCallback(
     async (page: number, params: { tab: any; fid: string; forumName: string }, signal?: AbortSignal) => {
       if (!params.tab || !params.fid) return { items: [], hasMore: false };
