@@ -48,8 +48,6 @@ import type { SubPostInfo } from '@/types';
 
 const subPostKeyExtractor = (item: SubPostInfo) => item.id;
 
-const SUBPOST_LIST_OVERRIDES = { initialDrawBatchSize: 10 };
-
 /** Extract image URLs from sub-post content (normalized to https) */
 function extractImages(content: SubPostInfo['content']): string[] {
   if (!content) return [];
@@ -662,7 +660,10 @@ export default function SubPostsPage() {
         onEndReachedThreshold={0.5}
         drawDistance={500}
         maxItemsInRecyclePool={24}
-        overrideProps={SUBPOST_LIST_OVERRIDES}
+        // 首屏大批量（pbFloor 一次返回全部楼中楼）：overlay 绘制批越大，
+        // 导航动画中越不容易出现"只挂 1 个 cell、其余留白"。行高真实值
+        // 由 onLayout 校正，不要设 estimatedItemSize（2.3.2 已移除该 prop）。
+        overrideProps={{ initialDrawBatchSize: 16 }}
         ListFooterComponent={renderFooter}
       />
       {/* C4: pbFloor only returns current/total/hasMore (no hasPrev), so
