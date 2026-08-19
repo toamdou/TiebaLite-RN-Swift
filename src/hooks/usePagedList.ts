@@ -82,6 +82,10 @@ export function usePagedList<T, P = undefined, E = any>({
   // loadingMore 经 setState 异步生效，FlashList 同帧二次 onEndReached 时
   // 闭包里的 loadingMore 仍是旧值，导致同页重复发起 run(page, 'more')。
   const loadingMoreRef = useRef(false);
+  // hasMore 同镜像：onEndReached 在贴底时会反复触发，仅靠 state 里的 hasMore
+  // 异步生效，翻到底之后仍会继续发请求（thread 页曾有 8 连发 pb/page 风暴，
+  // 越界页回吐重复楼层把 FlashList 键冲突渲染成全屏灰）。
+  const hasMoreRef = useRef(true);
   const pageRef = useRef(initialPage);
   const paramsRef = useRef(params);
   useEffect(() => {
@@ -120,13 +124,27 @@ export function usePagedList<T, P = undefined, E = any>({
         );
         if (seq !== seqRef.current) return;
         if (mode === 'more') {
-          setItems((prev) => [...prev, ...result.items].slice(-maxItems));
+          setItems((prev) => {
+            // 按 id 去重：越界翻页时服务端会回吐与既有列表重复的楼层，重复
+            // key 会让 FlashList 虚拟化错乱并渲染成全屏灰。无 id 的项不去重。
+            const seen = new Set<string>();
+            const merged = [...prev, ...result.items].filter((it: any) => {
+              const id = it?.id;
+              if (id === undefined || id === null) return true;
+              const key = String(id);
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+            return merged.slice(-maxItems);
+          });
         } else {
           setItems(result.items.slice(0, maxItems));
         }
         setPage(result.nextPage ?? targetPage);
         pageRef.current = result.nextPage ?? targetPage;
         setHasMore(result.hasMore);
+        hasMoreRef.current = result.hasMore;
         setExtra(result.extra ?? null);
       } catch (e: any) {
         if (controller.signal.aborted || seq !== seqRef.current) return;
@@ -158,9 +176,12 @@ export function usePagedList<T, P = undefined, E = any>({
   // 若这里用 page + 1 会双重递增，每次翻页都跳过一页。
   // 同步守卫：loadingMore 经 setState 异步生效，FlashList 快速滚动时同帧
   // 二次 onEndReached 会拿旧闭包再跑一次；用 loadingMoreRef 同步拦截。
+  // hasMore 守卫：已翻到底后（hasMore=false）贴底触发 onEndReached 不应当
+  // 再发请求——否则每个越界页都会回吐重复数据并再次触发 onEndReached，
+  // 形成停不下来的翻页风暴。
   // 同理 page 也走 pageRef，保证两次调用读取同一真实页号。
   const loadMore = useCallback(() => {
-    if (loadingMoreRef.current) return Promise.resolve();
+    if (!hasMoreRef.current || loadingMoreRef.current) return Promise.resolve();
     loadingMoreRef.current = true;
     return run(pageRef.current, 'more');
   }, [run]);
@@ -172,6 +193,7 @@ export function usePagedList<T, P = undefined, E = any>({
     setPage(initialPage);
     pageRef.current = initialPage;
     setHasMore(true);
+    hasMoreRef.current = true;
     setLoading(true);
     setRefreshing(false);
     setLoadingMore(false);

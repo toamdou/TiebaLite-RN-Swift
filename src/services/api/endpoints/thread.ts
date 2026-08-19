@@ -39,12 +39,21 @@ export async function pbPage(
   const posts = rawPosts.length > 0
     ? mapProtoPosts(rawPosts, threadId, data?.userList ?? [])
     : (data?.firstFloorPost ? mapProtoPosts([data.firstFloorPost], threadId, data?.userList ?? []) : []);
+  // hasMore 用 currentPage < totalPage 推导，而非服务端 hasMore 字段（同
+  // pbFloor）：越界 pn 时服务端返回 current 递增 + totalPage 不变，若直信
+  // hasMore 会把"越界页也算还有下一页"，配合 loadMore 守卫层叠失效。
+  const curPage = data?.page?.currentPage ?? page;
+  const totPage = data?.page?.totalPage ?? data?.page?.totalCount ?? 0;
   return {
     // ⚠️ mapProtoThread 的 opts 结构是 { forum }：直接传 forum 对象会读不到
     // forum.avatar/forum.id → 吧头像、吧名、forumId 全空（remote 版引入）。
     thread: mapProtoThread(data?.thread, { forum: data?.forum }),
     posts,
-    page: { current: data?.page?.currentPage ?? page, total: data?.page?.totalPage ?? data?.page?.totalCount ?? 0, hasMore: (data?.page?.hasMore ?? 0) === 1 },
+    page: {
+      current: curPage,
+      total: totPage,
+      hasMore: totPage > 0 ? curPage < totPage : (data?.page?.hasMore ?? 0) === 1,
+    },
   };
 }
 
