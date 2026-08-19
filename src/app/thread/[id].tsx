@@ -83,6 +83,91 @@ const replyKeyExtractor = (item: PostInfo) => item.id;
 
 const PostSeparator = () => <View style={styles.postSep} />;
 
+/**
+ * 吧头像（headerRight）带 App Store 风格 HDR 高光：按下瞬间一道白色
+ * 斜向光带横扫过头像（触觉反馈同步）。导航逻辑不变——仍由外层 Link
+ * 进入吧页。reduceMotion 时直接静态（无扫光动画）。
+ */
+function ForumAvatarWithHdr({
+  forumName,
+  forumAvatar,
+}: {
+  forumName?: string;
+  forumAvatar?: string;
+}) {
+  const { colors } = useThemeColors();
+  const { reduceMotion } = useReducedMotion();
+  const sweepX = useSharedValue(-100);
+  const sweepOpacity = useSharedValue(0);
+  const glassGlow = useSharedValue(0);
+
+  const sweepStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: sweepX.value }, { rotate: '15deg' }],
+    opacity: sweepOpacity.value,
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glassGlow.value,
+  }));
+
+  const triggerSweep = useCallback(() => {
+    hapticForScene('press');
+    if (reduceMotion) return;
+    // 两道效应合成 App Store "液态玻璃" 高光：
+    //  1. 宽斜光带横扫（比旧版更宽、更亮、带渐变感）
+    //  2. 头像整体上浮一层短促的增亮（模拟玻璃受光反射）
+    sweepX.value = -100;
+    sweepOpacity.value = 0.95;
+    glassGlow.value = 0.55;
+    sweepX.value = withTiming(120, { duration: 460, easing: EASE_OUT });
+    sweepOpacity.value = withTiming(0, { duration: 560 });
+    glassGlow.value = withTiming(0, { duration: 620 });
+  }, [reduceMotion, sweepX, sweepOpacity, glassGlow]);
+
+  // 直接导航进入吧（不用 Link asChild —— asChild 注入 onPress 与
+  // onPressIn 的 sweep 手势冲突，会导致点击无响应 / 不导航）。
+  const handlePress = useCallback(() => {
+    router.push({
+      pathname: '/forum/[name]',
+      params: { name: forumName || '' },
+    });
+  }, [forumName]);
+
+  return (
+    <Pressable
+      style={styles.forumAvatarBtn}
+      onPressIn={triggerSweep}
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={`进入${forumName || ''}吧`}
+    >
+      {/* 液态玻璃：顶部受光的高亮弧（icon 玻璃化标志性高光） */}
+      <Reanimated.View
+        pointerEvents="none"
+        style={[
+          styles.forumAvatarGlassTop,
+          { backgroundColor: colors.textOnPrimary },
+          glowStyle,
+        ]}
+      />
+      <Avatar
+        source={forumAvatar || undefined}
+        initials={(forumName || '吧')?.charAt(0)}
+        size={28}
+      />
+      {/* HDR 主高光带：宽斜向白色光条，划过时 0.95 → 0 淡出 */}
+      <Reanimated.View
+        pointerEvents="none"
+        style={[
+          styles.forumAvatarSweep,
+          { backgroundColor: colors.textOnPrimary },
+          sweepStyle,
+        ]}
+      />
+    </Pressable>
+  );
+}
+
 /** 浮动按钮按压反馈：按下缩到 0.88 */
 const pressedScale = ({ pressed }: { pressed: boolean }) => [
   styles.floatingBtn,
@@ -762,22 +847,10 @@ export default function ThreadPage() {
           title: threadTitle,
           headerTransparent: false,
           headerRight: () => (
-            <Link
-              href={{ pathname: '/forum/[name]', params: { name: thread?.forumName || '' } }}
-              push
-              asChild
-            >
-              <Pressable
-                style={styles.forumAvatarBtn}
-                onPressIn={() => hapticForScene('press')}
-              >
-                <Avatar
-                  source={thread?.forumAvatar || undefined}
-                  initials={(thread?.forumName || '吧')?.charAt(0)}
-                  size={28}
-                />
-              </Pressable>
-            </Link>
+            <ForumAvatarWithHdr
+              forumName={thread?.forumName}
+              forumAvatar={thread?.forumAvatar}
+            />
           ),
         }}
       />
@@ -1024,10 +1097,31 @@ const styles = StyleSheet.create({
 
   // ── Forum avatar (header right) ──
   forumAvatarBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     overflow: 'hidden',
+  },
+  /* 液态玻璃顶部受光弧：icon 玻璃化标志性的上缘高光 */
+  forumAvatarGlassTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 9,
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
+    opacity: 0,
+  },
+  /* HDR 主高光带：款斜向白色光条，随 pressIn 横扫过头像 */
+  forumAvatarSweep: {
+    position: 'absolute',
+    top: -14,
+    bottom: -14,
+    width: 14,
+    borderRadius: 7,
   },
 
   // ── Loading skeleton ──

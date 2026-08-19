@@ -44,4 +44,6 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   forumListSingle: true,
   exploreAutoRefresh: true,
   hapticFeedback: true,
+  /** 省流量模式：默认关闭（查看器加载原图）；开启后改用服务端中等尺寸图 */
+  dataSaverMode: 'off',
 };

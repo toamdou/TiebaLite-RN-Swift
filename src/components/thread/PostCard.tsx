@@ -28,7 +28,7 @@ import { useThemeColors } from '@/theme/ThemeContext';
 import { useAppPreference } from '@/hooks/useAppPreference';
 import { Radius } from '@/theme/spacing';
 import { contentToText , relativeTime, formatCount, getLevelColor } from '@/utils';
-import { thumbnailUrl, THUMB_CARD } from '@/utils/thumbnail';
+import { thumbnailUrl, THUMB_CARD, pickViewerImages } from '@/utils/thumbnail';
 import { Avatar } from '@/components/ui/Avatar';
 import PostContent from './PostContent';
 import { openLink } from '@/utils/linkOpener';
@@ -61,6 +61,7 @@ function InlineQuoteContent({
   onImagePress?: (images: string[], index: number) => void;
 }) {
   const router = useRouter();
+  const dataSaverMode = useAppPreference('dataSaverMode', 'off') ?? 'off';
   if (!content || content.length === 0) {
     return <Text style={[s.quoteInlineText, { color: colors.textSecondary }]}>[内容已删除]</Text>;
   }
@@ -162,7 +163,7 @@ function InlineQuoteContent({
                 onPress={(e) => {
                   e.stopPropagation();
                   hapticForScene('press');
-                  const urls = images.map((i) => i.originSrc || i.src || '');
+                  const urls = pickViewerImages(images, dataSaverMode);
                   onImagePress?.(urls, imgIdx);
                 }}
                 style={[

@@ -16,6 +16,7 @@ import {
   type TiebaRes,
 } from './helpers';
 import type { ForumDetail, SignResult } from '@/types';
+
 // Kotlin OfficialTiebaApi.forumGuideFlow: POST /c/f/forum/forumGuide (form-encoded)
 export async function forumGuide(
   sortType: number = 3,

@@ -35,7 +35,7 @@ import { useBlockFilter } from '@/hooks/useBlockFilter';
 import { useAuthStore } from '@/stores/authStore';
 import { saveImageToGallery, shareFile } from '@/services/media';
 import { EMOTICON_NAME_MAP, buildEmoticonSrc } from '@/constants/emoticons';
-import { thumbnailUrl, THUMB_POST } from '@/utils/thumbnail';
+import { thumbnailUrl, THUMB_POST, pickViewerImages } from '@/utils/thumbnail';
 import { Radius } from '@/theme/spacing';
 import type { PostContent as PostContentType, PollOption } from '@/types';
 import { TiebaRichText, type TiebaRichTextRun } from '../../../modules/tieba-native/src/TiebaRichText';
@@ -51,6 +51,10 @@ const IMAGE_RADIUS = Radius.input;
  * 内容宽（≈480pt），超出部分点击进查看器看全图。
  */
 const SINGLE_IMAGE_MAX_HEIGHT = 480;
+/** 多图分页统一显示高度（不再随首图比例伸缩，避免横+竖混排时被撑大） */
+const MULTI_IMAGE_HEIGHT = 300;
+/** 宽高比（h/w）超过该值视为竖长图 → 右下角“长图”徽标（对齐 Kotlin） */
+const LONG_IMAGE_RATIO = 2.4;
 /** Horizontal padding/margins around PostContent in thread detail cards. */
 const CONTENT_HORIZONTAL_INSET = 64;
 
@@ -130,15 +134,28 @@ function ImageSegment({
   const { colors } = useThemeColors();
   const count = images.length;
   const imageLoadType = useAppPreference('imageLoadType', 'smart_load');
+  const dataSaverMode = useAppPreference('dataSaverMode', 'off') ?? 'off';
   // 多图横向分页当前页（页码点高亮）
   const [pagerPage, setPagerPage] = useState(0);
 
-  // 单图 → 全宽按宽高比（高度钳制）；多图分页每页同此尺寸，左右滑动看缩略图
+  // 单图显示尺寸：
+  //  - 非长图（横图/方图/普通竖图）：全宽按宽高比，高度钳制在 SINGLE_IMAGE_MAX_HEIGHT
+  //  - 竖长图：改用固定高度 MULTI_IMAGE_HEIGHT（contain 整图可见），右下角“长图”徽标，
+  //    不再让长图拉满整屏高度；点击进查看器看完整大图。
   const pageDim = (img: { width: number; height: number }) => {
     const aspectRatio = img.width > 0 && img.height > 0 ? img.width / img.height : 1;
+    if (img.height > 0 && img.width > 0 && img.height / img.width > LONG_IMAGE_RATIO) {
+      return { width: contentWidth, height: MULTI_IMAGE_HEIGHT };
+    }
     const height = Math.min(contentWidth / aspectRatio, SINGLE_IMAGE_MAX_HEIGHT);
     return { width: contentWidth, height };
   };
+
+  const isLongImage = (img: { width: number; height: number }) =>
+    img.height > 0 && img.width > 0 && img.height / img.width > LONG_IMAGE_RATIO;
+
+  // 多图分页每页独立高：统一 MULTI_IMAGE_HEIGHT（contain 整图可见）
+  const multiDims = { width: contentWidth, height: MULTI_IMAGE_HEIGHT };
 
   // Limit to 9 images
   const displayImages = images.slice(0, 9);
@@ -196,7 +213,8 @@ function ImageSegment({
   }
 
   // Normal image rendering — smart_origin, smart_load, all_origin
-  // 多图 → 横向分页滑动查看缩略图（无需点开）；单图 → 全宽按宽高比
+  // 多图 → 横向分页滑动查看缩略图（每页统一高度 MULTI_IMAGE_HEIGHT + contain，
+  // 横/竖混排时区域高度稳定不跳动）；单图 → 全宽按宽高比（长图固定高度 + 徽标）
   if (count > 1) {
     return (
       <View style={[styles.imagePagerWrap, style]}>
@@ -212,7 +230,6 @@ function ImageSegment({
           }}
         >
           {displayImages.map((img, idx) => {
-            const dims = pageDim(img);
             const useOriginal = imageLoadType === 'original';
             const imageUri = useOriginal
               ? (img.originSrc || img.src)
@@ -222,7 +239,7 @@ function ImageSegment({
                 key={idx}
                 onPress={() => {
                   hapticForScene('press');
-                  onPress?.(images.map((i) => i.originSrc || i.src), idx);
+                  onPress?.(pickViewerImages(images, dataSaverMode), idx);
                 }}
                 onLongPress={() => {
                   hapticForScene('press');
@@ -231,7 +248,7 @@ function ImageSegment({
                       text: '查看大图',
                       onPress: () => {
                         hapticForScene('press');
-                        onPress?.(images.map((i) => i.originSrc || i.src), idx);
+                        onPress?.(pickViewerImages(images, dataSaverMode), idx);
                       },
                     },
                     {
@@ -244,8 +261,8 @@ function ImageSegment({
                 style={[
                   styles.imageWrapper,
                   {
-                    width: dims.width,
-                    height: dims.height,
+                    width: multiDims.width,
+                    height: multiDims.height,
                     backgroundColor: colors.placeholder,
                   },
                 ]}
@@ -253,10 +270,16 @@ function ImageSegment({
                 <Image
                   cachePolicy="memory-disk" source={{ uri: imageUri }}
                   style={[styles.image, dimmed && { opacity: 0.6 }]}
-                  contentFit="cover"
+                  contentFit="contain"
                   transition={200}
                   recyclingKey={imageUri}
                 />
+                {isLongImage(img) ? (
+                  <View style={styles.longBadge} pointerEvents="none">
+                    <SymbolView name="arrow.down" size={10} tintColor="#FFFFFF" />
+                    <Text style={styles.longBadgeText}>长图</Text>
+                  </View>
+                ) : null}
                 {idx === 8 && remainingCount > 0 && (
                   <View style={styles.imageOverlay}>
                     <Text style={styles.imageOverlayText}>
@@ -268,18 +291,11 @@ function ImageSegment({
             );
           })}
         </ScrollView>
-        {/* 页码点：当前页高亮加宽 */}
-        <View style={styles.pagerDots} pointerEvents="none">
-          {displayImages.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.pagerDot,
-                i === pagerPage && styles.pagerDotActive,
-                { backgroundColor: i === pagerPage ? colors.primary : colors.textTertiary },
-              ]}
-            />
-          ))}
+        {/* 页码胶囊：右下角显示 “当前/总数” */}
+        <View style={styles.pageBadge} pointerEvents="none">
+          <Text style={styles.pageBadgeText}>
+            {Math.min(Math.max(pagerPage + 1, 1), displayImages.length)}/{displayImages.length}
+          </Text>
         </View>
       </View>
     );
@@ -292,6 +308,7 @@ function ImageSegment({
   const singleUri = useOriginalSingle
     ? (single.originSrc || single.src)
     : thumbnailUrl(single.src, THUMB_POST);
+  const singleIsLong = isLongImage(single);
   return (
     <Pressable
       style={[
@@ -305,7 +322,7 @@ function ImageSegment({
       ]}
       onPress={() => {
         hapticForScene('press');
-        onPress?.(images.map((i) => i.originSrc || i.src), 0);
+        onPress?.(pickViewerImages(images, dataSaverMode), 0);
       }}
       onLongPress={() => {
         hapticForScene('press');
@@ -314,7 +331,7 @@ function ImageSegment({
             text: '查看大图',
             onPress: () => {
               hapticForScene('press');
-              onPress?.(images.map((i) => i.originSrc || i.src), 0);
+              onPress?.(pickViewerImages(images, dataSaverMode), 0);
             },
           },
           {
@@ -328,10 +345,16 @@ function ImageSegment({
       <Image
         cachePolicy="memory-disk" source={{ uri: singleUri }}
         style={[styles.image, dimmed && { opacity: 0.6 }]}
-        contentFit="cover"
+        contentFit={singleIsLong ? 'contain' : 'cover'}
         transition={200}
         recyclingKey={singleUri}
       />
+      {singleIsLong ? (
+        <View style={styles.longBadge} pointerEvents="none">
+          <SymbolView name="arrow.down" size={10} tintColor="#FFFFFF" />
+          <Text style={styles.longBadgeText}>长图</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -1268,36 +1291,52 @@ const styles = StyleSheet.create({
     gap: IMAGE_GAP,
   },
   imageBlockSpaced: {
-    marginTop: 10,
+    marginTop: 14,
   },
   imageGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: IMAGE_GAP,
   },
-  // 多图横向分页：整块圆角裁切，页码点叠在底部
+  // 多图横向分页：整块圆角裁切，页码胶囊叠在右下角
   imagePagerWrap: {
     borderRadius: IMAGE_RADIUS,
     overflow: 'hidden',
     position: 'relative',
   },
-  pagerDots: {
+  /* 长图徽标：右下角深色胶囊（对齐 Kotlin 长图右下角标识） */
+  longBadge: {
     position: 'absolute',
+    right: 8,
     bottom: 8,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
-  pagerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  longBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
   },
-  pagerDotActive: {
-    width: 16,
+  /* 页码胶囊：右下角 "n/m" 指示发图总数 */
+  pageBadge: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  pageBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
   },
   imageWrapper: {
     borderRadius: IMAGE_RADIUS,

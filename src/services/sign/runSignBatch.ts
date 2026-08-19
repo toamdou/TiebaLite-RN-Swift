@@ -136,7 +136,7 @@ export async function runSignBatch(options: RunSignBatchOptions): Promise<RunSig
       remaining = unsigned.filter((f) => !handledIds.has(f.forumId));
       await emitProgress();
       if (liveActivity && liveActivityId) {
-        await liveActivity.update(liveActivityId, snapshot());
+        void liveActivity.update(liveActivityId, snapshot()).catch(() => {});
       }
       if (shouldCancel?.()) {
         cancelled = true;
@@ -181,10 +181,12 @@ export async function runSignBatch(options: RunSignBatchOptions): Promise<RunSig
 
     const done = successCount + failCount;
     if (progressNotif && progressNotifId && done % NOTIFICATION_UPDATE_EVERY === 0) {
-      await progressNotif.update(progressNotifId, done, totalCount);
+      // 不阻塞签到循环：通知/ActivityKit IPC 在模拟器上可能耗时数秒，
+      // await 会把整个串行签到拖慢一个数量级（后台签到不能影响签到本身）。
+      void progressNotif.update(progressNotifId, done, totalCount).catch(() => {});
     }
     if (liveActivity && liveActivityId && done % LIVE_ACTIVITY_UPDATE_EVERY === 0) {
-      await liveActivity.update(liveActivityId, snapshot(forum.forumName));
+      void liveActivity.update(liveActivityId, snapshot(forum.forumName)).catch(() => {});
     }
 
     if (failAutoStop && !signedToday(result)) break;

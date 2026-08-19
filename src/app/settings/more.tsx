@@ -152,6 +152,12 @@ export default function MoreSettingsPage() {
             isOn={preferences.imageDarkenWhenNight}
             onIsOnChange={(v) => setPreference('imageDarkenWhenNight', v)}
           />
+          <Toggle
+            label="省流量模式"
+            systemImage="arrow.down.circle.fill"
+            isOn={preferences.dataSaverMode === 'on'}
+            onIsOnChange={(v) => setPreference('dataSaverMode', v ? 'on' : 'off')}
+          />
         </Section>
 
         {/* 「默认启动页」偏好暂不生效（启动标签页由原生标签栏记忆上次位置），

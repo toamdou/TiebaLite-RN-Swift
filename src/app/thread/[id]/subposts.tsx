@@ -755,10 +755,10 @@ const s = StyleSheet.create({
   // Item container
   item: {
     flexDirection: 'row',
-    paddingVertical: 14,
+    paddingVertical: 9,
     paddingHorizontal: 4,
     borderRadius: 10,
-    marginVertical: 2,
+    marginVertical: 1,
   },
 
   // Left accent bar — thin, subtle visual anchor
@@ -779,7 +779,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   avatarNameRow: {
     flexDirection: 'row',
@@ -825,7 +825,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   replyChipText: {
     fontSize: 12,
@@ -836,14 +836,14 @@ const s = StyleSheet.create({
   content: {
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   // Image thumbnails
   imageRow: {
     flexDirection: 'row',
     gap: 6,
-    marginBottom: 8,
+    marginBottom: 6,
     flexWrap: 'wrap',
   },
   thumbImage: {

@@ -816,7 +816,7 @@ export default function ForumPage() {
         </View>
 
         {/* ── Tab Bar — SwiftUI Segmented Picker (对齐 Kotlin ScrollableTabRow) ── */}
-        <ThemedHost style={styles.segmentedHost}>
+        <ThemedHost matchContents style={{ alignSelf: 'center', marginBottom: Spacing.sm }}>
           <Picker
             selection={String(currentTab)}
             onSelectionChange={handleSegmentChange as any}
@@ -1179,13 +1179,6 @@ const styles = StyleSheet.create({
   levelSection: { marginTop: 14 },
   levelTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
   levelFill: { height: 4, borderRadius: 2 },
-
-  // ── Segmented Picker (SwiftUI) ──
-  segmentedHost: {
-    height: 36,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
-  },
 
   // ── 最新 tab 排序切换行 ──
   sortRow: {

@@ -41,3 +41,22 @@ export function thumbnailUrl(url: string, width: number): string {
     ? url.replace(/^http:\/\//i, 'https://').replace(/^\/\//, 'https://')
     : url;
 }
+
+/**
+ * 省流量模式下的查看器图片选择。
+ *
+ * 贴吧图片分两档：originSrc = 原图（可数 MB，查看器默认加载）；src = 服务端
+ * 中等尺寸图（bigPic ~960px，列表/帖内缩略图用）。开启省流量后，查看器大图
+ * 改用 src（bigPic），画质在手机屏幕上几乎无感，流量省 60-80%。
+ */
+export type ViewerImageMode = 'off' | 'on';
+
+export function pickViewerImages(
+  images: { src?: string; originSrc?: string }[],
+  mode: ViewerImageMode,
+): string[] {
+  return images.map((i) => {
+    const preferred = mode === 'on' ? i.src : i.originSrc || i.src;
+    return preferred || i.src || '';
+  });
+}

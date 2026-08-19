@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/immutability -- Reanimated shared values are mutable refs; React Compiler cannot model them. */
 /**
  * TweetCard — 推特（X）风格信息流卡片
  *
@@ -36,9 +35,7 @@ import Animated, {
   useAnimatedScrollHandler,
   withSpring,
   withSequence,
-  interpolate,
   clamp,
-  type SharedValue,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -51,7 +48,7 @@ import { Radius, Shadows } from '@/theme/spacing';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useAppPreference } from '@/hooks/useAppPreference';
 import { formatCount, relativeTime } from '@/utils';
-import { thumbnailUrl, THUMB_POST } from '@/utils/thumbnail';
+import { thumbnailUrl, THUMB_POST, pickViewerImages } from '@/utils/thumbnail';
 import type { ThreadInfo } from '@/types';
 
 // ── 设计常量（推特 timeline 规格） ──
@@ -101,6 +98,7 @@ const TweetCard = React.memo(function TweetCard({
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   const hideMedia = useAppPreference('hideMedia');
+  const dataSaverMode = useAppPreference('dataSaverMode', 'off') ?? 'off';
 
   // 卡片内容宽度：屏宽 - 列表左右边距 16*2 - 卡片左右 padding 12*2
   const contentWidth = screenWidth - 16 * 2 - 12 * 2;
@@ -126,7 +124,6 @@ const TweetCard = React.memo(function TweetCard({
   const [expanded, setExpanded] = useState(false);
   const [truncatable, setTruncatable] = useState(false);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- FlashList 回收复用：换帖时重置展开态
     setExpanded(false);
     setTruncatable(false);
   }, [thread.id]);
@@ -160,9 +157,9 @@ const TweetCard = React.memo(function TweetCard({
         return;
       }
       hapticForScene('press');
-      onImagePress(images.map((m) => m.originSrc || m.src), index);
+      onImagePress(pickViewerImages(images, dataSaverMode), index);
     },
-    [onImagePress, images, handleCardPress],
+    [onImagePress, images, handleCardPress, dataSaverMode],
   );
 
   // ── 操作栏 ──
@@ -437,9 +434,10 @@ interface PagerImage {
   height: number;
 }
 
-const DOT_IDLE = 6;
-const DOT_ACTIVE = 16;
-const DOT_HEIGHT = 4;
+/** 多图分页统一显示高度（不再随首图比例伸缩，避免横+竖混排时被撑大） */
+const MULTI_MEDIA_HEIGHT = 260;
+/** 宽高比（h/w）超过该值视为竖长图 → 右下角“长图”徽标（对齐 Kotlin） */
+const LONG_IMAGE_RATIO = 2.4;
 
 const MediaPager = React.memo(function MediaPager({
   images,
@@ -459,11 +457,11 @@ const MediaPager = React.memo(function MediaPager({
   const { isDark } = useThemeColors();
   const scrollRef = useRef<any>(null);
   const scrollX = useSharedValue(0);
-  const pageRef = useRef(0);
+  const [pageIndex, setPageIndex] = useState(0);
 
   // FlashList 回收复用：换帖时重置分页偏移
   useEffect(() => {
-    pageRef.current = 0;
+    setPageIndex(0);
     scrollX.value = 0;
     scrollRef.current?.scrollTo?.({ x: 0, animated: false });
   }, [recycleKey, scrollX]);
@@ -482,7 +480,7 @@ const MediaPager = React.memo(function MediaPager({
 
   const handleMomentumEnd = useCallback((e: any) => {
     const w = width || 1;
-    pageRef.current = Math.round(e.nativeEvent.contentOffset.x / w);
+    setPageIndex(Math.round(e.nativeEvent.contentOffset.x / w));
   }, [width]);
 
   // ── 单图 / 视频 poster ──
@@ -491,6 +489,8 @@ const MediaPager = React.memo(function MediaPager({
     if (!uri) return null;
     const thumb = thumbnailUrl(uri, THUMB_POST);
     const isVideo = !images[0] && !!videoPoster;
+    const img0 = images[0];
+    const isLong = !!img0 && img0.height > 0 && img0.width > 0 && img0.height / img0.width > LONG_IMAGE_RATIO;
     return (
       <View style={[styles.mediaWrap, { width, height: mediaHeight, backgroundColor: placeholderBg }]}>
         <Pressable
@@ -513,14 +513,23 @@ const MediaPager = React.memo(function MediaPager({
               <SymbolView name="play.fill" size={20} tintColor="#FFFFFF" />
             </View>
           ) : null}
+          {!isVideo && isLong ? (
+            <View style={styles.longBadge} pointerEvents="none">
+              <SymbolView name="arrow.down" size={10} tintColor="#FFFFFF" />
+              <Text style={styles.longBadgeText}>长图</Text>
+            </View>
+          ) : null}
         </Pressable>
       </View>
     );
   }
 
   // ── 多图分页 ──
+  // 横+竖图混排时统一用固定显示高度（MULTI_MEDIA_HEIGHT）+ contain：
+  // 每张图在框内完整显示（竖图缩小、横图不撑爆），区域高度稳定不跳动。
+  const multiHeight = MULTI_MEDIA_HEIGHT;
   return (
-    <View style={[styles.mediaWrap, { width, height: mediaHeight, backgroundColor: placeholderBg }]}>
+    <View style={[styles.mediaWrap, { width, height: multiHeight, backgroundColor: placeholderBg }]}>
       <Animated.ScrollView
         ref={scrollRef as any}
         horizontal
@@ -533,47 +542,45 @@ const MediaPager = React.memo(function MediaPager({
       >
         {images.map((img, i) => {
           const thumb = thumbnailUrl(img.src, THUMB_POST);
+          const isLong = img.height > 0 && img.width > 0 && img.height / img.width > LONG_IMAGE_RATIO;
           return (
-            <Pressable
-              key={`${recycleKey}-${i}`}
-              onPress={() => onImagePress(i)}
-              onPressIn={stopPropagation}
-              onPressOut={stopPropagation}
-              accessibilityRole="imagebutton"
-              accessibilityLabel={`第${i + 1}张图片`}
-            >
-              <Image
-                source={{ uri: thumb }}
-                style={{ width, height: mediaHeight }}
-                contentFit="contain"
-                cachePolicy="memory-disk"
-                transition={200}
-                recyclingKey={thumb}
-              />
-            </Pressable>
+            <View key={`${recycleKey}-${i}`} style={{ width, height: multiHeight }}>
+              <Pressable
+                onPress={() => onImagePress(i)}
+                onPressIn={stopPropagation}
+                onPressOut={stopPropagation}
+                accessibilityRole="imagebutton"
+                accessibilityLabel={`第${i + 1}张图片`}
+                style={{ width, height: multiHeight, justifyContent: 'center', alignItems: 'center' }}
+              >
+                <Image
+                  source={{ uri: thumb }}
+                  style={{ width, height: multiHeight }}
+                  contentFit="contain"
+                  cachePolicy="memory-disk"
+                  transition={200}
+                  recyclingKey={thumb}
+                />
+                {isLong ? (
+                  <View style={styles.longBadge} pointerEvents="none">
+                    <SymbolView name="arrow.down" size={10} tintColor="#FFFFFF" />
+                    <Text style={styles.longBadgeText}>长图</Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            </View>
           );
         })}
       </Animated.ScrollView>
-      {/* 页码点：当前页加宽胶囊，随滚动插值过渡（UI 线程） */}
-      <View style={styles.dotsRow} pointerEvents="none">
-        {images.map((_, i) => {
-          return <PagerDot key={i} index={i} pageWidth={width} scrollX={scrollX} />;
-        })}
+      {/* 页码胶囊：右下角显示 “当前/总数”（替代圆点，直观显示发了几张图） */}
+      <View style={styles.pageBadge} pointerEvents="none">
+        <Text style={styles.pageBadgeText}>
+          {Math.min(Math.max(pageIndex + 1, 1), images.length)}/{images.length}
+        </Text>
       </View>
     </View>
   );
 });
-
-function PagerDot({ index, pageWidth, scrollX }: { index: number; pageWidth: number; scrollX: SharedValue<number> }) {
-  const dotStyle = useAnimatedStyle(() => {
-    const progress = scrollX.value / (pageWidth || 1);
-    const d = Math.abs(progress - index);
-    const w = interpolate(clamp(d, 0, 1), [0, 1], [DOT_ACTIVE, DOT_IDLE]);
-    const opacity = interpolate(clamp(d, 0, 1), [0, 1], [1, 0.45]);
-    return { width: w, opacity };
-  });
-  return <Animated.View style={[styles.dot, dotStyle]} />;
-}
 
 // ────────────────────────────────────────────────────────────
 // Styles
@@ -674,21 +681,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dotsRow: {
+  /* 长图徽标：右下角深色胶囊（对齐 Kotlin 长图右下角标识） */
+  longBadge: {
     position: 'absolute',
+    right: 8,
     bottom: 8,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
-  dot: {
-    width: DOT_IDLE,
-    height: DOT_HEIGHT,
-    borderRadius: DOT_HEIGHT / 2,
-    backgroundColor: 'rgba(255,255,255,0.92)',
+  longBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  /* 页码胶囊：右下角 "n/m" 指示发图总数 */
+  pageBadge: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  pageBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
   },
 
   // ── 引用帖（转发） ──

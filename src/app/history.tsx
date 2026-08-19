@@ -14,6 +14,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, Link } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from '@/components/ui/SymbolView';
@@ -177,7 +178,7 @@ export default function HistoryPage() {
         ? `/thread/${item.threadId}`
         : `/forum/${encodeURIComponent(item.forumName || '')}`;
       return (
-        <View style={[styles.historyCard, { backgroundColor: colors.card }]}>
+        <View style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.divider }]}>
           <Link href={href as any} push asChild>
             <Pressable
               style={({ pressed }) => [
@@ -190,21 +191,39 @@ export default function HistoryPage() {
               accessibilityRole="button"
               accessibilityLabel={`${isThread ? '贴子' : '贴吧'}：${item.title || item.forumName || '未知'}，${timeStr}`}
             >
-              <View style={[styles.itemIcon, { backgroundColor: isThread ? colors.primary + '1A' : colors.accent + '1A' }]}>
-                <SymbolView
-                  name={isThread ? 'doc.text.fill' : 'rectangle.3.group.fill'}
-                  size={20}
-                  weight="medium"
-                  tintColor={isThread ? colors.primary : colors.accent}
+              {/* 吧/帖缩略图：吧用真实头像；帖子用带底色的图标块 */}
+              {!isThread && item.avatar ? (
+                <Image
+                  source={{ uri: item.avatar }}
+                  style={[styles.itemAvatar, { backgroundColor: colors.surfaceSecondary }]}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={150}
                 />
-              </View>
+              ) : (
+                <View style={[styles.itemIcon, { backgroundColor: isThread ? colors.primary + '1A' : colors.accent + '1A' }]}>
+                  <SymbolView
+                    name={isThread ? 'doc.text.fill' : 'rectangle.3.group.fill'}
+                    size={20}
+                    weight="medium"
+                    tintColor={isThread ? colors.primary : colors.accent}
+                  />
+                </View>
+              )}
               <View style={styles.itemInfo}>
                 <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={2}>
                   {item.title || item.forumName || '未知'}
                 </Text>
-                <Text style={[styles.itemTime, { color: colors.textTertiary }]}>
-                  {timeStr}
-                </Text>
+                <View style={styles.itemMetaRow}>
+                  {item.forumName && isThread ? (
+                    <Text style={[styles.itemForum, { color: colors.textLink }]} numberOfLines={1}>
+                      {item.forumName}
+                    </Text>
+                  ) : null}
+                  <Text style={[styles.itemTime, { color: colors.textTertiary }]} numberOfLines={1}>
+                    {timeStr}
+                  </Text>
+                </View>
               </View>
             </Pressable>
           </Link>
@@ -373,6 +392,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: Radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   historyBody: {
     flex: 1,
@@ -393,14 +413,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemIcon: {
-    width: 38,
-    height: 38,
+    width: 42,
+    height: 42,
     borderRadius: Radius.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  itemInfo: { flex: 1, gap: 3 },
+  itemAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: Radius.chip,
+  },
+  itemInfo: { flex: 1, gap: 4 },
   itemTitle: typographyStyles.subheadBold,
+  itemMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  itemForum: {
+    ...typographyStyles.caption1,
+    flexShrink: 1,
+  },
   itemTime: typographyStyles.caption1,
   historySeparator: { height: Spacing.sm },
 });

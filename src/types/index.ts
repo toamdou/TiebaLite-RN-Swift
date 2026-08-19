@@ -574,4 +574,9 @@ export interface AppPreferences {
   forumListSingle: boolean;
   exploreAutoRefresh: boolean;
   hapticFeedback: boolean;
+  /**
+   * 省流量模式：查看器大图不再加载原图（originPic，可数 MB），改用服务端
+   * 中等尺寸图（bigPic ~960px）。off = 原图；on = 省流量（约省 60-80% 流量）。
+   */
+  dataSaverMode: 'off' | 'on';
 }
