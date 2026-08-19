@@ -109,7 +109,9 @@ export async function startSignLiveActivity(
   snapshot: Omit<SignLiveActivitySnapshot, 'phase'>,
 ): Promise<string | null> {
   if (!isLiveActivityAvailable()) return null;
-  if (!usePreferencesStore.getState().preferences.liveActivitySignEnabled) return null;
+  const prefs = usePreferencesStore.getState().preferences;
+  // 显示位置设置：选通知栏时不再创建 Live Activity（二选一）。
+  if (!prefs.liveActivitySignEnabled || prefs.signDisplayMode === 'notification') return null;
   try {
     const activityId = await TiebaNative.startLiveActivity({
       name: ACTIVITY_NAME,

@@ -17,6 +17,7 @@ import {
   DatePicker,
   Form,
   HStack,
+  Picker,
   ProgressView,
   RNHostView,
   Section,
@@ -30,7 +31,9 @@ import {
   disabled,
   font,
   foregroundStyle,
+  pickerStyle,
   progressViewStyle,
+  tag,
   tint,
 } from '@expo/ui/swift-ui/modifiers';
 import { Stack } from 'expo-router';
@@ -87,7 +90,8 @@ export default function OKSignSettingsPage() {
   const slowSignMode = usePreferencesStore((s) => s.preferences.slowSignMode);
   const failAutoStop = usePreferencesStore((s) => s.preferences.failAutoStop);
   const useOfficialSign = usePreferencesStore((s) => s.preferences.useOfficialSign);
-  const liveActivitySignEnabled = usePreferencesStore((s) => s.preferences.liveActivitySignEnabled);
+  const signDisplayMode = usePreferencesStore((s) => s.preferences.signDisplayMode);
+  const signSilent = usePreferencesStore((s) => s.preferences.signSilent);
   const setPreference = usePreferencesStore((s) => s.setPreference);
 
   const [isScheduled, setIsScheduled] = useState(false);
@@ -164,13 +168,21 @@ export default function OKSignSettingsPage() {
     [setPreference],
   );
 
-  const handleLiveActivityToggle = useCallback(
-    (value: boolean) => {
+  const handleDisplayModeChange = useCallback(
+    (value: string) => {
       hapticForScene('toggle');
-      setPreference('liveActivitySignEnabled', value);
-      if (!value) {
+      setPreference('signDisplayMode', value === 'notification' ? 'notification' : 'liveActivity');
+      if (value === 'notification') {
         recoverStaleSignLiveActivities().catch(() => {});
       }
+    },
+    [setPreference],
+  );
+
+  const handleSilentToggle = useCallback(
+    (value: boolean) => {
+      hapticForScene('toggle');
+      setPreference('signSilent', value);
     },
     [setPreference],
   );
@@ -306,15 +318,32 @@ export default function OKSignSettingsPage() {
           </Section>
         )}
 
-        <Section title="实时活动">
-          <Toggle isOn={liveActivitySignEnabled} onIsOnChange={handleLiveActivityToggle}>
-            <Text>在灵动岛显示签到进度</Text>
-            <Text>关闭后签到过程不会创建实时活动</Text>
+        <Section title="进度显示">
+          <Picker
+            label="签到进度显示位置"
+            selection={signDisplayMode}
+            onSelectionChange={handleDisplayModeChange}
+            modifiers={[pickerStyle('menu')]}
+          >
+            <Text modifiers={[tag('liveActivity')]}>灵动岛</Text>
+            <Text modifiers={[tag('notification')]}>通知栏</Text>
+          </Picker>
+          <Text
+            modifiers={[
+              font({ textStyle: 'caption' }),
+              foregroundStyle({ type: 'hierarchical', style: 'secondary' }),
+            ]}
+          >
+            选择在灵动岛还是通知栏显示签到进度
+          </Text>
+          <Toggle isOn={signSilent} onIsOnChange={handleSilentToggle}>
+            <Text>静默显示</Text>
+            <Text>签到完成通知不发声，横幅照常显示</Text>
           </Toggle>
           <RNHostView matchContents>
             <LiveActivityPreview
               active={previewActive}
-              enabled={liveActivitySignEnabled}
+              enabled={signDisplayMode === 'liveActivity'}
               done={previewDone}
               total={previewTotal}
               currentForumName={previewForum}

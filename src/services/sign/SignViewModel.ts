@@ -8,6 +8,7 @@ import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import { hapticNotify, NotificationFeedbackType } from '@/utils/haptics';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { useAuthStore } from '@/stores/authStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { ensureNotificationPermissionAsync } from '@/services/NotificationPoller';
 import { setTbsSync } from '@/services/storage/AuthSQLiteStorage';
 import { syncBackgroundSnapshot } from '@/services/nativeBackground';
@@ -169,6 +170,12 @@ export function createSignViewModel(): UseBoundStore<StoreApi<SignState>> {
           setTbsSync(tbs, account.uid);
           syncBackgroundSnapshot();
 
+          // 显示位置二选一（设置项）：灵动岛 Live Activity / 通知栏横幅。
+          const prefs = usePreferencesStore.getState().preferences;
+          const useIsland = prefs.signDisplayMode !== 'notification' && prefs.liveActivitySignEnabled;
+          const useBanner = prefs.signDisplayMode === 'notification';
+          const silent = prefs.signSilent ?? false;
+
           const result = await runSignBatch({
             tbs,
             isBackground: false,
@@ -184,77 +191,81 @@ export function createSignViewModel(): UseBoundStore<StoreApi<SignState>> {
                 progressList: snapshot.progressList,
               });
             },
-            progressNotif: {
-              start: async (total) => {
-                const notifId = `sign-progress-${Date.now()}`;
-                if (await ensureNotificationPermissionAsync(false)) {
-                  try {
-                    await Notifications.scheduleNotificationAsync({
-                      identifier: notifId,
-                      content: {
-                        title: '正在签到',
-                        body: `0 / ${total} 个吧`,
-                        sound: undefined,
-                        badge: 0,
-                        interruptionLevel: 'passive',
-                        data: { type: 'sign_progress' },
-                      },
-                      trigger: null,
-                    });
-                    set({ _notifId: notifId });
-                    return notifId;
-                  } catch {}
-                }
-                return null;
-              },
-              update: async (notifId, done, total) => {
-                if (!notifId) return;
-                if (!(await ensureNotificationPermissionAsync(false))) return;
-                try {
-                  await Notifications.dismissNotificationAsync(notifId);
-                  await Notifications.scheduleNotificationAsync({
-                    identifier: notifId,
-                    content: {
-                      title: '正在签到',
-                      body: `${done} / ${total} 个吧`,
-                      sound: undefined,
-                      badge: 0,
-                      interruptionLevel: 'passive',
-                      data: { type: 'sign_progress' },
-                    },
-                    trigger: null,
-                  });
-                } catch {}
-              },
-            },
-            liveActivity: {
-              start: async (total) => {
-                const id = await startSignLiveActivity({
-                  done: 0,
-                  total,
-                  currentForumName: '',
-                  success: 0,
-                  fail: 0,
-                  exp: 0,
-                });
-                set({ _liveActivityId: id });
-                return id;
-              },
-              update: async (id, snapshot) => {
-                await updateSignLiveActivity(
-                  id,
-                  {
-                    done: snapshot.successCount + snapshot.failCount,
-                    total: snapshot.totalCount,
-                    currentForumName: snapshot.currentForumName,
-                    success: snapshot.successCount,
-                    fail: snapshot.failCount,
-                    exp: snapshot.totalExp,
+            progressNotif: useBanner
+              ? {
+                  start: async (total) => {
+                    const notifId = `sign-progress-${Date.now()}`;
+                    if (await ensureNotificationPermissionAsync(false)) {
+                      try {
+                        await Notifications.scheduleNotificationAsync({
+                          identifier: notifId,
+                          content: {
+                            title: '正在签到',
+                            body: `0 / ${total} 个吧`,
+                            sound: undefined,
+                            badge: 0,
+                            interruptionLevel: silent ? 'passive' : 'active',
+                            data: { type: 'sign_progress' },
+                          },
+                          trigger: null,
+                        });
+                        set({ _notifId: notifId });
+                        return notifId;
+                      } catch {}
+                    }
+                    return null;
                   },
-                  false,
-                );
-              },
-            },
+                  update: async (notifId, done, total) => {
+                    if (!notifId) return;
+                    if (!(await ensureNotificationPermissionAsync(false))) return;
+                    try {
+                      await Notifications.dismissNotificationAsync(notifId);
+                      await Notifications.scheduleNotificationAsync({
+                        identifier: notifId,
+                        content: {
+                          title: '正在签到',
+                          body: `${done} / ${total} 个吧`,
+                          sound: undefined,
+                          badge: 0,
+                          interruptionLevel: silent ? 'passive' : 'active',
+                          data: { type: 'sign_progress' },
+                        },
+                        trigger: null,
+                      });
+                    } catch {}
+                  },
+                }
+              : undefined,
+            liveActivity: useIsland
+              ? {
+                  start: async (total) => {
+                    const id = await startSignLiveActivity({
+                      done: 0,
+                      total,
+                      currentForumName: '',
+                      success: 0,
+                      fail: 0,
+                      exp: 0,
+                    });
+                    set({ _liveActivityId: id });
+                    return id;
+                  },
+                  update: async (id, snapshot) => {
+                    await updateSignLiveActivity(
+                      id,
+                      {
+                        done: snapshot.successCount + snapshot.failCount,
+                        total: snapshot.totalCount,
+                        currentForumName: snapshot.currentForumName,
+                        success: snapshot.successCount,
+                        fail: snapshot.failCount,
+                        exp: snapshot.totalExp,
+                      },
+                      false,
+                    );
+                  },
+                }
+              : undefined,
           });
 
           if (result.allAlreadySigned) {
@@ -263,7 +274,8 @@ export function createSignViewModel(): UseBoundStore<StoreApi<SignState>> {
                 content: {
                   title: '一键签到',
                   body: '今天所有吧都已签到过了',
-                  sound: 'default',
+                  sound: usePreferencesStore.getState().preferences.signSilent ? undefined : 'default',
+                  interruptionLevel: usePreferencesStore.getState().preferences.signSilent ? 'passive' : 'active',
                 },
                 trigger: null,
               });

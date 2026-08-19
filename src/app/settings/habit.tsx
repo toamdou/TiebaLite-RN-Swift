@@ -40,6 +40,12 @@ export default function HabitSettingsPage() {
             isOn={preferences.homePageShowHistoryForum}
             onIsOnChange={(v) => handlePrefChange('homePageShowHistoryForum', v)}
           />
+          <Toggle
+            label="关注吧列表单列"
+            systemImage="list.bullet"
+            isOn={preferences.forumListSingle}
+            onIsOnChange={(v) => handlePrefChange('forumListSingle', v)}
+          />
         </Section>
 
         <Section title="浏览">

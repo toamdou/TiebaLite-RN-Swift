@@ -27,28 +27,29 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlassView } from 'expo-glass-effect';
 import { hapticForScene } from '@/theme/hapticsMap';
 import { useThemeColors } from '@/theme/ThemeContext';
 import { useAuthStore } from '@/stores/authStore';
 import { useForumStore } from '@/stores/forumStore';
 import { useSignStore } from '@/stores/signStore';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useAppPreference } from '@/hooks/useAppPreference';
 import { getVisitHistory, toForumHistoryItem, type ForumHistoryItem } from '@/services/storage/visitHistory';
 import { formatCount, getLevelColor } from '@/utils';
 import { SymbolView } from '@/components/ui/SymbolView';
 import { Avatar } from '@/components/ui/Avatar';
+import { GlassView } from '@/components/ui/GlassView';
 import { ThemedHost } from '@/components/ui/ThemedHost';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { PressScale } from '@/components/ui/PressScale';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { DURATION, EASE_OUT, PRESS_ENTER, Radius, Spacing } from '@/theme';
+import { DURATION, EASE_OUT, Radius, Spacing } from '@/theme';
 import { typographyStyles } from '@/theme/typography';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { ForumInfo } from '@/types';
@@ -100,30 +101,8 @@ const EntranceRow = memo(function EntranceRow({
 
 /**
  * 按压反馈：进入用 PRESS_ENTER 弹簧缩放（0.97），释放回 1。
- * 替代原先 opacity-only 的按压态（index/notifications 同步统一）。
+ * 共享实现见 @/components/ui/PressScale（index/notifications/…… 统一）。
  */
-function PressScale({ onPress, children }: { onPress?: () => void; children: React.ReactNode }) {
-  const { reduceMotion } = useReducedMotion();
-  const scale = useSharedValue(1);
-
-  const pressIn = useCallback(() => {
-    if (reduceMotion) return;
-    scale.value = withSpring(0.97, PRESS_ENTER);
-  }, [reduceMotion, scale]);
-
-  const pressOut = useCallback(() => {
-    if (reduceMotion) return;
-    scale.value = withSpring(1, PRESS_ENTER);
-  }, [reduceMotion, scale]);
-
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return (
-    <Animated.View style={animatedStyle}>
-      <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut}>{children}</Pressable>
-    </Animated.View>
-  );
-}
-
 const FORUM_MENU_ACTIONS: MenuAction[] = [
   {
     id: 'unfollow',
@@ -137,6 +116,14 @@ export default function HomeScreen() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const isLoading = useAuthStore((s) => s.isLoading);
   const router = useRouter();
+
+  // 未登录时一键签到同样可见：点击后提示先登录（登录后跳转登录页）
+  const handleSignRequireLogin = useCallback(() => {
+    Alert.alert('提示', '签到需要先登录百度账号', [
+      { text: '去登录', onPress: () => router.push('/login') },
+      { text: '取消', style: 'cancel' },
+    ]);
+  }, [router]);
 
   if (isLoading) {
     return (
@@ -155,11 +142,13 @@ export default function HomeScreen() {
     return (
       <ThemedHost style={{ flex: 1 }}>
         <VStack spacing={0}>
-          <HStack spacing={0} modifiers={[padding({ horizontal: Spacing.lg })]}>
-            <RNHostView>
-              <SearchBarPill onPress={() => router.push('/search' as any)} />
-            </RNHostView>
-          </HStack>
+          {/* 顶部操作条：搜索栏 + 签到图标按钮（未登录也可点，点击提示登录） */}
+          <HomeTopActions
+            isSigning={false}
+            onSignPress={handleSignRequireLogin}
+            sortMode="level"
+            onSortPress={() => {}}
+          />
 
           <Spacer />
           <ContentUnavailableView
@@ -182,11 +171,106 @@ export default function HomeScreen() {
   return <LoggedInHome />;
 }
 
+// ── 首页顶部操作条：搜索栏（左）+ 一键签到 / 排序切换 图标按钮（右） ──
+// 排序切换（按等级 ⇄ 按名称）在右上角；单列/双列布局入口已移入设置页。
+function HomeTopActions({
+  isSigning,
+  onSignPress,
+  sortMode,
+  onSortPress,
+}: {
+  isSigning: boolean;
+  onSignPress: () => void;
+  sortMode: 'level' | 'name';
+  onSortPress: () => void;
+}) {
+  const { colors, isDark } = useThemeColors();
+  const router = useRouter();
+
+  const tint = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.10)';
+  const border = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(120,120,128,0.45)';
+
+  return (
+    /* 整条顶栏放进单个 RNHostView 的 RN 行：RN 的 flex:1 才让搜索胶囊真正铺满、
+       按钮贴右（RNHostView 在 SwiftUI HStack 里拿不到弹性宽度会把胶囊塌缩成固有宽） */
+    <RNHostView>
+      <View style={styles.topRow}>
+        <View style={{ flex: 1 }}>
+          <SearchBarPill onPress={() => router.push('/search' as any)} />
+        </View>
+
+        {/* 一键签到：纯图标（无文字），点击直接开始签到（Kotlin 同款无确认弹窗） */}
+        <TopIconButton
+          theme={isDark ? 'dark' : 'light'}
+          tint={tint}
+          border={border}
+          onPress={onSignPress}
+          symbol={isSigning ? 'checkmark.seal.fill' : 'checkmark.seal'}
+          symbolTint={isSigning ? colors.primary : colors.text}
+        />
+
+        {/* 排序切换：按等级（arrow.up.arrow.down 等级徽章） ⇄ 按名称（character 排序） */}
+        <TopIconButton
+          theme={isDark ? 'dark' : 'light'}
+          tint={tint}
+          border={border}
+          onPress={onSortPress}
+          symbol={sortMode === 'level' ? 'arrow.up.arrow.down' : 'textformat.abc'}
+          symbolTint={colors.text}
+        />
+      </View>
+    </RNHostView>
+  );
+}
+
+/** 顶部 34pt 图标按钮：下单玻璃胶囊 + 可见描边（浅色白底也看得出轮廓） */
+function TopIconButton({
+  theme,
+  tint,
+  border,
+  symbol,
+  symbolTint,
+  onPress,
+}: {
+  theme: 'light' | 'dark';
+  tint: string;
+  border: string;
+  symbol: string;
+  symbolTint: string;
+  onPress: () => void;
+}) {
+  return (
+    <GlassView
+      borderRadius={17}
+      glassEffectStyle="clear"
+      theme={theme}
+      tintColor={tint}
+      style={styles.topIconBtn}
+    >
+      <Pressable onPress={onPress} style={styles.topIconBtnInner}>
+        <SymbolView name={symbol} size={17} tintColor={symbolTint} />
+      </Pressable>
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            borderRadius: 17,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: border,
+          },
+        ]}
+      />
+    </GlassView>
+  );
+}
+
 // ── 已登录首页 ──
 function LoggedInHome() {
   const { colors } = useThemeColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const followedForums = useForumStore((s) => s.followedForums);
   const isLoadingForums = useForumStore((s) => s.isLoadingForums);
   const loadFollowedForums = useForumStore((s) => s.loadFollowedForums);
@@ -194,6 +278,9 @@ function LoggedInHome() {
   const startSign = useSignStore((s) => s.startSign);
   const isSigning = useSignStore((s) => s.isSigning);
   const showHistoryForum = useAppPreference('homePageShowHistoryForum', false);
+  const forumListSingle = useAppPreference('forumListSingle', true);
+  const forumSortMode = useAppPreference('forumSortMode', 'level') ?? 'level';
+  const setPreference = usePreferencesStore((s) => s.setPreference);
 
   const [searchQuery] = useState('');
   const [recentForums, setRecentForums] = useState<ForumHistoryItem[]>([]);
@@ -212,6 +299,23 @@ function LoggedInHome() {
     const q = searchQuery.trim().toLowerCase();
     return followedForums.filter((f) => f.forumName.toLowerCase().includes(q));
   }, [followedForums, searchQuery]);
+
+  // 排序：按等级（高→低，未关注等级为 0 排最后）或按名称（中文拼音序）。
+  // 右上角图标一键切换（Kotlin 关注列表排序语义）。
+  const sortedForums = useMemo(() => {
+    const list = [...filteredForums];
+    if (forumSortMode === 'name') {
+      list.sort((a, b) => a.forumName.localeCompare(b.forumName, 'zh-Hans-CN'));
+    } else {
+      list.sort((a, b) => (b.levelId ?? 0) - (a.levelId ?? 0));
+    }
+    return list;
+  }, [filteredForums, forumSortMode]);
+
+  const toggleSortMode = useCallback(() => {
+    hapticForScene('toggle');
+    setPreference('forumSortMode', forumSortMode === 'level' ? 'name' : 'level');
+  }, [forumSortMode, setPreference]);
 
   const handleLoadFollowedForums = useCallback(async () => {
     try {
@@ -243,9 +347,23 @@ function LoggedInHome() {
   }, [handleLoadFollowedForums]);
 
   const handleSign = useCallback(() => {
+    if (!isLoggedIn) {
+      Alert.alert('提示', '签到需要先登录百度账号', [
+        { text: '去登录', onPress: () => router.push('/login') },
+        { text: '取消', style: 'cancel' },
+      ]);
+      return;
+    }
+    // 点击即开始（Kotlin 同款无确认弹窗）：仅对“未签到”的吧执行；
+    // 全部已签到时直接提示。
+    const unsigned = followedForums.filter((f) => !f.isSign).length;
+    if (unsigned === 0) {
+      Alert.alert('提示', '今天所有关注的吧都已签到过了');
+      return;
+    }
     hapticForScene('action-success');
     startSign();
-  }, [startSign]);
+  }, [isLoggedIn, followedForums, router, startSign]);
 
   const handleForumPress = useCallback((forum: ForumInfo) => {
     hapticForScene('press');
@@ -285,7 +403,7 @@ function LoggedInHome() {
     ({ item, index }: { item: ForumInfo; index: number }) => (
       <EntranceRow index={index} animateEntry={!entranceDoneRef.current}>
         <MenuView
-          style={styles.forumMenu}
+          style={forumListSingle ? styles.forumMenu : styles.forumMenuGrid}
           actions={FORUM_MENU_ACTIONS}
           shouldOpenOnLongPress
           onPressAction={(event) => {
@@ -296,37 +414,43 @@ function LoggedInHome() {
         >
           <PressScale onPress={() => handleForumPress(item)}>
             <View
-              style={[styles.forumRow, { backgroundColor: colors.card }]}
+              style={[
+                forumListSingle ? styles.forumRow : styles.forumCardGrid,
+                { backgroundColor: colors.card },
+              ]}
             >
               <Avatar
                 source={item.avatar || undefined}
                 initials={(item.forumName || '吧')?.charAt(0)}
-                size={38}
+                size={forumListSingle ? 38 : 42}
               />
               <View style={styles.forumRowText}>
                 <RNText style={[styles.forumRowName, { color: colors.text }]} numberOfLines={1}>
                   {item.forumName}吧
                 </RNText>
                 {item.memberCount > 0 && (
-                  <RNText style={[styles.forumRowMeta, { color: colors.textTertiary }]}>
+                  <RNText style={[styles.forumRowMeta, { color: colors.textTertiary }]} numberOfLines={1}>
                     {formatCount(item.memberCount)} 关注
                   </RNText>
                 )}
               </View>
-              <View style={styles.forumRowBadge}>
+              {/* 等级胶囊（Kotlin 样式）：chip 底 + Lv.X + 已签对勾（同色 12dp 圆角勾） */}
+              <View style={[styles.levelCapsule, { backgroundColor: colors.surfaceSecondary }]}>
                 {item.levelId > 0 && (
                   <RNText style={[styles.forumRowLevel, { color: getLevelColor(item.levelId) }]}>
                     Lv.{item.levelId}
                   </RNText>
                 )}
-                {item.isSign && <SymbolView name="checkmark.circle.fill" size={14} tintColor={colors.success} />}
+                {item.isSign && (
+                  <SymbolView name="checkmark" size={10} weight="bold" tintColor={getLevelColor(item.levelId)} />
+                )}
               </View>
             </View>
           </PressScale>
         </MenuView>
       </EntranceRow>
     ),
-    [colors, handleForumPress, handleUnfollowConfirm],
+    [colors, handleForumPress, handleUnfollowConfirm, forumListSingle],
   );
 
   return (
@@ -336,21 +460,13 @@ function LoggedInHome() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
     <ThemedHost style={{ flex: 1 }}>
     <VStack spacing={0}>
-        {/* §5.7: 搜索栏 (flex-1) + 一键签到 同一行，签到按钮在右上 */}
-        <HStack spacing={10} modifiers={[padding({ horizontal: Spacing.lg, top: Spacing.sm })]}>
-          <RNHostView>
-            <SearchBarPill onPress={() => router.push('/search' as any)} />
-          </RNHostView>
-          <Button
-            onPress={handleSign}
-            modifiers={[buttonStyle('glass'), buttonBorderShape('capsule')]}
-          >
-            <Label
-              title={isSigning ? '签到中...' : '一键签到'}
-              systemImage={isSigning ? 'checkmark.circle.fill' : 'checkmark.circle'}
-            />
-          </Button>
-        </HStack>
+        {/* 顶部操作条：搜索栏 + 一键签到 / 排序切换 图标按钮（同一行，按钮在右顶端） */}
+        <HomeTopActions
+          isSigning={isSigning}
+          onSignPress={handleSign}
+          sortMode={forumSortMode}
+          onSortPress={toggleSortMode}
+        />
 
         {/* 最近访问 */}
         {showHistoryForum && recentForums.length > 0 && (
@@ -421,8 +537,10 @@ function LoggedInHome() {
           <RNHostView>
             <View style={{ flex: 1, width: '100%' }}>
               <FlashList
-                data={filteredForums}
+                key={forumListSingle ? 'forum-list-single' : 'forum-list-grid'}
+                data={sortedForums}
                 keyExtractor={forumKeyExtractor}
+                numColumns={forumListSingle ? 1 : 2}
                 renderItem={renderForumItem}
                 contentContainerStyle={styles.forumListContent}
                 refreshControl={
@@ -479,13 +597,28 @@ function SearchBarPill({ onPress }: { onPress: () => void }) {
           />
         </Pressable>
 
-        {/* Center: Glass Search Pill */}
+        {/* Center: Glass Search Pill —— 用应用内 GlassView（带 glassTokens 描边/高光，
+            静态降级时也保持玻璃质感，避免 expo-glass-effect raw 组件的纯白降级） */}
         <Pressable onPress={onPress} style={({ pressed }) => [searchStyles.pill, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
-          {/* 默认 glassEffectStyle（regular 磨砂）与全局 GlassView 质感统一，
-              不再叠加 clear 液态玻璃 + 手写 rgba 底 */}
           <GlassView
             style={StyleSheet.absoluteFill}
-            colorScheme={isDark ? 'dark' : 'light'}
+            borderRadius={18}
+            glassEffectStyle="clear"
+            theme={isDark ? 'dark' : 'light'}
+            tintColor={isDark ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.10)'}
+          />
+          {/* 可见描边：浅色白底上液态玻璃需要一条浅灰边才有轮廓，
+              glassTokens 浅色 border 是白色，白对白不可见 → 这里显式覆盖 */}
+          <View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                borderRadius: 18,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(120,120,128,0.45)',
+              },
+            ]}
           />
           <View style={searchStyles.pillInner}>
             <SymbolView name="magnifyingglass" size={15} tintColor={colors.textTertiary} style={{ marginRight: Spacing.sm }} />
@@ -506,6 +639,28 @@ const styles = StyleSheet.create({
   forumMenu: {
     flex: 1,
   },
+  forumMenuGrid: {
+    flex: 1,
+  },
+  /* 顶部图标按钮：34pt 胶囊玻璃钮（签到 / 布局切换），无文字 */
+  topIconBtn: {
+    width: 34,
+    height: 34,
+  },
+  topIconBtnInner: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /* 首页顶部条：RN 行，搜索胶囊 flex:1 铺满、图标按钮贴右 */
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+  },
   forumSkeleton: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
@@ -525,10 +680,32 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     marginBottom: Spacing.sm,
   },
+  /* 双列（一行两个）卡片：略小的内边距以适配窄卡。
+     列间间隙用 marginHorizontal（FlashList numColumns 不支持 columnWrapperStyle） */
+  forumCardGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: Radius.card,
+    paddingHorizontal: 10,
+    paddingVertical: Spacing.sm + 2,
+    marginHorizontal: Spacing.xs / 2,
+    marginBottom: Spacing.xs,
+  },
   forumRowText: { flex: 1, gap: 2 },
   forumRowName: { ...typographyStyles.subheadBold },
   forumRowMeta: { ...typographyStyles.caption1 },
-  forumRowBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  /* 等级胶囊（Kotlin ForumItemContent 对位）：chip 底色圆角盒，
+     Lv.X + 已签对勾（对勾与 Lv 文字同色、12dp 圆角勾） */
+  levelCapsule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
   forumRowLevel: { ...typographyStyles.caption1Bold },
 });
 

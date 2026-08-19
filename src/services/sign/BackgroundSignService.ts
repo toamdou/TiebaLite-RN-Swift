@@ -26,12 +26,16 @@ export async function sendSignCompleteNotification(
       ? `成功签到 ${successCount} 个吧，失败 ${failCount} 个，获得 ${totalExp} 经验`
       : `成功签到 ${successCount} 个吧，获得 ${totalExp} 经验`;
 
+  // 静默模式：完成通知不发声（iOS 横幅照常显示，仅静音）。
+  const silent = (await getPreferences()).signSilent ?? false;
+
   await Notifications.scheduleNotificationAsync({
     content: {
       title: '一键签到完成',
       body,
-      sound: 'default',
+      sound: silent ? undefined : 'default',
       badge: 0,
+      interruptionLevel: silent ? 'passive' : 'active',
       data: { type: 'sign_complete' },
     },
     trigger: null,
